@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/Resource">
+        <file>ico/Weixin_IDI_ICON1.ico</file>
+        <file>Image/Login/avatar.jpg</file>
+    </qresource>
+</RCC>
