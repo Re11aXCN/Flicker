@@ -1,5 +1,19 @@
-﻿#ifndef FKILLOGINWIDGET_H
-#define FKILLOGINWIDGET_H
+﻿/*************************************************************************************
+ *
+ * @ Filename	 : FKLoginWidget.h
+ * @ Description : 
+ * 
+ * @ Version	 : V1.0
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/15
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
+*************************************************************************************/
+#ifndef FK_LOGINWIDGET_H_
+#define FK_LOGINWIDGET_H_
 #include <NXWidget.h>
 #include <NXLineEdit.h>
 #include <NXPushButton.h>
@@ -26,12 +40,12 @@ private:
 	void _initForgetPasswordPage();
 	void _initRegistryCallback();
 	// private slots
-	void _handleResponseRegisterSevice(QString&& response, Http::RequestId requestId, Http::RequestErrorCode errorCode);
+	void _handleResponseRegisterSevice(const QString& response, Http::RequestId requestId, Http::RequestErrorCode errorCode);
 	
 	// utils
 	void _showMessage(const QString& title, const QString& text, NXMessageBarType::MessageMode mode, NXMessageBarType::PositionPolicy position, int displayMsec = 2000);
 	
-	QMap<Http::RequestId, std::function<void(const QJsonObject&)>> _registerRequestMap;
+	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _registerRequestHashMap;
 	
 	NXMessageButton* _pMessageButton{ nullptr };
 
@@ -57,4 +71,4 @@ private:
 };
 
 
-#endif // !FKILLOGINWIDGET_H
+#endif // !FK_LOGINWIDGET_H_

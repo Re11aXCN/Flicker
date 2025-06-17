@@ -1,5 +1,19 @@
-﻿#ifndef FKDEF_H
-#define FKDEF_H
+﻿/*************************************************************************************
+ *
+ * @ Filename	 : FKDef.h
+ * @ Description : 
+ * 
+ * @ Version	 : V1.0
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/17
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
+*************************************************************************************/
+#ifndef FK_DEF_H_
+#define FK_DEF_H_
 #include <NXDef.h>
 
 namespace LoginSide {
@@ -25,4 +39,5 @@ namespace Http {
 		NETWORK_ERROR,
 	};
 }
-#endif // !FKDEF_H
+
+#endif // !FK_DEF_H_

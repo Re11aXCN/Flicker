@@ -51,6 +51,9 @@
     <ClInclude Include="Global\FKUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Global\FKMarco.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource\ico\Flicker.rc">

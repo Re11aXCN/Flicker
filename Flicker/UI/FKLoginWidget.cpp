@@ -1,4 +1,18 @@
-﻿#include "FKLoginWidget.h"
+﻿/*************************************************************************************
+ *
+ * @ Filename	 : FKLoginWidget.cpp
+ * @ Description : 
+ * 
+ * @ Version	 : V1.0
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/15
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
+*************************************************************************************/
+#include "FKLoginWidget.h"
 #include <NXIcon.h>
 #include <QStackedWidget>
 #include <QJsonDocument>
@@ -10,7 +24,7 @@ FKLoginWidget::FKLoginWidget(QWidget *parent)
 {
 	_initUi();
 
-	QObject::connect(FKHttpManager::getInstance(), &FKHttpManager::registerServiceFinished, this, &FKLoginWidget::_handleResponseRegisterSevice);
+	QObject::connect(FKHttpManager::getInstance().get(), &FKHttpManager::registerServiceFinished, this, &FKLoginWidget::_handleResponseRegisterSevice);
 }
 
 FKLoginWidget::~FKLoginWidget()
@@ -232,7 +246,7 @@ void FKLoginWidget::_initForgetPasswordPage()
 
 void FKLoginWidget::_initRegistryCallback()
 {
-	_registerRequestMap.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
+	_registerRequestHashMap.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
 		if (jsonObj["error"].toInt() != Http::RequestErrorCode::SUCCESS) {
 			this->_showMessage("ERROR", "注册表单错误，请填写！", NXMessageBarType::Error, NXMessageBarType::Bottom);
 			return;
@@ -243,7 +257,7 @@ void FKLoginWidget::_initRegistryCallback()
 		});
 }
 
-void FKLoginWidget::_handleResponseRegisterSevice(QString&& response, Http::RequestId requestId, Http::RequestErrorCode errorCode)
+void FKLoginWidget::_handleResponseRegisterSevice(const QString& response, Http::RequestId requestId, Http::RequestErrorCode errorCode)
 {
 	if (errorCode != Http::RequestErrorCode::SUCCESS) {
 		this->_showMessage("ERROR", "网络请求错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
