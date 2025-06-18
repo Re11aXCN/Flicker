@@ -14,18 +14,21 @@
 *************************************************************************************/
 #ifndef FK_DEF_H_
 #define FK_DEF_H_
-#include <NXDef.h>
 
 namespace LoginSide {
 	enum OperationType {
-		Login = 0x0001,
-		Register = 0x0002,
-		ForgetPassword = 0x0003,
-		QrCodeLogin = 0x0004
+		Login = 0x0000,
+		Register = 0x0001,
+		ForgetPassword = 0x0002,
+		QrCodeLogin = 0x0003
 	};
 };
 
 namespace Http {
+	enum class RequestType {
+		GET,
+		POST
+	};
 	enum RequestId {
 		ID_GET_VARIFY_CODE = 1001,
 		ID_REGISTER_USER = 1002,
@@ -34,9 +37,10 @@ namespace Http {
 		REGISTER_SERVICE,
 	};
 	enum RequestErrorCode {
-		SUCCESS,
-		PARSER_JSON_ERROR,
-		NETWORK_ERROR,
+		SUCCESS				= 0,
+		PARSER_JSON_ERROR	= 4001,
+		NETWORK_ERROR		= 4002,
+		RPC_ERROR			= 4003,
 	};
 }
 

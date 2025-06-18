@@ -23,7 +23,7 @@ FKHttpManager::FKHttpManager(QObject* parent /*= nullptr*/)
 
 }
 
-void FKHttpManager::_postHttpRequest(const QString& url, const QJsonObject& json, Http::RequestId requestId, Http::RequestSeviceType serviceType)
+void FKHttpManager::postHttpRequest(const QString& url, const QJsonObject& json, Http::RequestId requestId, Http::RequestSeviceType serviceType)
 {
 	QByteArray data = QJsonDocument(json).toJson();
 	QNetworkRequest request(url);
@@ -35,24 +35,13 @@ void FKHttpManager::_postHttpRequest(const QString& url, const QJsonObject& json
 	QObject::connect(reply, &QNetworkReply::finished, [=, self = shared_from_this()]() {
 		if (reply->error() != QNetworkReply::NoError) {
 			qDebug() << reply->errorString();
-			self->_handleHttpRequestFinished(QString{}, requestId, serviceType, Http::RequestErrorCode::NETWORK_ERROR);
+			Q_EMIT self->httpRequestFinished(QString{}, requestId, serviceType, Http::RequestErrorCode::NETWORK_ERROR);
 			reply->deleteLater();
 			return;
 		}
 		QString responseData = reply->readAll();
-		self->_handleHttpRequestFinished(responseData, requestId, serviceType, Http::RequestErrorCode::SUCCESS);
+		Q_EMIT self->httpRequestFinished(responseData, requestId, serviceType, Http::RequestErrorCode::SUCCESS);
 		reply->deleteLater();
 		return;
 		});
-}
-
-
-void FKHttpManager::_handleHttpRequestFinished(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestErrorCode errorCode)
-{
-	switch (serviceType) {
-	case Http::REGISTER_SERVICE:
-		Q_EMIT registerServiceFinished(response, requestId, errorCode);
-	default:
-		break;
-	}
 }

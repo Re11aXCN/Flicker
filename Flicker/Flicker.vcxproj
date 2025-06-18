@@ -159,6 +159,7 @@
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Global\FKUtils.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Source\FKHttpManager.cpp" />
     <ClCompile Include="UI\FKLoginWidget.cpp" />

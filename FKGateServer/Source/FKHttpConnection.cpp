@@ -13,8 +13,10 @@
  * ======================================
 *************************************************************************************/
 #include "FKHttpConnection.h"
-#include "FKLogicSystem.h"
 #include <print>
+
+#include "FKLogicSystem.h"
+#include "FKUtils.h"
 FKHttpConnection::FKHttpConnection(boost::asio::ip::tcp::socket socket)
 	: _pSocket(std::move(socket))
 	, _pBuffer{ 8192 }
@@ -78,21 +80,31 @@ void FKHttpConnection::_handleRequest()
 	// 设置为短链接
 	_pRequest.keep_alive(false);
 
-	if (_pRequest.method() == boost::beast::http::verb::get)
+	bool success = false;
+	switch (_pRequest.method())
 	{
-		bool success = FKLogicSystem::getInstance()->handleGetRequest(_pRequest.target(), shared_from_this());
-	
-		if (!success) {
-			_pResponse.result(boost::beast::http::status::not_found);
-			_pResponse.set(boost::beast::http::field::content_type, "text/plain");
-			boost::beast::ostream(_pResponse.body()) << "url not found\r\n";
-			_writeResponse();
-			return;
-		}
+	case boost::beast::http::verb::get: {
+		_pQueryParams = FKUtils::parse_query_params(_pRequest.target(), _pUrl);
+		success = FKLogicSystem::getInstance()->callBack(_pUrl, Http::RequestType::GET, shared_from_this());
+		break;
+	}		  
+	case boost::beast::http::verb::post: {
+		success = FKLogicSystem::getInstance()->callBack(_pRequest.target(), Http::RequestType::POST, shared_from_this());
+		break;
+	}
+	default:
+		break;
+	}
 
-		_pResponse.result(boost::beast::http::status::ok);
-		_pResponse.set(boost::beast::http::field::server, "GateServer");
+	if (!success) {
+		_pResponse.result(boost::beast::http::status::not_found);
+		_pResponse.set(boost::beast::http::field::content_type, "text/plain");
+		boost::beast::ostream(_pResponse.body()) << "url not found\r\n";
 		_writeResponse();
 		return;
 	}
+
+	_pResponse.result(boost::beast::http::status::ok);
+	_pResponse.set(boost::beast::http::field::server, "GateServer");
+	_writeResponse();
 }

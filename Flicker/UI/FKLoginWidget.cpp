@@ -23,8 +23,11 @@ FKLoginWidget::FKLoginWidget(QWidget *parent)
     : NXWidget(parent)
 {
 	_initUi();
-
-	QObject::connect(FKHttpManager::getInstance().get(), &FKHttpManager::registerServiceFinished, this, &FKLoginWidget::_handleResponseRegisterSevice);
+	_initRegistryCallback();
+	QObject::connect(FKHttpManager::getInstance().get(), &FKHttpManager::httpRequestFinished, this, &FKLoginWidget::_handleServerResponse);
+	QObject::connect(_pLoginSwitchToRegisterPageButton, &NXText::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Register); });
+	QObject::connect(_pRegisterCancelButton, &NXPushButton::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Login); });
+	QObject::connect(_pRegisterGetVerifyCodeButton, &NXPushButton::clicked, this, &FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked);
 }
 
 FKLoginWidget::~FKLoginWidget()
@@ -61,9 +64,6 @@ void FKLoginWidget::_initUi()
 	mainLayout->setContentsMargins(0, 0, 0, 0);
 	mainLayout->setSpacing(0);
 	mainLayout->addWidget(_pStackedWidget);
-
-	QObject::connect(_pLoginSwitchToRegisterPageButton, &NXText::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Register); });
-	QObject::connect(_pRegisterCancelButton, &NXPushButton::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Login); });
 }
 
 /**
@@ -257,7 +257,17 @@ void FKLoginWidget::_initRegistryCallback()
 		});
 }
 
-void FKLoginWidget::_handleResponseRegisterSevice(const QString& response, Http::RequestId requestId, Http::RequestErrorCode errorCode)
+void FKLoginWidget::_showMessage(const QString& title, const QString& text, NXMessageBarType::MessageMode mode, NXMessageBarType::PositionPolicy position, int displayMsec)
+{
+	_pMessageButton->setBarTitle(title);
+	_pMessageButton->setBarText(text);
+	_pMessageButton->setMessageMode(mode);
+	_pMessageButton->setPositionPolicy(position);
+	_pMessageButton->setDisplayMsec(displayMsec);
+	Q_EMIT _pMessageButton->showMessage();
+}
+
+void FKLoginWidget::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestErrorCode errorCode)
 {
 	if (errorCode != Http::RequestErrorCode::SUCCESS) {
 		this->_showMessage("ERROR", "网络请求错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
@@ -271,14 +281,27 @@ void FKLoginWidget::_handleResponseRegisterSevice(const QString& response, Http:
 	}
 
 	QJsonObject jsonObject = jsonDoc.object();
+
+	switch (serviceType) {
+	case Http::RequestSeviceType::REGISTER_SERVICE:
+		_registerRequestHashMap[requestId](jsonObject);
+	default:
+		break;
+	}
 }
 
-void FKLoginWidget::_showMessage(const QString& title, const QString& text, NXMessageBarType::MessageMode mode, NXMessageBarType::PositionPolicy position, int displayMsec)
+void FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked()
 {
-	_pMessageButton->setBarTitle(title);
-	_pMessageButton->setBarText(text);
-	_pMessageButton->setMessageMode(mode);
-	_pMessageButton->setPositionPolicy(position);
-	_pMessageButton->setDisplayMsec(displayMsec);
-	Q_EMIT _pMessageButton->showMessage();
+	QString email = _pRegisterEmailLineEdit->text().trimmed();
+	QRegularExpression emailRegex(R"(^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
+	if (!emailRegex.match(email).hasMatch()) {
+		this->_showMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	QJsonObject requestObj;
+	requestObj["email"] = email;
+	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varifycode",
+		requestObj,
+		Http::RequestId::ID_GET_VARIFY_CODE,
+		Http::RequestSeviceType::REGISTER_SERVICE);
 }

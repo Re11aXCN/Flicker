@@ -29,6 +29,7 @@
 #include <boost/asio.hpp>
 
 #include "FKMarco.h"
+#include "FKDef.h"
 
 class FKHttpConnection;
 class FKLogicSystem {
@@ -37,10 +38,12 @@ class FKLogicSystem {
 public:
 
 	~FKLogicSystem() = default;
-	bool handleGetRequest(const std::string & url, std::shared_ptr<FKHttpConnection> connection);
+	// 外部调用
+	bool callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection);
+	// 内部注册业务回调
+	void registerCallback(const std::string& url, Http::RequestType requestType, MessageHandler handler);
 private:
 	FKLogicSystem();
-
 	std::unordered_map<std::string, MessageHandler> _pPostRequestCallBacks;
 	std::unordered_map<std::string, MessageHandler> _pGetRequestCallBacks;
 

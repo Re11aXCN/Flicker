@@ -1,7 +1,8 @@
 ﻿/*************************************************************************************
  *
  * @ Filename	 : FKHttpConnection.h
- * @ Description : 
+ * @ Description : 建立和 Flicker客户端 的链接 将HTTP请求(如GET/POST等)转发给LogicSystem处理，
+ *				   并将处理结果发送给 Flicker客户端
  * 
  * @ Version	 : V1.0
  * @ Author		 : Re11a
@@ -24,14 +25,15 @@
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
 
-#include "FKMarco.h"
 class FKHttpConnection : public std::enable_shared_from_this<FKHttpConnection>
 {
 public:
 	explicit FKHttpConnection(boost::asio::ip::tcp::socket socket);
 	~FKHttpConnection() = default;
 	void start();
+	boost::beast::http::request<boost::beast::http::dynamic_body>& getRequest() { return _pRequest; };
 	boost::beast::http::response<boost::beast::http::dynamic_body>& getResponse() { return _pResponse; };
+	std::unordered_map<std::string, std::string> getQueryParams() const { return _pQueryParams; };
 private:
 	void _checkTimeout();
 	void _writeResponse();
@@ -42,6 +44,9 @@ private:
 	boost::beast::http::request<boost::beast::http::dynamic_body> _pRequest;
 	boost::beast::http::response<boost::beast::http::dynamic_body> _pResponse;
 	boost::asio::steady_timer _pTimeout;
+
+	std::string _pUrl;
+	std::unordered_map<std::string, std::string> _pQueryParams;
 };
 
 #endif // !FK_HTTPCONNECTION_H_
