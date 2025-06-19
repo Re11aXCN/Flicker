@@ -217,11 +217,29 @@ class VarifyCodeResponseBody final : public ::google::protobuf::Message
 
   // accessors -------------------------------------------------------
   enum : int {
-    kEmailFieldNumber = 2,
-    kCodeFieldNumber = 3,
-    kErrorFieldNumber = 1,
+    kMessageFieldNumber = 2,
+    kEmailFieldNumber = 4,
+    kVarifyCodeFieldNumber = 5,
+    kStatusCodeFieldNumber = 1,
+    kRequestTypeFieldNumber = 3,
   };
-  // string email = 2;
+  // string message = 2;
+  void clear_message() ;
+  const std::string& message() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_message(Arg_&& arg, Args_... args);
+  std::string* mutable_message();
+  PROTOBUF_NODISCARD std::string* release_message();
+  void set_allocated_message(std::string* value);
+
+  private:
+  const std::string& _internal_message() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_message(
+      const std::string& value);
+  std::string* _internal_mutable_message();
+
+  public:
+  // string email = 4;
   void clear_email() ;
   const std::string& email() const;
   template <typename Arg_ = const std::string&, typename... Args_>
@@ -237,30 +255,40 @@ class VarifyCodeResponseBody final : public ::google::protobuf::Message
   std::string* _internal_mutable_email();
 
   public:
-  // string code = 3;
-  void clear_code() ;
-  const std::string& code() const;
+  // string varify_code = 5;
+  void clear_varify_code() ;
+  const std::string& varify_code() const;
   template <typename Arg_ = const std::string&, typename... Args_>
-  void set_code(Arg_&& arg, Args_... args);
-  std::string* mutable_code();
-  PROTOBUF_NODISCARD std::string* release_code();
-  void set_allocated_code(std::string* value);
+  void set_varify_code(Arg_&& arg, Args_... args);
+  std::string* mutable_varify_code();
+  PROTOBUF_NODISCARD std::string* release_varify_code();
+  void set_allocated_varify_code(std::string* value);
 
   private:
-  const std::string& _internal_code() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_code(
+  const std::string& _internal_varify_code() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_varify_code(
       const std::string& value);
-  std::string* _internal_mutable_code();
+  std::string* _internal_mutable_varify_code();
 
   public:
-  // int32 error = 1;
-  void clear_error() ;
-  ::int32_t error() const;
-  void set_error(::int32_t value);
+  // int32 status_code = 1;
+  void clear_status_code() ;
+  ::int32_t status_code() const;
+  void set_status_code(::int32_t value);
 
   private:
-  ::int32_t _internal_error() const;
-  void _internal_set_error(::int32_t value);
+  ::int32_t _internal_status_code() const;
+  void _internal_set_status_code(::int32_t value);
+
+  public:
+  // int32 request_type = 3;
+  void clear_request_type() ;
+  ::int32_t request_type() const;
+  void set_request_type(::int32_t value);
+
+  private:
+  ::int32_t _internal_request_type() const;
+  void _internal_set_request_type(::int32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:FKVerifyGrpc.VarifyCodeResponseBody)
@@ -268,8 +296,8 @@ class VarifyCodeResponseBody final : public ::google::protobuf::Message
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<
-      2, 3, 0,
-      53, 2>
+      3, 5, 0,
+      67, 2>
       _table_;
 
   friend class ::google::protobuf::MessageLite;
@@ -286,9 +314,11 @@ class VarifyCodeResponseBody final : public ::google::protobuf::Message
     inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
                           ::google::protobuf::Arena* arena, const Impl_& from,
                           const VarifyCodeResponseBody& from_msg);
+    ::google::protobuf::internal::ArenaStringPtr message_;
     ::google::protobuf::internal::ArenaStringPtr email_;
-    ::google::protobuf::internal::ArenaStringPtr code_;
-    ::int32_t error_;
+    ::google::protobuf::internal::ArenaStringPtr varify_code_;
+    ::int32_t status_code_;
+    ::int32_t request_type_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -443,9 +473,10 @@ class VarifyCodeRequestBody final : public ::google::protobuf::Message
 
   // accessors -------------------------------------------------------
   enum : int {
-    kEmailFieldNumber = 1,
+    kEmailFieldNumber = 2,
+    kRequestTypeFieldNumber = 1,
   };
-  // string email = 1;
+  // string email = 2;
   void clear_email() ;
   const std::string& email() const;
   template <typename Arg_ = const std::string&, typename... Args_>
@@ -461,12 +492,22 @@ class VarifyCodeRequestBody final : public ::google::protobuf::Message
   std::string* _internal_mutable_email();
 
   public:
+  // int32 request_type = 1;
+  void clear_request_type() ;
+  ::int32_t request_type() const;
+  void set_request_type(::int32_t value);
+
+  private:
+  ::int32_t _internal_request_type() const;
+  void _internal_set_request_type(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:FKVerifyGrpc.VarifyCodeRequestBody)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<
-      0, 1, 0,
+      1, 2, 0,
       48, 2>
       _table_;
 
@@ -485,6 +526,7 @@ class VarifyCodeRequestBody final : public ::google::protobuf::Message
                           ::google::protobuf::Arena* arena, const Impl_& from,
                           const VarifyCodeRequestBody& from_msg);
     ::google::protobuf::internal::ArenaStringPtr email_;
+    ::int32_t request_type_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -508,7 +550,29 @@ class VarifyCodeRequestBody final : public ::google::protobuf::Message
 
 // VarifyCodeRequestBody
 
-// string email = 1;
+// int32 request_type = 1;
+inline void VarifyCodeRequestBody::clear_request_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_type_ = 0;
+}
+inline ::int32_t VarifyCodeRequestBody::request_type() const {
+  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeRequestBody.request_type)
+  return _internal_request_type();
+}
+inline void VarifyCodeRequestBody::set_request_type(::int32_t value) {
+  _internal_set_request_type(value);
+  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeRequestBody.request_type)
+}
+inline ::int32_t VarifyCodeRequestBody::_internal_request_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.request_type_;
+}
+inline void VarifyCodeRequestBody::_internal_set_request_type(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_type_ = value;
+}
+
+// string email = 2;
 inline void VarifyCodeRequestBody::clear_email() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.email_.ClearToEmpty();
@@ -560,29 +624,99 @@ inline void VarifyCodeRequestBody::set_allocated_email(std::string* value) {
 
 // VarifyCodeResponseBody
 
-// int32 error = 1;
-inline void VarifyCodeResponseBody::clear_error() {
+// int32 status_code = 1;
+inline void VarifyCodeResponseBody::clear_status_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_ = 0;
+  _impl_.status_code_ = 0;
 }
-inline ::int32_t VarifyCodeResponseBody::error() const {
-  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.error)
-  return _internal_error();
+inline ::int32_t VarifyCodeResponseBody::status_code() const {
+  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.status_code)
+  return _internal_status_code();
 }
-inline void VarifyCodeResponseBody::set_error(::int32_t value) {
-  _internal_set_error(value);
-  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.error)
+inline void VarifyCodeResponseBody::set_status_code(::int32_t value) {
+  _internal_set_status_code(value);
+  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.status_code)
 }
-inline ::int32_t VarifyCodeResponseBody::_internal_error() const {
+inline ::int32_t VarifyCodeResponseBody::_internal_status_code() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_;
+  return _impl_.status_code_;
 }
-inline void VarifyCodeResponseBody::_internal_set_error(::int32_t value) {
+inline void VarifyCodeResponseBody::_internal_set_status_code(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_ = value;
+  _impl_.status_code_ = value;
 }
 
-// string email = 2;
+// string message = 2;
+inline void VarifyCodeResponseBody::clear_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.message_.ClearToEmpty();
+}
+inline const std::string& VarifyCodeResponseBody::message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.message)
+  return _internal_message();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void VarifyCodeResponseBody::set_message(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.message)
+}
+inline std::string* VarifyCodeResponseBody::mutable_message() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_message();
+  // @@protoc_insertion_point(field_mutable:FKVerifyGrpc.VarifyCodeResponseBody.message)
+  return _s;
+}
+inline const std::string& VarifyCodeResponseBody::_internal_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.message_.Get();
+}
+inline void VarifyCodeResponseBody::_internal_set_message(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.message_.Set(value, GetArena());
+}
+inline std::string* VarifyCodeResponseBody::_internal_mutable_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.message_.Mutable( GetArena());
+}
+inline std::string* VarifyCodeResponseBody::release_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:FKVerifyGrpc.VarifyCodeResponseBody.message)
+  return _impl_.message_.Release();
+}
+inline void VarifyCodeResponseBody::set_allocated_message(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.message_.IsDefault()) {
+    _impl_.message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:FKVerifyGrpc.VarifyCodeResponseBody.message)
+}
+
+// int32 request_type = 3;
+inline void VarifyCodeResponseBody::clear_request_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_type_ = 0;
+}
+inline ::int32_t VarifyCodeResponseBody::request_type() const {
+  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.request_type)
+  return _internal_request_type();
+}
+inline void VarifyCodeResponseBody::set_request_type(::int32_t value) {
+  _internal_set_request_type(value);
+  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.request_type)
+}
+inline ::int32_t VarifyCodeResponseBody::_internal_request_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.request_type_;
+}
+inline void VarifyCodeResponseBody::_internal_set_request_type(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_type_ = value;
+}
+
+// string email = 4;
 inline void VarifyCodeResponseBody::clear_email() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.email_.ClearToEmpty();
@@ -630,52 +764,52 @@ inline void VarifyCodeResponseBody::set_allocated_email(std::string* value) {
   // @@protoc_insertion_point(field_set_allocated:FKVerifyGrpc.VarifyCodeResponseBody.email)
 }
 
-// string code = 3;
-inline void VarifyCodeResponseBody::clear_code() {
+// string varify_code = 5;
+inline void VarifyCodeResponseBody::clear_varify_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.code_.ClearToEmpty();
+  _impl_.varify_code_.ClearToEmpty();
 }
-inline const std::string& VarifyCodeResponseBody::code() const
+inline const std::string& VarifyCodeResponseBody::varify_code() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.code)
-  return _internal_code();
+  // @@protoc_insertion_point(field_get:FKVerifyGrpc.VarifyCodeResponseBody.varify_code)
+  return _internal_varify_code();
 }
 template <typename Arg_, typename... Args_>
-inline PROTOBUF_ALWAYS_INLINE void VarifyCodeResponseBody::set_code(Arg_&& arg,
+inline PROTOBUF_ALWAYS_INLINE void VarifyCodeResponseBody::set_varify_code(Arg_&& arg,
                                                      Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.code)
+  _impl_.varify_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:FKVerifyGrpc.VarifyCodeResponseBody.varify_code)
 }
-inline std::string* VarifyCodeResponseBody::mutable_code() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  std::string* _s = _internal_mutable_code();
-  // @@protoc_insertion_point(field_mutable:FKVerifyGrpc.VarifyCodeResponseBody.code)
+inline std::string* VarifyCodeResponseBody::mutable_varify_code() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_varify_code();
+  // @@protoc_insertion_point(field_mutable:FKVerifyGrpc.VarifyCodeResponseBody.varify_code)
   return _s;
 }
-inline const std::string& VarifyCodeResponseBody::_internal_code() const {
+inline const std::string& VarifyCodeResponseBody::_internal_varify_code() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.code_.Get();
+  return _impl_.varify_code_.Get();
 }
-inline void VarifyCodeResponseBody::_internal_set_code(const std::string& value) {
+inline void VarifyCodeResponseBody::_internal_set_varify_code(const std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.code_.Set(value, GetArena());
+  _impl_.varify_code_.Set(value, GetArena());
 }
-inline std::string* VarifyCodeResponseBody::_internal_mutable_code() {
+inline std::string* VarifyCodeResponseBody::_internal_mutable_varify_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.code_.Mutable( GetArena());
+  return _impl_.varify_code_.Mutable( GetArena());
 }
-inline std::string* VarifyCodeResponseBody::release_code() {
+inline std::string* VarifyCodeResponseBody::release_varify_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:FKVerifyGrpc.VarifyCodeResponseBody.code)
-  return _impl_.code_.Release();
+  // @@protoc_insertion_point(field_release:FKVerifyGrpc.VarifyCodeResponseBody.varify_code)
+  return _impl_.varify_code_.Release();
 }
-inline void VarifyCodeResponseBody::set_allocated_code(std::string* value) {
+inline void VarifyCodeResponseBody::set_allocated_varify_code(std::string* value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.code_.IsDefault()) {
-    _impl_.code_.Set("", GetArena());
+  _impl_.varify_code_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.varify_code_.IsDefault()) {
+    _impl_.varify_code_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:FKVerifyGrpc.VarifyCodeResponseBody.code)
+  // @@protoc_insertion_point(field_set_allocated:FKVerifyGrpc.VarifyCodeResponseBody.varify_code)
 }
 
 #ifdef __GNUC__

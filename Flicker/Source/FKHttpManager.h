@@ -27,7 +27,7 @@ public:
 	void postHttpRequest(const QString& url, const QJsonObject& json, Http::RequestId requestId, Http::RequestSeviceType serviceType);
 
 Q_SIGNALS:
-	void httpRequestFinished(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestErrorCode errorCode);
+	void httpRequestFinished(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 private:
 	explicit FKHttpManager(QObject* parent = nullptr);
 

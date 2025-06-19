@@ -43,10 +43,10 @@ private:
 	void _showMessage(const QString& title, const QString& text, NXMessageBarType::MessageMode mode, NXMessageBarType::PositionPolicy position, int displayMsec = 2000);
 
 	// private slots
-	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestErrorCode errorCode);
+	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 	Q_SLOT void _onRegisterGetVerifyCodeButtonClicked();
 	
-	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _registerRequestHashMap;
+	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _responseCallbacks;
 	
 	NXMessageButton* _pMessageButton{ nullptr };
 

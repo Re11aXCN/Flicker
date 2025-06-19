@@ -15,12 +15,11 @@ class FKVerifyGrpcClinet
 {
 	SINGLETON_CREATE_SHARED_H(FKVerifyGrpcClinet)
 public:
-	VarifyCodeResponseBody GetVarifyCode(std::string email);
-	~FKVerifyGrpcClinet() = default;
+	VarifyCodeResponseBody getVarifyCode(const VarifyCodeRequestBody& requestBody);
 
 private:
 	FKVerifyGrpcClinet();
-
+	~FKVerifyGrpcClinet() = default;
 	std::unique_ptr<VarifyCodeService::Stub> _pStub;
 };
 #endif

@@ -24,6 +24,18 @@
     <ClInclude Include="Source\FKServer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Grpc\FKVerifyGrpcClinet.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FKAsioThreadPool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\FKHttpConnection.cpp">
@@ -36,6 +48,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKVerifyGrpcClinet.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\FKAsioThreadPool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -19,7 +19,7 @@
 #include <json/json.h>
 
 #include "FKHttpConnection.h"
-
+#include "Grpc/FKVerifyGrpcClinet.h"
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
 
 FKLogicSystem::FKLogicSystem()
@@ -41,24 +41,80 @@ FKLogicSystem::FKLogicSystem()
 		};
 
 	auto getVarifyCodeFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+		// 读取请求体
 		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
-		std::println("Received Body: {}", body);
-		
+		std::println("Received Body: \n{}", body);
+
+		// 设置响应头
 		connection->getResponse().set(boost::beast::http::field::content_type, "text/json");
-		
-		Json::Value root;
-		Json::Reader reader;
-		bool parse_success = reader.parse(body, root);
-		if (!parse_success) [[unlikely]] {
-			std::println("Failed to parse JSON data!");
-			root["state"] = Http::RequestErrorCode::PARSER_JSON_ERROR;
-			boost::beast::ostream(connection->getResponse().body()) << root.toStyledString();
+		Json::Value responseRoot;
+		// 解析JSON
+		Json::Value requestRoot;
+		Json::CharReaderBuilder readerBuilder;
+		std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+		std::string errors;
+		bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+
+		if (!isValidJson) {
+			std::println("Invalid JSON format: {}", errors);
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
+			responseRoot["message"] = "Invalid JSON format: " + errors;
+			connection->getResponse().result(boost::beast::http::status::bad_request);
+			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
 			return;
 		}
-		
-		root["state"] = Http::RequestErrorCode::SUCCESS;
-		root["email"] = root["email"].asString();
-		boost::beast::ostream(connection->getResponse().body()) << root.toStyledString();
+
+		// 验证必需字段
+		if (!requestRoot.isMember("email") || requestRoot["email"].empty()) {
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
+			responseRoot["message"] = "Missing required field: email";
+			connection->getResponse().result(boost::beast::http::status::bad_request);
+			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+			return;
+		}
+
+		// 构建gRPC请求
+		VarifyCodeRequestBody grpcRequest;
+		if (requestRoot.isMember("request_type")) {
+			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
+		}
+		else [[unlikely]] {
+			// 默认值（根据业务需求设置）
+			grpcRequest.set_request_type(0);
+		}
+		grpcRequest.set_email(requestRoot["email"].asString());
+
+		try {
+			// 调用gRPC服务
+			VarifyCodeResponseBody grpcResponse = FKVerifyGrpcClinet::getInstance()->getVarifyCode(grpcRequest);
+
+			// 构建JSON响应
+			responseRoot["status_code"] = grpcResponse.status_code();
+			responseRoot["message"] = grpcResponse.message();
+			responseRoot["request_type"] = grpcResponse.request_type();
+			responseRoot["email"] = grpcResponse.email();
+			responseRoot["varify_code"] = grpcResponse.varify_code();
+
+			// 根据gRPC状态设置HTTP状态
+			if (grpcResponse.status_code() >= 400) {
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+			}
+			else {
+				connection->getResponse().result(boost::beast::http::status::ok);
+			}
+
+		}
+		catch (const std::exception& e) {
+			// gRPC调用异常处理
+			std::println("gRPC call failed: {}", e.what());
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::GRPC_CALL_FAILED);
+			responseRoot["message"] = "Service unavailable: " + std::string(e.what());
+			connection->getResponse().result(boost::beast::http::status::service_unavailable);
+		}
+
+		// 发送响应
+		boost::beast::ostream(connection->getResponse().body())
+			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
 		};
 
 	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);

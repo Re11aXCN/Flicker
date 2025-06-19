@@ -246,8 +246,9 @@ void FKLoginWidget::_initForgetPasswordPage()
 
 void FKLoginWidget::_initRegistryCallback()
 {
-	_registerRequestHashMap.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
-		if (jsonObj["error"].toInt() != Http::RequestErrorCode::SUCCESS) {
+	_responseCallbacks.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
+		qDebug() << "get varify code response is " << jsonObj;
+		if (jsonObj["error"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
 			this->_showMessage("ERROR", "注册表单错误，请填写！", NXMessageBarType::Error, NXMessageBarType::Bottom);
 			return;
 		}
@@ -267,9 +268,9 @@ void FKLoginWidget::_showMessage(const QString& title, const QString& text, NXMe
 	Q_EMIT _pMessageButton->showMessage();
 }
 
-void FKLoginWidget::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestErrorCode errorCode)
+void FKLoginWidget::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode)
 {
-	if (errorCode != Http::RequestErrorCode::SUCCESS) {
+	if (statusCode != Http::RequestStatusCode::SUCCESS) {
 		this->_showMessage("ERROR", "网络请求错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
 		return;
 	}
@@ -283,8 +284,8 @@ void FKLoginWidget::_handleServerResponse(const QString& response, Http::Request
 	QJsonObject jsonObject = jsonDoc.object();
 
 	switch (serviceType) {
-	case Http::RequestSeviceType::REGISTER_SERVICE:
-		_registerRequestHashMap[requestId](jsonObject);
+	case Http::RequestSeviceType::REGISTER:
+		_responseCallbacks[requestId](jsonObject);
 	default:
 		break;
 	}
@@ -300,8 +301,9 @@ void FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked()
 	}
 	QJsonObject requestObj;
 	requestObj["email"] = email;
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER);
 	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varifycode",
 		requestObj,
 		Http::RequestId::ID_GET_VARIFY_CODE,
-		Http::RequestSeviceType::REGISTER_SERVICE);
+		Http::RequestSeviceType::REGISTER);
 }

@@ -35,12 +35,12 @@ void FKHttpManager::postHttpRequest(const QString& url, const QJsonObject& json,
 	QObject::connect(reply, &QNetworkReply::finished, [=, self = shared_from_this()]() {
 		if (reply->error() != QNetworkReply::NoError) {
 			qDebug() << reply->errorString();
-			Q_EMIT self->httpRequestFinished(QString{}, requestId, serviceType, Http::RequestErrorCode::NETWORK_ERROR);
+			Q_EMIT self->httpRequestFinished(QString{}, requestId, serviceType, Http::RequestStatusCode::NETWORK_ABNORMAL);
 			reply->deleteLater();
 			return;
 		}
 		QString responseData = reply->readAll();
-		Q_EMIT self->httpRequestFinished(responseData, requestId, serviceType, Http::RequestErrorCode::SUCCESS);
+		Q_EMIT self->httpRequestFinished(responseData, requestId, serviceType, Http::RequestStatusCode::SUCCESS);
 		reply->deleteLater();
 		return;
 		});

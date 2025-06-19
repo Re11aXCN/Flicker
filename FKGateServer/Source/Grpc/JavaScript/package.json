@@ -1,0 +1,21 @@
+{
+  "name": "email-verification-service",
+  "version": "1.0.0",
+  "description": "SMTP邮箱验证码服务，用于Flicker应用的用户注册验证",
+  "main": "emailVerificationServer.js",
+  "scripts": {
+    "start": "node emailVerificationServer.js",
+    "dev": "nodemon emailVerificationServer.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.7.15",
+    "nodemailer": "^7.0.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "author": "",
+  "license": "ISC"
+}

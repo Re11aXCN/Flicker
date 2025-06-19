@@ -29,18 +29,20 @@ namespace Http {
 		GET,
 		POST
 	};
-	enum RequestId {
+	enum class RequestId {
 		ID_GET_VARIFY_CODE = 1001,
 		ID_REGISTER_USER = 1002,
 	};
-	enum RequestSeviceType {
-		REGISTER_SERVICE,
+	enum class RequestSeviceType {
+		REGISTER,
+		CHANGE_PASSWORD,
 	};
-	enum RequestErrorCode {
+	enum class RequestStatusCode {
 		SUCCESS				= 0,
-		PARSER_JSON_ERROR	= 4001,
-		NETWORK_ERROR		= 4002,
-		RPC_ERROR			= 4003,
+		INVALID_JSON		= 4001,
+		NETWORK_ABNORMAL	= 4002,
+		GRPC_CALL_FAILED	= 4003,
+		MISSING_FIELDS 		= 4004,
 	};
 }
 
