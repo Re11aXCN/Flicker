@@ -35,21 +35,26 @@ private:                                                    \
 private:                                            \
     static std::unique_ptr<Class> _instance;        \
     friend std::default_delete<Class>;              \
-                                                    \
+    template<typename... Args>                              \
+    static std::unique_ptr<Class> _create(Args&&... args) { \
+        struct make_unique_helper : public Class            \
+        {                                                   \
+            make_unique_helper(Args&&... a) : Class(std::forward<Args>(a)...){}     \
+        };                                                  \
+        return std::make_unique<make_unique_helper>(std::forward<Args>(args)...);   \
+    }                                                       \
 public:                                             \
     static Class* getInstance();
 
 #define SINGLETON_CREATE_CPP(Class)  \
     std::unique_ptr<Class> Class::_instance = nullptr; \
-    Class* Class::getInstance()        \
-    {                                  \
-        static QMutex mutex;           \
-        QMutexLocker locker(&mutex);   \
-        if (_instance == nullptr)      \
-        {                              \
-            _instance.reset(new Class());   \
-        }                              \
-        return _instance.get();              \
+    Class* Class::getInstance()                 \
+    {                                           \
+        static std::once_flag flag;             \
+        std::call_once(flag, [&]() {            \
+            _instance = _create();              \
+        });                                     \
+        return _instance.get();                 \
     }
 
 #define SINGLETON_CREATE_SHARED_H(Class)                    \

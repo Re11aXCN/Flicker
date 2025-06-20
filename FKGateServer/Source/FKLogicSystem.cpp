@@ -19,7 +19,9 @@
 #include <json/json.h>
 
 #include "FKHttpConnection.h"
-#include "Grpc/FKVerifyGrpcClinet.h"
+#include "Grpc/FKVerifyGrpcClient.h"
+#include "FKUtils.h"
+
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
 
 FKLogicSystem::FKLogicSystem()
@@ -86,7 +88,7 @@ FKLogicSystem::FKLogicSystem()
 
 		try {
 			// 调用gRPC服务
-			VarifyCodeResponseBody grpcResponse = FKVerifyGrpcClinet::getInstance()->getVarifyCode(grpcRequest);
+			VarifyCodeResponseBody grpcResponse = FKVerifyGrpcClient::getInstance()->getVarifyCode(grpcRequest);
 
 			// 构建JSON响应
 			responseRoot["status_code"] = grpcResponse.status_code();
@@ -123,26 +125,117 @@ FKLogicSystem::FKLogicSystem()
 
 bool FKLogicSystem::callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection)
 {
-	if (requestType == Http::RequestType::GET) {
-		if (_pGetRequestCallBacks.find(url) == _pGetRequestCallBacks.end()) return false;
-
-		_pGetRequestCallBacks[url](connection);
+	try {
+		// 记录请求信息
+		std::println("处理请求: {} {}", 
+			(requestType == Http::RequestType::GET ? "GET" : "POST"), 
+			url);
+		
+		// 根据请求类型查找对应的回调函数
+		if (requestType == Http::RequestType::GET) {
+			// 检查GET回调是否存在
+			auto it = _pGetRequestCallBacks.find(url);
+			if (it == _pGetRequestCallBacks.end()) {
+				std::println("未找到GET处理函数: {}", url);
+				return false;
+			}
+			
+			// 执行回调函数
+			std::println("执行GET处理函数: {}", url);
+			it->second(connection);
+		}
+		else if (requestType == Http::RequestType::POST) {
+			// 检查POST回调是否存在
+			auto it = _pPostRequestCallBacks.find(url);
+			if (it == _pPostRequestCallBacks.end()) {
+				std::println("未找到POST处理函数: {}", url);
+				return false;
+			}
+			
+			// 执行回调函数
+			std::println("执行POST处理函数: {}", url);
+			it->second(connection);
+		}
+		else {
+			// 不支持的请求类型
+			std::println("不支持的请求类型");
+			return false;
+		}
+		
+		return true;
 	}
-	else {
-		if (_pPostRequestCallBacks.find(url) == _pPostRequestCallBacks.end()) return false;
-
-		_pPostRequestCallBacks[url](connection);
+	catch (const std::exception& ex) {
+		// 处理回调执行过程中的异常
+		std::println("回调执行异常: {}", ex.what());
+		
+		// 设置500错误响应
+		auto& response = connection->getResponse();
+		response.result(boost::beast::http::status::internal_server_error);
+		response.set(boost::beast::http::field::content_type, "application/json");
+		response.set(boost::beast::http::field::server, "GateServer");
+		response.set(boost::beast::http::field::date, FKUtils::get_http_date());
+		
+		// 构建错误JSON响应
+		boost::beast::ostream(response.body()) << 
+			"{\"code\":500,\"message\":\"服务器内部错误\",\"error\":\"" << 
+			ex.what() << "\"}";
+		
+		return true; // 返回true表示已处理请求
 	}
-	
-	return true;
+	catch (...) {
+		// 处理未知异常
+		std::println("回调执行发生未知异常");
+		
+		// 设置500错误响应
+		auto& response = connection->getResponse();
+		response.result(boost::beast::http::status::internal_server_error);
+		response.set(boost::beast::http::field::content_type, "application/json");
+		response.set(boost::beast::http::field::server, "GateServer");
+		response.set(boost::beast::http::field::date, FKUtils::get_http_date());
+		
+		// 构建错误JSON响应
+		boost::beast::ostream(response.body()) << 
+			"{\"code\":500,\"message\":\"服务器内部错误\",\"error\":\"未知异常\"}";
+		
+		return true; // 返回true表示已处理请求
+	}
 }
 
 void FKLogicSystem::registerCallback(const std::string& url, Http::RequestType requestType, MessageHandler handler)
 {
+	// 检查参数有效性
+	if (url.empty()) {
+		std::println("错误: 尝试注册空URL的回调函数");
+		return;
+	}
+	
+	if (!handler) {
+		std::println("错误: 尝试注册空回调函数, URL: {}", url);
+		return;
+	}
+	
+	// 根据请求类型注册回调
 	if (requestType == Http::RequestType::GET) {
-		_pGetRequestCallBacks.insert({ url, handler });
+		// 检查是否已存在
+		if (_pGetRequestCallBacks.find(url) != _pGetRequestCallBacks.end()) {
+			std::println("警告: 覆盖已存在的GET回调函数, URL: {}", url);
+		}
+		
+		// 注册回调
+		_pGetRequestCallBacks[url] = handler;
+		std::println("成功注册GET回调函数: {}", url);
 	}
 	else if (requestType == Http::RequestType::POST) {
-		_pPostRequestCallBacks.insert({ url, handler });
+		// 检查是否已存在
+		if (_pPostRequestCallBacks.find(url) != _pPostRequestCallBacks.end()) {
+			std::println("警告: 覆盖已存在的POST回调函数, URL: {}", url);
+		}
+		
+		// 注册回调
+		_pPostRequestCallBacks[url] = handler;
+		std::println("成功注册POST回调函数: {}", url);
+	}
+	else {
+		std::println("错误: 尝试注册不支持的请求类型回调函数, URL: {}", url);
 	}
 }

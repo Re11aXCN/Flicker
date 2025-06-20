@@ -28,7 +28,6 @@ public:
 private:
     boost::asio::io_context& _pIoContext;
     boost::asio::ip::tcp::acceptor _pAcceptor;
-    boost::asio::ip::tcp::socket _pSocket;
 };
 
 #endif // !FK_SERVER_H_

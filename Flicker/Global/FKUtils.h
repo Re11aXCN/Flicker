@@ -23,6 +23,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <chrono>
 namespace FKUtils {
 	namespace helper {
 		// 辅助函数：将半字节(0-15)转换为16进制字符（大写）
@@ -241,6 +242,27 @@ namespace FKUtils {
 		}
 
 		return params;
+	}
+
+	// 获取HTTP日期格式的当前时间
+	inline std::string get_http_date() {
+		// 获取当前时间点
+		auto now = std::chrono::system_clock::now();
+		auto time_t_now = std::chrono::system_clock::to_time_t(now);
+
+		// 转换为GMT时间
+		std::tm gmt_tm;
+#ifdef _WIN32
+		gmtime_s(&gmt_tm, &time_t_now);
+#else
+		gmtime_r(&time_t_now, &gmt_tm);
+#endif
+
+		// 格式化为HTTP日期格式 (RFC 7231)
+		// 例如: "Sun, 06 Nov 1994 08:49:37 GMT"
+		std::stringstream ss;
+		ss << std::put_time(&gmt_tm, "%a, %d %b %Y %H:%M:%S GMT");
+		return ss.str();
 	}
 };
 

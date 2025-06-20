@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -23,9 +23,10 @@
     <ClInclude Include="Source\FKHttpConnection.h" />
     <ClInclude Include="Source\FKLogicSystem.h" />
     <ClInclude Include="Source\FKServer.h" />
+    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
-    <ClInclude Include="Source\Grpc\FKVerifyGrpcClinet.h" />
+    <ClInclude Include="Source\Grpc\FKVerifyGrpcClient.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -35,7 +36,7 @@
     <ClCompile Include="Source\FKServer.cpp" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\FKVerifyGrpcClinet.cpp" />
+    <ClCompile Include="Source\Grpc\FKVerifyGrpcClient.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -187,6 +188,8 @@ upb_wire_lib.lib;
 utf8_range.lib;
 utf8_validity.lib;
 zlibd.lib;
+redis++.lib;
+hiredisd.lib;
 		%(AdditionalDependencies)
 	  </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib</AdditionalLibraryDirectories>
@@ -258,6 +261,8 @@ upb_wire_lib.lib;
 utf8_range.lib;
 utf8_validity.lib;
 zlib.lib;
+redis++.lib;
+hiredis.lib;
 		%(AdditionalDependencies)
 		</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib</AdditionalLibraryDirectories>

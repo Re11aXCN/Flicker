@@ -28,9 +28,10 @@
 class FKHttpConnection : public std::enable_shared_from_this<FKHttpConnection>
 {
 public:
-	explicit FKHttpConnection(boost::asio::ip::tcp::socket socket);
+	explicit FKHttpConnection(boost::asio::io_context& ioc);
 	~FKHttpConnection() = default;
 	void start();
+	boost::asio::ip::tcp::socket& getSocket() { return _pSocket; };
 	boost::beast::http::request<boost::beast::http::dynamic_body>& getRequest() { return _pRequest; };
 	boost::beast::http::response<boost::beast::http::dynamic_body>& getResponse() { return _pResponse; };
 	std::unordered_map<std::string, std::string> getQueryParams() const { return _pQueryParams; };
