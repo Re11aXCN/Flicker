@@ -153,6 +153,15 @@
     <ClInclude Include="Global\FKMacro.h" />
     <ClInclude Include="Global\FKDef.h" />
     <ClInclude Include="Global\FKUtils.h" />
+    <QtMoc Include="UI\Login_interface\transparent_transition_interface.h" />
+    <QtMoc Include="UI\Login_interface\scroll_bar.h" />
+    <QtMoc Include="UI\Login_interface\responsive_form.h" />
+    <QtMoc Include="UI\Login_interface\registration_form.h" />
+    <QtMoc Include="UI\Login_interface\other_login_buttons.h" />
+    <QtMoc Include="UI\Login_interface\login_form.h" />
+    <QtMoc Include="UI\Login_interface\login_button.h" />
+    <QtMoc Include="UI\Login_interface\input_box.h" />
+    <QtMoc Include="UI\Login_interface\hollow_button.h" />
     <QtMoc Include="Source\FKHttpManager.h" />
     <Image Include="Resource\ico\Weixin_IDI_ICON1.ico" />
     <ResourceCompile Include="Resource\ico\Flicker.rc" />
@@ -163,6 +172,15 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Source\FKHttpManager.cpp" />
     <ClCompile Include="UI\FKLoginWidget.cpp" />
+    <ClCompile Include="UI\Login_interface\hollow_button.cpp" />
+    <ClCompile Include="UI\Login_interface\input_box.cpp" />
+    <ClCompile Include="UI\Login_interface\login_button.cpp" />
+    <ClCompile Include="UI\Login_interface\login_form.cpp" />
+    <ClCompile Include="UI\Login_interface\other_login_buttons.cpp" />
+    <ClCompile Include="UI\Login_interface\registration_form.cpp" />
+    <ClCompile Include="UI\Login_interface\responsive_form.cpp" />
+    <ClCompile Include="UI\Login_interface\scroll_bar.cpp" />
+    <ClCompile Include="UI\Login_interface\transparent_transition_interface.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="UI\FKLoginWidget.h" />

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 邮箱验证码服务入口文件
  * 提供gRPC服务，处理验证码请求并发送邮件
  */
@@ -6,8 +6,9 @@
 const grpc = require('@grpc/grpc-js');
 const { v4: uuidv4 } = require('uuid');
 const verifyCodeProto = require('./utils/protoLoader');
-const { ERROR_CODE } = require('./utils/constants');
+const { ERROR_CODE, VERIFICATION } = require('./utils/constants');
 const { sendVerificationEmail } = require('./services/emailService');
+const { getRedis, queryRedis, setRedisExpire } = require('./utils/redis');
 
 /**
  * 处理验证码请求并发送邮件
@@ -19,6 +20,25 @@ async function getVerificationCode(call, callback) {
     console.log(`收到验证码请求，邮箱: ${email}, 请求类型: ${request_type}`);
     
     try {
+        // 构建Redis键名
+        const redisKey = `${VERIFICATION.CODE_PREFIX}${email}`;
+        
+        // 检查是否已存在验证码（可选：如果已存在且未过期，可以重用）
+        const existingCode = await getRedis(redisKey);
+        if (existingCode) {
+            console.log(`邮箱 ${email} 已有验证码，重用现有验证码`);
+            
+            // 返回成功响应，使用现有验证码
+            callback(null, {
+                status_code: ERROR_CODE.SUCCESS,
+                message: "验证码发送成功",
+                request_type: request_type,
+                email: email,
+                varify_code: existingCode
+            });
+            return;
+        }
+        
         // 生成唯一验证码
         const verificationCode = uuidv4().substring(0, 6).toUpperCase();
         console.log(`生成验证码: ${verificationCode} 用于邮箱: ${email}`);
@@ -26,6 +46,22 @@ async function getVerificationCode(call, callback) {
         // 使用emailService发送验证邮件
         await sendVerificationEmail(email, verificationCode);
         console.log(`邮件发送成功: ${email}`);
+        
+        // 将验证码存储到Redis，设置过期时间为5分钟
+        const saveResult = await setRedisExpire(redisKey, verificationCode, VERIFICATION.EXPIRATION);
+        if (!saveResult) {
+            console.error(`存储验证码到Redis失败: ${email}`);
+            callback(null, {
+                status_code: ERROR_CODE.REDIS_ERROR,
+                message: "验证码存储失败，请稍后重试",
+                request_type: request_type,
+                email: email,
+                varify_code: ""
+            });
+            return;
+        }
+        
+        console.log(`验证码已存储到Redis，过期时间: ${VERIFICATION.EXPIRATION}秒`);
 
         // 返回成功响应 - 注意字段名与proto定义匹配
         callback(null, {

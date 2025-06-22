@@ -284,13 +284,13 @@ void FKLoginWidget::_showMessage(const QString& title, const QString& text, NXMe
 void FKLoginWidget::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode)
 {
 	if (statusCode != Http::RequestStatusCode::SUCCESS) {
-		this->_showMessage("ERROR", "网络请求错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		this->_showMessage("ERROR", "NETWORK REQUEST ERROR!", NXMessageBarType::Error, NXMessageBarType::Bottom);
 		return;
 	}
 	QJsonDocument jsonDoc = QJsonDocument::fromJson(response.toUtf8());
 
 	if (jsonDoc.isNull() || !jsonDoc.isObject()) {
-		this->_showMessage("ERROR", "JSON解析错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		this->_showMessage("ERROR", "JSON PARSE ERROR!", NXMessageBarType::Error, NXMessageBarType::Bottom);
 		return;
 	}
 
@@ -314,12 +314,13 @@ void FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked()
 	// 创建 JSON 请求对象
 	QJsonObject requestObj;
 	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::GET_VARIFY_CODE);
-	requestObj["message"] = QStringLiteral("请求获取验证码");
+	requestObj["message"] = "Client request for varify code";
 
 	// 创建数据对象
 	QJsonObject dataObj;
 	dataObj["email"] = email;
 	requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+	qDebug() << "request is " << requestObj;
 
 	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varify_code",
 		requestObj,
@@ -382,7 +383,7 @@ void FKLoginWidget::_onRegisterComfirmButtonClicked()
 	// 创建 JSON 请求对象
 	QJsonObject requestObj;
 	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
-	requestObj["message"] = QStringLiteral("请求注册用户");
+	requestObj["message"] = "Client request for register user";
 
 	// 创建数据对象
 	QJsonObject dataObj;

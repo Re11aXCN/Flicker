@@ -28,8 +28,8 @@
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
 
-#include "FKMacro.h"
 #include "FKDef.h"
+#include "FKMacro.h"
 
 class FKHttpConnection;
 class FKLogicSystem {

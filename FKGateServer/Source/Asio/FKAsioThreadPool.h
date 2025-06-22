@@ -28,7 +28,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/experimental/channel.hpp>
 #include "FKMacro.h"
-
+#include "../FKConfigManager.h"
 /**
  * @brief 高效的线程池类，管理多个工作线程，每个线程运行一个io_context
  * 使用单例模式确保全局唯一实例
@@ -94,7 +94,7 @@ private:
      * @param threadCount 线程数量，默认为系统核心数
      * @param channelCapacity 任务通道容量，默认为1024
      */
-    void _initialize(size_t threadCount = std::thread::hardware_concurrency() / 2, size_t channelCapacity = 1024);
+    void _initialize(const FKAsioThreadPoolConfig& config);
 
     /**
      * @brief 设置当前线程名称

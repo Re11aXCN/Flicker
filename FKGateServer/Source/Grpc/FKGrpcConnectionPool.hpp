@@ -28,60 +28,37 @@
 #include <functional>
 #include <print>
 
-struct FKGrpcServiceConfig {
-	std::string host;                // 服务器地址
-	int port;                        // 服务器端口
-	size_t poolSize;                 // 连接池大小
-	bool useSSL = false;             // 是否使用SSL
-	std::chrono::seconds timeout{ 10 }; // 连接超时时间
-    std::string getAddress() const {
-        return std::format("{}:{}", host, port);
-    }
-};
-
+#include "../FKConfigManager.h"
+struct FKGrpcServiceConfig;
 template <typename ServiceType>
 class FKGrpcConnectionPool {
 public:
     using StubType = typename ServiceType::Stub;
-    FKGrpcConnectionPool() : _pInitialized(false), _pActiveConnections(0) {}
-    ~FKGrpcConnectionPool() { shutdown(); }
+    FKGrpcConnectionPool(const FKGrpcServiceConfig& config) 
+        : _pConfig(config)
+    {
+		// 预创建连接
+		try {
+			for (size_t i = 0; i < _pConfig.PoolSize; ++i) {
+				auto connection = _createStub();
+				if (connection) {
+					_pConnections.push(std::move(connection));
+				}
+			}
 
-    void initialize(FKGrpcServiceConfig&& config) {
-        std::lock_guard<std::mutex> lock(_pMutex);
-
-        if (_pInitialized) {
-            std::println("连接池已初始化，请勿重复初始化");
-            return;
-        }
-
-        _pConfig = std::move(config);
-        _pInitialized = true;
-        // 预创建连接
-        try {
-            for (size_t i = 0; i < _pConfig.poolSize; ++i) {
-                auto connection = _createStub();
-                if (connection) {
-                    _pConnections.push(std::move(connection));
-                }
-            }
-
-            std::println("gRPC连接池初始化成功，服务地址: {}，连接池大小: {}", 
-                _pConfig.getAddress(), _pConfig.poolSize);
-        }
-        catch (const std::exception& e) {
-            _pInitialized = false;
-            std::println("gRPC连接池初始化失败: {}", e.what());
-            throw;
-        }
+			std::println("gRPC连接池初始化成功，服务地址: {}，连接池大小: {}",
+				_pConfig.getAddress(), _pConfig.PoolSize);
+		}
+		catch (const std::exception& e) {
+			std::println("gRPC连接池初始化失败: {}", e.what());
+			throw;
+		}
     }
+    ~FKGrpcConnectionPool() { shutdown(); }
 
     void shutdown() {
         std::lock_guard<std::mutex> lock(_pMutex);
-
-        if (!_pInitialized) return;
-
-        // 标记为未初始化状态，阻止新的连接获取
-        _pInitialized = false;
+        if (_pShutdown) return;
 
         // 清空连接队列
         while (!_pConnections.empty()) {
@@ -101,38 +78,39 @@ public:
         return _pConnections.size();
     }
     
-    size_t getPoolSize() const { return _pConfig.poolSize; }
+    size_t getPoolSize() const { return _pConfig.PoolSize; }
 
 	std::string getStatus() const {
 		std::lock_guard<std::mutex> lock(_pMutex);
 		return std::format("Active: {}\nAvailable: {}\nPoolSize: {}",
 			_pActiveConnections.load(),
 			_pConnections.size(),
-			_pConfig.poolSize);
+			_pConfig.PoolSize);
 	}
 
     std::unique_ptr<StubType> getConnection(std::chrono::milliseconds timeout = std::chrono::milliseconds(5000)) {
         std::unique_lock<std::mutex> lock(_pMutex);
 
-        if (!_pInitialized) {
-            throw std::runtime_error("连接池未初始化，请先调用initialize方法");
-        }
+		// 添加关闭状态检查
+		if (_pShutdown) {
+			throw std::runtime_error("连接池已关闭");
+		}
 
-        // 等待可用连接或超时
-        bool hasConnection = _pCv.wait_for(lock, timeout, [this] {
-            return !_pConnections.empty() || !_pInitialized;
-        });
+		// 等待可用连接或超时
+		bool hasConnection = _pCv.wait_for(lock, timeout, [this] {
+			return _pShutdown || !_pConnections.empty();
+			});
 
-        // 再次检查初始化状态（可能在等待期间被关闭）
-        if (!_pInitialized) {
-            throw std::runtime_error("连接池已关闭");
-        }
+		// 再次检查关闭状态（可能在等待期间关闭）
+		if (_pShutdown) {
+			throw std::runtime_error("连接池已关闭");
+		}
 
         // 连接池为空，需要创建新连接
         if (!hasConnection) {
             std::println("获取连接超时，创建新连接 (活跃连接数: {})", _pActiveConnections.load());
             // 检查是否超过最大连接数限制
-            if (_pActiveConnections.load() >= _pConfig.poolSize * 3) {
+            if (_pActiveConnections.load() >= _pConfig.PoolSize * 3) {
                 throw std::runtime_error("已达到最大连接数限制，无法创建新连接");
             }
 
@@ -157,8 +135,8 @@ public:
         if (!connection) return;
 
         std::lock_guard<std::mutex> lock(_pMutex);
-
-        if (!_pInitialized)  return; 
+        // 如果已关闭，直接丢弃连接
+		if (_pShutdown) return; 
 
         // 将连接放回队列
         _pConnections.push(std::move(connection));
@@ -223,7 +201,7 @@ private:
 			channelArgs.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 10000);  // 最大重连间隔10秒
 
             // 根据配置创建安全或非安全通道
-            if (_pConfig.useSSL) {
+            if (_pConfig.UseSSL) {
                 grpc::SslCredentialsOptions sslOpts;
 				// 可以在这里设置SSL证书路径
 		        // ssl_opts.pem_root_certs = "..."
@@ -249,8 +227,8 @@ private:
     mutable std::mutex _pMutex;
     std::condition_variable _pCv;
     FKGrpcServiceConfig _pConfig;
-    std::atomic<bool> _pInitialized;
-    std::atomic<size_t> _pActiveConnections;
+    std::atomic<bool> _pShutdown{ false };
+    std::atomic<size_t> _pActiveConnections{ 0 };
 };
 
 #endif // !FK_GRPC_CONNECTION_POOL_H_

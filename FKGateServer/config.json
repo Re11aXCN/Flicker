@@ -2,40 +2,40 @@
     "server": {
         "host": "localhost",
         "port": 8080,
-        "useSSL": false
+        "use_ssl": false
     },
-    "asioThreadPool": {
-        "threadCount": 8,
-        "channelCapacity": 1024
+    "asio_thread_pool": {
+        "thread_count": 8,
+        "channel_capacity": 1024
     },
-    "requestTimeout": 30,
-    "grpcServices": {
+    "request_timeout": 30,
+    "grpc_services": {
         "VERIFY_CODE_SERVICE": {
             "host": "localhost",
             "port": 50051,
-            "poolSize": 10,
-            "useSSL": false,
+            "pool_size": 10,
+            "use_ssl": false,
             "timeout": 15
         },
         "USER_AUTH_SERVICE": {
             "host": "localhost",
             "port": 50052,
-            "poolSize": 8,
-            "useSSL": false,
+            "pool_size": 8,
+            "use_ssl": false,
             "timeout": 20
         },
         "PROFILE_SERVICE": {
             "host": "localhost",
             "port": 50053,
-            "poolSize": 5,
-            "useSSL": false,
+            "pool_size": 5,
+            "use_ssl": false,
             "timeout": 10
         },
         "MESSAGE_SERVICE": {
             "host": "localhost",
             "port": 50054,
-            "poolSize": 12,
-            "useSSL": false,
+            "pool_size": 12,
+            "use_ssl": false,
             "timeout": 15
         }
     },
@@ -47,6 +47,10 @@
     "redis": {
         "host": "localhost",
         "port": 6379,
-        "password": "123456"
+        "password": "123456",
+		"pool_size": 10,
+		"connection_timeout": 100,
+		"socket_timeout": 100,
+		"db_index": 0
     }
 }

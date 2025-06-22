@@ -27,7 +27,7 @@ void FKHttpManager::postHttpRequest(const QString& url, const QJsonObject& json,
 {
 	QByteArray data = QJsonDocument(json).toJson();
 	QNetworkRequest request(url);
-	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=utf-8");
 	request.setHeader(QNetworkRequest::ContentLengthHeader, QByteArray::number(data.length()));
 
 	QNetworkReply* reply = _pNetworkAccessManager.post(request, data);

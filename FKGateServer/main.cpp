@@ -1,10 +1,11 @@
 ﻿#include <print>
-#include <json/json.h>
-
-#include "FKServer.h"
-#include "Source/FKServerConfig.h"
 #include <functional>
 #include <iostream>
+#include <json/json.h>
+
+#include "Asio/FKServer.h"
+#include "Source/FKConfigManager.h"
+
 
 class Finally {
 public:
@@ -36,15 +37,8 @@ int main(int argc, char* argv[])
 	try
 	{
 		// 获取服务器配置（单例构造函数中已自动加载配置）
-		auto serverConfig = FKServerConfig::getInstance();
-		
-		// 获取服务器配置
-		UINT16 port = serverConfig->getServerPort();
-		size_t threadPoolSize = serverConfig->getAsioThreadPoolSize();
-		
-		std::println("服务器启动中...");
-		std::println("端口: {}", port);
-		std::println("ASIO线程池大小: {}", threadPoolSize);
+		auto serverConfig = FKConfigManager::getInstance()->getServerConfig();
+		std::println("服务器: {} 启动中...", serverConfig.getAddress());
 		
 		boost::asio::io_context ioContext;
 		boost::asio::signal_set signals(ioContext, SIGINT, SIGTERM);
@@ -59,7 +53,7 @@ int main(int argc, char* argv[])
 			});
 		
 		// 使用配置创建服务器
-		std::make_shared<FKServer>(ioContext, port)->start();
+		std::make_shared<FKServer>(ioContext, serverConfig.Port)->start();
 		ioContext.run();
 	}
 	catch (const std::exception& e)

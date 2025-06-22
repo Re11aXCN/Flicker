@@ -19,26 +19,28 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\FKAsioThreadPool.h" />
-    <ClInclude Include="Source\FKHttpConnection.h" />
-    <ClInclude Include="Source\FKLogicSystem.h" />
-    <ClInclude Include="Source\FKServer.h" />
-    <ClInclude Include="Source\FKServerConfig.h" />
+    <ClInclude Include="Source\Asio\FKAsioThreadPool.h" />
+    <ClInclude Include="Source\Asio\FKHttpConnection.h" />
+    <ClInclude Include="Source\Asio\FKLogicSystem.h" />
+    <ClInclude Include="Source\Asio\FKServer.h" />
+    <ClInclude Include="Source\FKConfigManager.h" />
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp" />
     <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
+    <ClInclude Include="Source\Redis\FKRedisConnectionPool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Source\FKAsioThreadPool.cpp" />
-    <ClCompile Include="Source\FKHttpConnection.cpp" />
-    <ClCompile Include="Source\FKLogicSystem.cpp" />
-    <ClCompile Include="Source\FKServer.cpp" />
-    <ClCompile Include="Source\FKServerConfig.cpp" />
+    <ClCompile Include="Source\Asio\FKAsioThreadPool.cpp" />
+    <ClCompile Include="Source\Asio\FKHttpConnection.cpp" />
+    <ClCompile Include="Source\Asio\FKLogicSystem.cpp" />
+    <ClCompile Include="Source\Asio\FKServer.cpp" />
+    <ClCompile Include="Source\FKConfigManager.cpp" />
     <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
+    <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

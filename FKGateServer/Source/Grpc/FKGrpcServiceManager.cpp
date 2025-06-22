@@ -1,5 +1,4 @@
 ﻿#include "FKGrpcServiceManager.h"
-#include "../FKServerConfig.h"
 #include <magic_enum/magic_enum.hpp>
 
 SINGLETON_CREATE_SHARED_CPP(FKGrpcServiceManager)
@@ -8,12 +7,12 @@ FKGrpcServiceManager::FKGrpcServiceManager() {
     std::println("FKGrpcServiceManager 已创建");
     
     // 从配置加载gRPC服务配置
-    FKServerConfig* config = FKServerConfig::getInstance();
+    FKConfigManager* config = FKConfigManager::getInstance();
     
     // 初始化验证码服务
     try {
-        auto verifyCodeConfig = config->getGrpcServiceConfig(gRPC::ServiceType::VERIFY_CODE_SERVICE);
-        _initializeService(gRPC::ServiceType::VERIFY_CODE_SERVICE, std::move(verifyCodeConfig));
+        _initializeService(gRPC::ServiceType::VERIFY_CODE_SERVICE,
+            config->getGrpcServiceConfig(gRPC::ServiceType::VERIFY_CODE_SERVICE));
     } catch (const std::exception& e) {
         std::println("初始化验证码服务失败: {}", e.what());
     }
@@ -23,7 +22,7 @@ FKGrpcServiceManager::~FKGrpcServiceManager() {
     shutdownAllServices();
 }
 
-void FKGrpcServiceManager::_initializeService(gRPC::ServiceType serviceType, FKGrpcServiceConfig&& config) {
+void FKGrpcServiceManager::_initializeService(gRPC::ServiceType serviceType, const FKGrpcServiceConfig& config) {
     std::lock_guard<std::mutex> lock(_pMutex);
     
     // 检查服务是否已存在
@@ -36,10 +35,10 @@ void FKGrpcServiceManager::_initializeService(gRPC::ServiceType serviceType, FKG
         switch (serviceType) {
             case gRPC::ServiceType::VERIFY_CODE_SERVICE: {
 				// 使用unique_ptr确保异常安全
-				std::unique_ptr<FKGrpcConnectionPool<ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE>::Type>> pool(
-					new FKGrpcConnectionPool<ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE>::Type>()
+                using service_type = ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE>::Type;
+				std::unique_ptr<FKGrpcConnectionPool<service_type>> pool(
+					new FKGrpcConnectionPool<service_type>(config)
 				);
-                pool->initialize(std::move(config));
 
 				auto rawPool = pool.release();
 				_pServicePools[serviceType] = {

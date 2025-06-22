@@ -21,9 +21,11 @@
 #include <chrono>
 #include <mutex>
 #include <print>
+
 #include "FKDef.h"
 #include "FKMacro.h"
 #include "FKGrpcConnectionPool.hpp"
+#include "../FKConfigManager.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
 #include "FKVerifyGrpc.grpc.pb.h"
@@ -35,7 +37,6 @@ template<> struct ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE> {
 	using Type = FKVerifyGrpc::VarifyCodeService;
 };
 #pragma endregion SERVICE_TRAITS_TEMPLATE
-
 
 class FKGrpcServiceManager {
     SINGLETON_CREATE_SHARED_H(FKGrpcServiceManager)
@@ -65,7 +66,7 @@ private:
     FKGrpcServiceManager();
     ~FKGrpcServiceManager();
 	// 初始化特定类型的gRPC服务连接池
-	void _initializeService(gRPC::ServiceType serviceType, FKGrpcServiceConfig&& config);
+	void _initializeService(gRPC::ServiceType serviceType, const FKGrpcServiceConfig& config);
 
 	struct ServicePoolWrapper {
 		void* poolPtr{ nullptr };

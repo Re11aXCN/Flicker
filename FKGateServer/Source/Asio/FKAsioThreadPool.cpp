@@ -1,5 +1,4 @@
 ﻿#include "FKAsioThreadPool.h"
-#include "FKServerConfig.h"
 #include <print>
 
 SINGLETON_CREATE_CPP(FKAsioThreadPool)
@@ -9,13 +8,8 @@ FKAsioThreadPool::FKAsioThreadPool()
 {
 	std::println("线程池构造");
 	
-	// 从配置加载参数
-	FKServerConfig* config = FKServerConfig::getInstance();
-	size_t threadCount = config->getAsioThreadPoolConfig().threadCount;
-	size_t channelCapacity = config->getAsioThreadPoolConfig().channelCapacity;
-	
 	// 使用配置的参数初始化线程池
-	_initialize(threadCount, channelCapacity);
+	_initialize(FKConfigManager::getInstance()->getAsioThreadPoolConfig());
 }
 
 FKAsioThreadPool::~FKAsioThreadPool()
@@ -23,26 +17,26 @@ FKAsioThreadPool::~FKAsioThreadPool()
 	stop();
 }
 
-void FKAsioThreadPool::_initialize(size_t threadCount /*= std::thread::hardware_concurrency()*/, size_t channelCapacity /*= 1024*/)
+void FKAsioThreadPool::_initialize(const FKAsioThreadPoolConfig& config)
 {
 	if (_pIsRunning) return;
 	std::println("线程池初始化");
 
 	_pIsRunning = true;
-	std::vector<ioContext> newContexts{ threadCount };
+	std::vector<ioContext> newContexts{ config.ThreadCount };
 	_pContexts.swap(newContexts);
 	_pGuards.clear();
-	_pGuards.reserve(threadCount);
-	_pThreads.resize(threadCount);
+	_pGuards.reserve(config.ThreadCount);
+	_pThreads.resize(config.ThreadCount);
 
 	// 创建任务通道
 	_pTaskChannels.resize(3); // 高、中、低三个优先级
 	for (auto& channel : _pTaskChannels) {
-		channel = std::make_unique<taskChannel>(_pContexts[0], channelCapacity);
+		channel = std::make_unique<taskChannel>(_pContexts[0], config.ChannelCapacity);
 	}
 
 	// 为每个io_context创建工作守卫和线程
-	for (size_t i = 0; i < threadCount; ++i) {
+	for (size_t i = 0; i < config.ThreadCount; ++i) {
 		// 创建工作守卫
 		_pGuards.emplace_back(boost::asio::make_work_guard(_pContexts[i]));
 
