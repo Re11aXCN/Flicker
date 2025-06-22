@@ -34,7 +34,8 @@ namespace Http {
 		ID_REGISTER_USER = 1002,
 	};
 	enum class RequestSeviceType {
-		REGISTER,
+		GET_VARIFY_CODE,
+		REGISTER_USER,
 		CHANGE_PASSWORD,
 	};
 	enum class RequestStatusCode {
@@ -43,6 +44,20 @@ namespace Http {
 		NETWORK_ABNORMAL	= 4002,
 		GRPC_CALL_FAILED	= 4003,
 		MISSING_FIELDS 		= 4004,
+		VERIFY_CODE_EXPIRED	= 4005,
+		VERIFY_CODE_ERROR	= 4006,
+		USER_EXIST			= 4007,
+	};
+}
+
+namespace gRPC {
+	enum class ServiceType {
+		VERIFY_CODE_SERVICE = 0,  // 验证码服务
+		USER_AUTH_SERVICE,        // 用户认证服务
+		PROFILE_SERVICE,          // 用户资料服务
+		MESSAGE_SERVICE,          // 消息服务
+
+		SERVICE_TYPE_COUNT        // 服务类型计数，必须放在最后
 	};
 }
 

@@ -2,112 +2,50 @@
 #include <json/json.h>
 
 #include "FKServer.h"
-#include  <hiredis/hiredis.h>
+#include "Source/FKServerConfig.h"
+#include <functional>
 #include <iostream>
-void TestRedis() {
-	// 连接 Redis
-	redisContext* c = redisConnect("127.0.0.1", 6379);
-	if (c->err) {
-		std::cerr << "Connect to redisServer failed: " << c->errstr << std::endl;
-		redisFree(c);
-		return;
-	}
-	std::cout << "Connect to redisServer Success" << std::endl;
 
-	// 修复点：使用 c_str() 转换
-	std::string redis_password = "123456";
-	redisReply* r = (redisReply*)redisCommand(c, "auth %s", redis_password.c_str());
-
-	if (!r) {
-		std::cerr << "Redis authentication command failed" << std::endl;
-		redisFree(c);
-		return;
+class Finally {
+public:
+	explicit Finally(std::function<void()> action)
+		: action_(std::move(action)) {
 	}
 
-	if (r->type == REDIS_REPLY_ERROR) {
-		std::cerr << "Redis认证失败: " << r->str << std::endl;
-	}
-	else {
-		std::cout << "Redis认证成功" << std::endl;
-	}
-	freeReplyObject(r);
-
-	//为redis设置key
-	const char* command1 = "set stest1 value1";
-
-	//执行redis命令行
-	r = (redisReply*)redisCommand(c, command1);
-
-	//如果返回NULL则说明执行失败
-	if (NULL == r)
-	{
-		printf("Execut command1 failure\n");
-		redisFree(c);        return;
+	~Finally() noexcept {
+		if (action_) {
+			try { action_(); }
+			catch (...) { /* 禁止抛出异常 */ }
+		}
 	}
 
-	//如果执行失败则释放连接
-	if (!(r->type == REDIS_REPLY_STATUS && (strcmp(r->str, "OK") == 0 || strcmp(r->str, "ok") == 0)))
-	{
-		printf("Failed to execute command[%s]\n", command1);
-		freeReplyObject(r);
-		redisFree(c);        return;
-	}
+	Finally(const Finally&) = delete;
+	Finally& operator=(const Finally&) = delete;
 
-	//执行成功 释放redisCommand执行后返回的redisReply所占用的内存
-	freeReplyObject(r);
-	printf("Succeed to execute command[%s]\n", command1);
+private:
+	std::function<void()> action_;
+};
 
-	const char* command2 = "strlen stest1";
-	r = (redisReply*)redisCommand(c, command2);
 
-	//如果返回类型不是整形 则释放连接
-	if (r->type != REDIS_REPLY_INTEGER)
-	{
-		printf("Failed to execute command[%s]\n", command2);
-		freeReplyObject(r);
-		redisFree(c);        return;
-	}
-
-	//获取字符串长度
-	int length = r->integer;
-	freeReplyObject(r);
-	printf("The length of 'stest1' is %d.\n", length);
-	printf("Succeed to execute command[%s]\n", command2);
-
-	//获取redis键值对信息
-	const char* command3 = "get stest1";
-	r = (redisReply*)redisCommand(c, command3);
-	if (r->type != REDIS_REPLY_STRING)
-	{
-		printf("Failed to execute command[%s]\n", command3);
-		freeReplyObject(r);
-		redisFree(c);        return;
-	}
-	printf("The value of 'stest1' is %s\n", r->str);
-	freeReplyObject(r);
-	printf("Succeed to execute command[%s]\n", command3);
-
-	const char* command4 = "get stest2";
-	r = (redisReply*)redisCommand(c, command4);
-	if (r->type != REDIS_REPLY_NIL)
-	{
-		printf("Failed to execute command[%s]\n", command4);
-		freeReplyObject(r);
-		redisFree(c);        return;
-	}
-	freeReplyObject(r);
-	printf("Succeed to execute command[%s]\n", command4);
-
-	//释放连接资源
-	redisFree(c);
-
-}
+#define CONCAT_IMPL(a, b) a##b
+#define CONCAT(a, b) CONCAT_IMPL(a, b)
+#define _finally(code) \
+    Finally CONCAT(_finally_, __LINE__)([&]() ##code);
 int main(int argc, char* argv[])
 {
-	TestRedis();
 	try
 	{
-		UINT16 port = 8080;
+		// 获取服务器配置（单例构造函数中已自动加载配置）
+		auto serverConfig = FKServerConfig::getInstance();
+		
+		// 获取服务器配置
+		UINT16 port = serverConfig->getServerPort();
+		size_t threadPoolSize = serverConfig->getAsioThreadPoolSize();
+		
+		std::println("服务器启动中...");
+		std::println("端口: {}", port);
+		std::println("ASIO线程池大小: {}", threadPoolSize);
+		
 		boost::asio::io_context ioContext;
 		boost::asio::signal_set signals(ioContext, SIGINT, SIGTERM);
 		signals.async_wait([&ioContext](const boost::system::error_code& error, int signalNumber) {
@@ -116,8 +54,11 @@ int main(int argc, char* argv[])
 				std::println("Error: {}", error.message());
 				return;
 			}
+			std::println("接收到停止信号，服务器正在关闭...");
 			ioContext.stop();
 			});
+		
+		// 使用配置创建服务器
 		std::make_shared<FKServer>(ioContext, port)->start();
 		ioContext.run();
 	}

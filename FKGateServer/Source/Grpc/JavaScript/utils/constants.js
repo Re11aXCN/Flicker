@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 常量定义文件
  * 包含系统中使用的各种常量和错误码
  */
@@ -10,7 +10,7 @@ const VERIFICATION = {
     // 验证码在Redis中的前缀
     CODE_PREFIX: "verification_code_",
     // 验证码有效期（秒）
-    EXPIRATION: 180
+    EXPIRATION: 300
 };
 
 /**

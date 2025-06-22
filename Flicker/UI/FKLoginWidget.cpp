@@ -19,6 +19,8 @@
 #include "Source/FKHttpManager.h"
 constexpr int LOGIN_WIDGET_WIDTH = 430;
 constexpr int LOGIN_WIDGET_HEIGHT = 330;
+static QRegularExpression s_email_pattern_regex(R"(^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
+static QRegularExpression s_username_pattern_regex("^[a-zA-Z0-9_]+$");
 FKLoginWidget::FKLoginWidget(QWidget *parent)
     : NXWidget(parent)
 {
@@ -26,6 +28,7 @@ FKLoginWidget::FKLoginWidget(QWidget *parent)
 	_initRegistryCallback();
 	QObject::connect(FKHttpManager::getInstance().get(), &FKHttpManager::httpRequestFinished, this, &FKLoginWidget::_handleServerResponse);
 	QObject::connect(_pLoginSwitchToRegisterPageButton, &NXText::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Register); });
+	QObject::connect(_pRegisterConfirmButton, &NXPushButton::clicked, this, &FKLoginWidget::_onRegisterComfirmButtonClicked);
 	QObject::connect(_pRegisterCancelButton, &NXPushButton::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Login); });
 	QObject::connect(_pRegisterGetVerifyCodeButton, &NXPushButton::clicked, this, &FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked);
 }
@@ -248,13 +251,23 @@ void FKLoginWidget::_initRegistryCallback()
 {
 	_responseCallbacks.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
 		qDebug() << "get varify code response is " << jsonObj;
-		if (jsonObj["error"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
-			this->_showMessage("ERROR", "注册表单错误，请填写！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		if (jsonObj["status_code"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
+			this->_showMessage("ERROR", jsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::Bottom);
 			return;
 		}
-		QString email = jsonObj["email"].toString();
-		this->_showMessage("SUCCESS", "验证码已发送到邮箱，注意查收！", NXMessageBarType::Success, NXMessageBarType::Top);
-		qDebug() << "email is " << email;
+		QJsonObject data = jsonObj["data"].toObject();
+		this->_showMessage("SUCCESS", jsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::Top);
+		qDebug() << "email is " << data["email"].toString();
+		});
+	_responseCallbacks.insert(Http::RequestId::ID_REGISTER_USER, [this](const QJsonObject& jsonObj) {
+		qDebug() << "get varify code response is " << jsonObj;
+		if (jsonObj["status_code"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
+			this->_showMessage("ERROR", jsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::Bottom);
+			return;
+		}
+		QJsonObject data = jsonObj["data"].toObject();
+		this->_showMessage("SUCCESS", jsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::Top);
+		qDebug() << "email is " << data["email"].toString();
 		});
 }
 
@@ -281,11 +294,11 @@ void FKLoginWidget::_handleServerResponse(const QString& response, Http::Request
 		return;
 	}
 
-	QJsonObject jsonObject = jsonDoc.object();
-
 	switch (serviceType) {
-	case Http::RequestSeviceType::REGISTER:
-		_responseCallbacks[requestId](jsonObject);
+	case Http::RequestSeviceType::GET_VARIFY_CODE:
+		_responseCallbacks[requestId](jsonDoc.object());
+	case Http::RequestSeviceType::REGISTER_USER:
+		_responseCallbacks[requestId](jsonDoc.object());
 	default:
 		break;
 	}
@@ -294,16 +307,93 @@ void FKLoginWidget::_handleServerResponse(const QString& response, Http::Request
 void FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked()
 {
 	QString email = _pRegisterEmailLineEdit->text().trimmed();
-	QRegularExpression emailRegex(R"(^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
-	if (!emailRegex.match(email).hasMatch()) {
+	if (!s_email_pattern_regex.match(email).hasMatch()) {
 		this->_showMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
 		return;
 	}
+	// 创建 JSON 请求对象
 	QJsonObject requestObj;
-	requestObj["email"] = email;
-	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER);
-	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varifycode",
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::GET_VARIFY_CODE);
+	requestObj["message"] = QStringLiteral("请求获取验证码");
+
+	// 创建数据对象
+	QJsonObject dataObj;
+	dataObj["email"] = email;
+	requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+
+	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varify_code",
 		requestObj,
 		Http::RequestId::ID_GET_VARIFY_CODE,
-		Http::RequestSeviceType::REGISTER);
+		Http::RequestSeviceType::GET_VARIFY_CODE);
+}
+
+void FKLoginWidget::_onRegisterComfirmButtonClicked()
+{
+	// 用户名验证（只允许字母、数字、下划线）
+	QString username = _pRegisterUsernameLineEdit->text().trimmed();
+	if (username.isEmpty()) {
+		this->_showMessage("ERROR", "用户名不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	else if (!s_username_pattern_regex.match(username).hasMatch()) {
+		this->_showMessage("ERROR", "用户名只能包含字母、数字和下划线！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	
+	QString email = _pRegisterEmailLineEdit->text().trimmed();
+	if (!s_email_pattern_regex.match(email).hasMatch()) {
+		this->_showMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+
+	// 密码规则验证（8-20位，不能包含空格）
+	QString password = _pRegisterPasswordLineEdit->text();
+	if (password.isEmpty()) {
+		this->_showMessage("ERROR", "密码不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	else if (password.length() < 8 || password.length() > 20) {
+		this->_showMessage("ERROR", "密码长度需在8-20位之间！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	else if (password.contains(' ')) {
+		this->_showMessage("ERROR", "密码不能包含空格！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+
+	// 密码一致性检查
+	QString confirm = _pRegisterConfirmPasswordLineEdit->text();
+	if (confirm.isEmpty()) {
+		this->_showMessage("ERROR", "确认密码不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	else if (password != confirm) {
+		this->_showMessage("ERROR", "两次输入的密码不一致！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+
+	// 验证码检查
+	QString varifyCode = _pRegisterVerifyCodeLineEdit->text().trimmed();
+	if (varifyCode.isEmpty()) {
+		this->_showMessage("ERROR", "验证码不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+
+	// 创建 JSON 请求对象
+	QJsonObject requestObj;
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
+	requestObj["message"] = QStringLiteral("请求注册用户");
+
+	// 创建数据对象
+	QJsonObject dataObj;
+	dataObj["username"] = username;
+	dataObj["email"] = email;
+	dataObj["password"] = password;
+	dataObj["verify_code"] = varifyCode;
+	requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+
+	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/register_user",
+		requestObj,
+		Http::RequestId::ID_REGISTER_USER,
+		Http::RequestSeviceType::REGISTER_USER);
 }

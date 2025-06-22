@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 邮件服务模块
  * 负责处理邮件发送功能
  */
@@ -55,12 +55,12 @@ async function sendVerificationEmail(email, code) {
         from: emailConfig.user,
         to: email,
         subject: 'Flicker应用验证码',
-        text: `您的验证码为 ${code}，请在三分钟内完成注册。`,
+        text: `您的验证码为 ${code}，请在五分钟内完成注册。`,
         html: `<div style="font-family: Arial, sans-serif; color: #333;">
                 <h2 style="color: #4a86e8;">Flicker应用验证码</h2>
                 <p>您好！</p>
                 <p>您的验证码为: <strong style="font-size: 18px; color: #4a86e8;">${code}</strong></p>
-                <p>请在三分钟内完成注册。</p>
+                <p>请在五分钟内完成注册。</p>
                 <p>如果您没有请求此验证码，请忽略此邮件。</p>
                 <p>谢谢！</p>
               </div>`

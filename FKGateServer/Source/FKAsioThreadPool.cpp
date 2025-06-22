@@ -1,18 +1,5 @@
-﻿/*************************************************************************************
- *
- * @ Filename	 : FKAsioThreadPool.cpp
- * @ Description : 高效的Asio线程池实现，支持多线程运行io_context
- * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
- * @ Date Created: 2025/6/19
- * ======================================
- * HISTORICAL UPDATE HISTORY
- * Version: V      Modify Time:       Modified By: 
- * Modifications: 
- * ======================================
-*************************************************************************************/
-#include "FKAsioThreadPool.h"
+﻿#include "FKAsioThreadPool.h"
+#include "FKServerConfig.h"
 #include <print>
 
 SINGLETON_CREATE_CPP(FKAsioThreadPool)
@@ -20,7 +7,15 @@ FKAsioThreadPool::FKAsioThreadPool()
 	: _pIsRunning(false)
 	, _pNextIndex(0)
 {
-	std::print("线程池初始化\n");
+	std::println("线程池构造");
+	
+	// 从配置加载参数
+	FKServerConfig* config = FKServerConfig::getInstance();
+	size_t threadCount = config->getAsioThreadPoolConfig().threadCount;
+	size_t channelCapacity = config->getAsioThreadPoolConfig().channelCapacity;
+	
+	// 使用配置的参数初始化线程池
+	_initialize(threadCount, channelCapacity);
 }
 
 FKAsioThreadPool::~FKAsioThreadPool()
@@ -28,9 +23,10 @@ FKAsioThreadPool::~FKAsioThreadPool()
 	stop();
 }
 
-void FKAsioThreadPool::initialize(size_t threadCount /*= std::thread::hardware_concurrency()*/, size_t channelCapacity /*= 1024*/)
+void FKAsioThreadPool::_initialize(size_t threadCount /*= std::thread::hardware_concurrency()*/, size_t channelCapacity /*= 1024*/)
 {
 	if (_pIsRunning) return;
+	std::println("线程池初始化");
 
 	_pIsRunning = true;
 	std::vector<ioContext> newContexts{ threadCount };
@@ -60,7 +56,7 @@ void FKAsioThreadPool::initialize(size_t threadCount /*= std::thread::hardware_c
 				_pContexts[i].run();
 			}
 			catch (const std::exception& e) {
-				std::print("线程池异常: {}\n", e.what());
+				std::println("线程池异常: {}", e.what());
 				_logError("线程池运行异常", e.what(), std::source_location::current());
 			}
 			});
@@ -135,7 +131,7 @@ bool FKAsioThreadPool::post(std::function<void()> task, Priority priority /*= Pr
 		std::move(task),
 		[](boost::system::error_code ec) {
 			if (ec) {
-				std::print("任务提交失败: {}\n", ec.message());
+				std::println("任务提交失败: {}", ec.message());
 			}
 		}
 	);
@@ -177,38 +173,6 @@ void FKAsioThreadPool::_startTaskDispatcher()
 	for (size_t i = 0; i < _pTaskChannels.size(); ++i) {
 		if (!_pTaskChannels[i]) continue;
 
-		//// 递归接收任务,这样写回调是空地址
-		//std::function<void()> receiveTask = [this, i, receiveTask]() {
-		//	if (!_pIsRunning) return;
-
-		//	_pTaskChannels[i]->async_receive(
-		//		[this, i, receiveTask](boost::system::error_code ec, std::function<void()> task) {
-		//			if (ec) {
-		//				if (ec != boost::asio::experimental::channel_errc::channel_closed) {
-		//					std::print("任务接收错误: {}\n", ec.message());
-		//				}
-		//				return;
-		//			}
-
-		//			// 获取下一个io_context并执行任务
-		//			ioContext& context = getNextContext();
-		//			boost::asio::post(context, [task = std::move(task)]() {
-		//				try {
-		//					task();
-		//				}
-		//				catch (const std::exception& e) {
-		//					std::print("任务执行异常: {}\n", e.what());
-		//				}
-		//				});
-
-		//			// 继续接收下一个任务
-		//			receiveTask();
-		//		}
-		//	);
-		//	};
-
-		//// 开始接收任务
-		//receiveTask();
 		 // 使用 std::function 声明接收函数
 		std::function<void()> receiveFunc;
 
@@ -218,7 +182,7 @@ void FKAsioThreadPool::_startTaskDispatcher()
 				[this, i, &receiveFunc](boost::system::error_code ec, std::function<void()> task) {
 					if (ec) {
 						if (ec != boost::asio::experimental::channel_errc::channel_closed) {
-							std::print("任务接收错误: {}\n", ec.message());
+							std::println("任务接收错误: {}", ec.message());
 						}
 						return;
 					}
@@ -229,7 +193,7 @@ void FKAsioThreadPool::_startTaskDispatcher()
 							if (task) task();
 						}
 						catch (const std::exception& e) {
-							std::print("任务执行异常: {}\n", e.what());
+							std::println("任务执行异常: {}", e.what());
 						}
 						});
 

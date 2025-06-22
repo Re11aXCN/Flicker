@@ -1,18 +1,4 @@
-﻿/*************************************************************************************
- *
- * @ Filename	 : FKHttpConnection.cpp
- * @ Description : 
- * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
- * @ Date Created: 2025/6/17
- * ======================================
- * HISTORICAL UPDATE HISTORY
- * Version: V          Modify Time:         Modified By: 
- * Modifications: 
- * ======================================
-*************************************************************************************/
-#include "FKHttpConnection.h"
+﻿#include "FKHttpConnection.h"
 #include <print>
 
 #include "FKLogicSystem.h"

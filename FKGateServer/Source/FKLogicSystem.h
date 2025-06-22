@@ -28,7 +28,7 @@
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
 
-#include "FKMarco.h"
+#include "FKMacro.h"
 #include "FKDef.h"
 
 class FKHttpConnection;

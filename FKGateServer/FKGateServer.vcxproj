@@ -23,10 +23,11 @@
     <ClInclude Include="Source\FKHttpConnection.h" />
     <ClInclude Include="Source\FKLogicSystem.h" />
     <ClInclude Include="Source\FKServer.h" />
-    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.h" />
+    <ClInclude Include="Source\FKServerConfig.h" />
+    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp" />
+    <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
-    <ClInclude Include="Source\Grpc\FKVerifyGrpcClient.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -34,9 +35,10 @@
     <ClCompile Include="Source\FKHttpConnection.cpp" />
     <ClCompile Include="Source\FKLogicSystem.cpp" />
     <ClCompile Include="Source\FKServer.cpp" />
+    <ClCompile Include="Source\FKServerConfig.cpp" />
+    <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\FKVerifyGrpcClient.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

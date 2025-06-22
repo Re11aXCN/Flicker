@@ -45,7 +45,7 @@ private:
 	// private slots
 	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 	Q_SLOT void _onRegisterGetVerifyCodeButtonClicked();
-	
+	Q_SLOT void _onRegisterComfirmButtonClicked();
 	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _responseCallbacks;
 	
 	NXMessageButton* _pMessageButton{ nullptr };

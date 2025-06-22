@@ -150,7 +150,7 @@
     <QtRcc Include="Resource\Flicker.qrc" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Global\FKMarco.h" />
+    <ClInclude Include="Global\FKMacro.h" />
     <ClInclude Include="Global\FKDef.h" />
     <ClInclude Include="Global\FKUtils.h" />
     <QtMoc Include="Source\FKHttpManager.h" />

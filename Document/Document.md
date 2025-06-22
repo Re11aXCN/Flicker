@@ -49,6 +49,8 @@ Port = 50051
 
 ## 4. 问题记录
 
+### shared_ptr管理的单例
+
 ```cpp
 #define SINGLETON_CREATE_SHARED_H(Class)          \
 private:                                            \
@@ -138,5 +140,115 @@ public:                                                     \
         });                                         \
         return _instance;                           \
     } 
+```
+
+### redis测试
+
+redis是C语言写的，如果使用std::string，即使密码正确`redisReply* r = (redisReply*)redisCommand(c, "auth %s", redis_password);`仍会得到的是响应错误，
+
+原因分析：
+
+1. 在C++中，`std::string`类型**并不是以空字符('\0')结尾的字符串**（虽然实际上C++11标准保证std::string内部存储是连续的，并且可以通过c_str()获取空字符结尾的字符串）。但是，`redisCommand`函数是一个可变参数函数，类似于`printf`，它期望一个格式字符串和一系列参数。当使用`%s`格式说明符时，它期望一个**以空字符结尾的字符串（即C风格字符串）**。
+
+```C
+void TestRedis() {
+	// 连接 Redis
+	redisContext* c = redisConnect("127.0.0.1", 6379);
+	if (c->err) {
+		std::cerr << "Connect to redisServer failed: " << c->errstr << std::endl;
+		redisFree(c);
+		return;
+	}
+	std::cout << "Connect to redisServer Success" << std::endl;
+
+	// 修复点：使用 c_str() 转换
+	std::string redis_password = "123456";
+	redisReply* r = (redisReply*)redisCommand(c, "auth %s", redis_password.c_str());
+
+	if (!r) {
+		std::cerr << "Redis authentication command failed" << std::endl;
+		redisFree(c);
+		return;
+	}
+
+	if (r->type == REDIS_REPLY_ERROR) {
+		std::cerr << "Redis认证失败: " << r->str << std::endl;
+	}
+	else {
+		std::cout << "Redis认证成功" << std::endl;
+	}
+	freeReplyObject(r);
+
+	//为redis设置key
+	const char* command1 = "set stest1 value1";
+
+	//执行redis命令行
+	r = (redisReply*)redisCommand(c, command1);
+
+	//如果返回NULL则说明执行失败
+	if (NULL == r)
+	{
+		printf("Execut command1 failure\n");
+		redisFree(c);        return;
+	}
+
+	//如果执行失败则释放连接
+	if (!(r->type == REDIS_REPLY_STATUS && (strcmp(r->str, "OK") == 0 || strcmp(r->str, "ok") == 0)))
+	{
+		printf("Failed to execute command[%s]\n", command1);
+		freeReplyObject(r);
+		redisFree(c);        return;
+	}
+
+	//执行成功 释放redisCommand执行后返回的redisReply所占用的内存
+	freeReplyObject(r);
+	printf("Succeed to execute command[%s]\n", command1);
+
+	const char* command2 = "strlen stest1";
+	r = (redisReply*)redisCommand(c, command2);
+
+	//如果返回类型不是整形 则释放连接
+	if (r->type != REDIS_REPLY_INTEGER)
+	{
+		printf("Failed to execute command[%s]\n", command2);
+		freeReplyObject(r);
+		redisFree(c);        return;
+	}
+
+	//获取字符串长度
+	int length = r->integer;
+	freeReplyObject(r);
+	printf("The length of 'stest1' is %d.\n", length);
+	printf("Succeed to execute command[%s]\n", command2);
+
+	//获取redis键值对信息
+	const char* command3 = "get stest1";
+	r = (redisReply*)redisCommand(c, command3);
+	if (r->type != REDIS_REPLY_STRING)
+	{
+		printf("Failed to execute command[%s]\n", command3);
+		freeReplyObject(r);
+		redisFree(c);        return;
+	}
+	printf("The value of 'stest1' is %s\n", r->str);
+	freeReplyObject(r);
+	printf("Succeed to execute command[%s]\n", command3);
+
+	const char* command4 = "get stest2";
+	r = (redisReply*)redisCommand(c, command4);
+	if (r->type != REDIS_REPLY_NIL)
+	{
+		printf("Failed to execute command[%s]\n", command4);
+		freeReplyObject(r);
+		redisFree(c);        return;
+	}
+	freeReplyObject(r);
+	printf("Succeed to execute command[%s]\n", command4);
+
+	//释放连接资源
+	redisFree(c);
+
+}
+
 ```
 

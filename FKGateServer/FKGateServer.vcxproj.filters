@@ -30,13 +30,16 @@
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\FKVerifyGrpcClient.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Source\FKAsioThreadPool.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.h">
+    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FKServerConfig.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,13 +59,16 @@
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\FKVerifyGrpcClient.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Source\FKAsioThreadPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\FKServerConfig.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

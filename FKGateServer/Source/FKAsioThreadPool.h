@@ -3,7 +3,7 @@
  * @ Filename	 : FKAsioThreadPool.h
  * @ Description : 高效的Asio线程池实现，支持多线程运行io_context
  * 
- * @ Version	 : V2.0
+ * @ Version	 : V1.0
  * @ Author		 : Re11a
  * @ Date Created: 2025/6/19
  * ======================================
@@ -27,7 +27,7 @@
 #include <print>
 #include <boost/asio.hpp>
 #include <boost/asio/experimental/channel.hpp>
-#include "FKMarco.h"
+#include "FKMacro.h"
 
 /**
  * @brief 高效的线程池类，管理多个工作线程，每个线程运行一个io_context
@@ -50,12 +50,6 @@ public:
 		normal,
 		low
 	};
-    /**
-     * @brief 初始化线程池
-     * @param threadCount 线程数量，默认为系统核心数
-     * @param channelCapacity 任务通道容量，默认为1024
-     */
-    void initialize(size_t threadCount = std::thread::hardware_concurrency() / 2, size_t channelCapacity = 1024);
 
     /**
      * @brief 停止线程池
@@ -95,6 +89,13 @@ public:
      */
     bool running() const { return _pIsRunning; }
 private:
+    /**
+     * @brief 初始化线程池
+     * @param threadCount 线程数量，默认为系统核心数
+     * @param channelCapacity 任务通道容量，默认为1024
+     */
+    void _initialize(size_t threadCount = std::thread::hardware_concurrency() / 2, size_t channelCapacity = 1024);
+
     /**
      * @brief 设置当前线程名称
      * @param name 线程名称

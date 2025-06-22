@@ -54,7 +54,7 @@
     <ClInclude Include="Global\FKUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Global\FKMarco.h">
+    <ClInclude Include="Global\FKMacro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

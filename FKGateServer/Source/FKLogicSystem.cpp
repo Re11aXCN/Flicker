@@ -1,27 +1,14 @@
-﻿/*************************************************************************************
- *
- * @ Filename	 : FKLogicSystem.cpp
- * @ Description : 
- * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
- * @ Date Created: 2025/6/17
- * ======================================
- * HISTORICAL UPDATE HISTORY
- * Version: V          Modify Time:         Modified By: 
- * Modifications: 
- * ======================================
-*************************************************************************************/
-#include "FKLogicSystem.h"
+﻿#include "FKLogicSystem.h"
 
 #include <print>
 
 #include <json/json.h>
 
 #include "FKHttpConnection.h"
-#include "Grpc/FKVerifyGrpcClient.h"
 #include "FKUtils.h"
+#include "Grpc/FKGrpcServiceManager.h"
 
+using namespace FKVerifyGrpc;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
 
 FKLogicSystem::FKLogicSystem()
@@ -88,14 +75,25 @@ FKLogicSystem::FKLogicSystem()
 
 		try {
 			// 调用gRPC服务
-			VarifyCodeResponseBody grpcResponse = FKVerifyGrpcClient::getInstance()->getVarifyCode(grpcRequest);
+			auto manager = FKGrpcServiceManager::getInstance();
+			VarifyCodeResponseBody grpcResponse = manager->getServicePool<gRPC::ServiceType::VERIFY_CODE_SERVICE>()
+                .executeWithConnection([&grpcRequest](auto* stub) {
+                    grpc::ClientContext context;
+                    VarifyCodeResponseBody response;
+                    stub->GetVarifyCode(&context, grpcRequest, &response);
+                    return response;
+                });
 
-			// 构建JSON响应
+			// 构建JSON响应（按照新格式）
 			responseRoot["status_code"] = grpcResponse.status_code();
 			responseRoot["message"] = grpcResponse.message();
-			responseRoot["request_type"] = grpcResponse.request_type();
-			responseRoot["email"] = grpcResponse.email();
-			responseRoot["varify_code"] = grpcResponse.varify_code();
+
+			// 创建data对象
+			Json::Value dataObj;
+			dataObj["request_type"] = grpcResponse.request_type();
+			dataObj["email"] = grpcResponse.email();
+			dataObj["varify_code"] = grpcResponse.varify_code();
+			responseRoot["data"] = dataObj;
 
 			// 根据gRPC状态设置HTTP状态
 			if (grpcResponse.status_code() >= 400) {
@@ -119,8 +117,71 @@ FKLogicSystem::FKLogicSystem()
 			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
 		};
 
+		auto registerUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+/*  qt发送的json数据
+	QJsonObject requestObj;
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
+	requestObj["message"] = QStringLiteral("请求注册用户");
+
+	// 创建数据对象
+	QJsonObject dataObj;
+	dataObj["username"] = username;
+	dataObj["email"] = email;
+	dataObj["password"] = password;
+	dataObj["verify_code"] = varifyCode;
+	requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+*/
+			// 读取请求体
+			std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
+			std::println("Received Body: \n{}", body);
+
+			// 设置响应头
+			connection->getResponse().set(boost::beast::http::field::content_type, "text/json");
+			Json::Value responseRoot;
+			// 解析JSON
+			Json::Value requestRoot;
+			Json::CharReaderBuilder readerBuilder;
+			std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+			std::string errors;
+			bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+
+			if (!isValidJson) {
+				std::println("Invalid JSON format: {}", errors);
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
+				responseRoot["message"] = "Invalid JSON format: " + errors;
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+				boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+				return;
+			}
+
+			//通过FKRedisManager TODO 
+			// 1.先查找key，邮箱是否存在（前缀"verification_code_" + email 作为key， 具体请查看配置constants.js） 
+			//   不存在说明验证码过期，Http::RequestStatusCode::VERIFY_CODE_EXPIRED，返回错误信息
+			// 2.处理json验证码和redis存储验证码是否匹配
+			//   不匹配，Http::RequestStatusCode::VERIFY_CODE_ERROR，返回错误信息
+			// 3.mysql查找是否存在用户
+			//   存在 Http::RequestStatusCode::USER_EXIST，返回错误信息
+			
+			// 构建JSON响应（按照新格式）
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
+			responseRoot["message"] = "Register success, go to login now!";
+
+			// 创建data对象
+			Json::Value dataObj;
+			dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
+			dataObj["username"] = requestRoot["data"]["username"].asString();
+			dataObj["email"] = requestRoot["data"]["email"].asString();
+			dataObj["password"] = requestRoot["data"]["password"].asString();
+			dataObj["verify_code"] = requestRoot["data"]["verify_code"].asString();
+			responseRoot["data"] = dataObj;
+
+			boost::beast::ostream(connection->getResponse().body())
+				<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+			};
 	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);
-	this->registerCallback("/get_varifycode", Http::RequestType::POST, getVarifyCodeFunc);
+	this->registerCallback("/get_varify_code", Http::RequestType::POST, getVarifyCodeFunc);
+	this->registerCallback("/register_user", Http::RequestType::POST, getVarifyCodeFunc);
+
 }
 
 bool FKLogicSystem::callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection)

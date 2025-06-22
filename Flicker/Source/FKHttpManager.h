@@ -17,7 +17,7 @@
 #include <QNetworkAccessManager>
 #include <QJsonObject>
 #include "FKDef.h"
-#include "FKMarco.h"
+#include "FKMacro.h"
 class FKHttpManager : public QObject, public std::enable_shared_from_this<FKHttpManager>
 {
 	Q_OBJECT

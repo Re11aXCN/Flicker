@@ -1,18 +1,4 @@
-﻿/*************************************************************************************
- *
- * @ Filename	 : FKServer.cpp
- * @ Description : 
- * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
- * @ Date Created: 2025/6/17
- * ======================================
- * HISTORICAL UPDATE HISTORY
- * Version: V          Modify Time:         Modified By: 
- * Modifications: 
- * ======================================
-*************************************************************************************/
-#include "FKServer.h"
+﻿#include "FKServer.h"
 #include "FKHttpConnection.h"
 #include "FKAsioThreadPool.h"
 #include <print>
@@ -26,13 +12,6 @@ FKServer::FKServer(boost::asio::io_context& ioc, UINT16 port)
 void FKServer::start()
 {
 	try {
-		// 确保线程池已初始化，使用系统核心数的一半作为线程数
-		if (!FKAsioThreadPool::getInstance()->running()) {
-			size_t threadCount = std::min<size_t>(2, std::thread::hardware_concurrency() / 2);
-			std::println("初始化线程池，线程数: {}", threadCount);
-			FKAsioThreadPool::getInstance()->initialize(threadCount);
-		}
-
 		// 获取下一个可用的IO上下文
 		FKAsioThreadPool::ioContext& ioc = FKAsioThreadPool::getInstance()->getNextContext();
 		
