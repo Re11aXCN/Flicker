@@ -28,6 +28,10 @@
     <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
+    <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
+    <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h" />
+    <ClInclude Include="Source\MySQL\FKUserManager.h" />
+    <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h" />
     <ClInclude Include="Source\Redis\FKRedisConnectionPool.h" />
   </ItemGroup>
   <ItemGroup>
@@ -40,6 +44,10 @@
     <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
+    <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp" />
+    <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp" />
+    <ClCompile Include="Source\MySQL\FKUserManager.cpp" />
+    <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp" />
     <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -194,6 +202,9 @@ utf8_validity.lib;
 zlibd.lib;
 redis++.lib;
 hiredisd.lib;
+mysqlcppconnx.lib;
+zstd.lib;
+lz4d.lib;
 		%(AdditionalDependencies)
 	  </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib</AdditionalLibraryDirectories>
@@ -267,6 +278,9 @@ utf8_validity.lib;
 zlib.lib;
 redis++.lib;
 hiredis.lib;
+mysqlcppconnx.lib;
+zstd.lib;
+lz4.lib;
 		%(AdditionalDependencies)
 		</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib</AdditionalLibraryDirectories>

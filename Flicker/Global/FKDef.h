@@ -1,4 +1,4 @@
-﻿/*************************************************************************************
+/*************************************************************************************
  *
  * @ Filename	 : FKDef.h
  * @ Description : 
@@ -32,10 +32,12 @@ namespace Http {
 	enum class RequestId {
 		ID_GET_VARIFY_CODE = 1001,
 		ID_REGISTER_USER = 1002,
+		ID_LOGIN_USER = 1003,
 	};
 	enum class RequestSeviceType {
 		GET_VARIFY_CODE,
 		REGISTER_USER,
+		LOGIN_USER,
 		CHANGE_PASSWORD,
 	};
 	enum class RequestStatusCode {
@@ -47,6 +49,8 @@ namespace Http {
 		VERIFY_CODE_EXPIRED	= 4005,
 		VERIFY_CODE_ERROR	= 4006,
 		USER_EXIST			= 4007,
+		DATABASE_ERROR 		= 4008,
+		PASSWORD_ERROR		= 4010,
 	};
 }
 

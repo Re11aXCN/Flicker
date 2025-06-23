@@ -36,30 +36,6 @@ FKGateServer服务器进行处理客户端发送的消息
 ## 3. TODO
 
 ```
-可以吧单例模式的设置都改一下
-
-设置一个配置单例，main方法就启动，
-其他的单例模式get使用的时候就加载单例的配置，比如连接池、线程池的一些设置，这样管理方便
-
-FKGrpcConnectionPool是一个模板旨在对任意的proto生成的gprc生成的服务连接进行管理，
-FKGrpcConnectionPool到底适不适合设计为单例？
-比如shared_ptr管理的FKVerifyGrpcClient单例内置使用
-std::unique_ptr<FKGrpcConnectionPool<VarifyCodeService>> _pConnectionPool;
-进行使用连接池的连接和规划连接，那么
-FKVerifyGrpcClient是否应该设计为FKGrpcServiceManager单例，因为Verify仅是我们的gprc通信的一个业务功能，
-FKGrpcServiceManager可以管理多个类似VarifyCodeService的grpc业务，获取验证码只是其中一个，也就是说
-FKGrpcServiceManager可以进行不同的grpc业务功能，内置了一个连接池，连接池可以管理不同的连接，如果是这样
-FKGrpcConnectionPool设计为了一个模板，好像不太好，因为每个grpc业务都要实例化，或许应该采用容器进行管理，
-通过映射不同的grpc类型，给自持有不同的连接个数，比如验证码业务，通过一个枚举映射，这个业务可以持有的连接是5，
-比如身份识别业务，也是通过枚举映射，持有连接时3，那么连接池的总连接时8
-
-请你检查内 Source Grpc 的所有cpp和.h文件，查找所有的单例类，帮我重构设计，我们打算设置一个配置单例类，main方法就启动，
-
-其他的单例模式getInstance()使用的时候就加载配置单例类的配置，比如连接池、线程池的一些设置，这样管理方便，我们不需要在手动进行设置配置，而是提供价值配置文件进行配置，请你思考使用一个合理的配置文件，如xml、json、ini其中的一个，你可以使用C++11到C++23和boost1.87版本特性进行高效解析文件
-
-封装reids连接池
-规范redis.js，并在emailVerificationServer.js进行逻辑完善，从redis进行查询是否存在，我们提供constants.js提供的前缀+email进行查询，找到直接使用，没找到存到redis，设置过期时间5分钟，注意处理失败
-
 mysql连接池，设置一个最后操作时间，如果最后操作时间到当前时间的差值大于规定时间要断开，采用子线程监控
 
 连接池查询等操作，需要通过获取当前时间和上一次操作数据库时间进行求差值，如果小于5s，我们就不进行连接池查询操作，

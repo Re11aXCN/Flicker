@@ -1,4 +1,4 @@
-﻿/*************************************************************************************
+/*************************************************************************************
  *
  * @ Filename	 : FKLoginWidget.cpp
  * @ Description : 
@@ -16,6 +16,8 @@
 #include <NXIcon.h>
 #include <QStackedWidget>
 #include <QJsonDocument>
+#include <QCryptographicHash>
+#include <QRandomGenerator>
 #include "Source/FKHttpManager.h"
 constexpr int LOGIN_WIDGET_WIDTH = 430;
 constexpr int LOGIN_WIDGET_HEIGHT = 330;
@@ -31,6 +33,7 @@ FKLoginWidget::FKLoginWidget(QWidget *parent)
 	QObject::connect(_pRegisterConfirmButton, &NXPushButton::clicked, this, &FKLoginWidget::_onRegisterComfirmButtonClicked);
 	QObject::connect(_pRegisterCancelButton, &NXPushButton::clicked, this, [this]() { _pStackedWidget->setCurrentIndex(LoginSide::Login); });
 	QObject::connect(_pRegisterGetVerifyCodeButton, &NXPushButton::clicked, this, &FKLoginWidget::_onRegisterGetVerifyCodeButtonClicked);
+	QObject::connect(_pLoginSubmitButton, &NXPushButton::clicked, this, &FKLoginWidget::_onLoginButtonClicked);
 }
 
 FKLoginWidget::~FKLoginWidget()
@@ -260,7 +263,7 @@ void FKLoginWidget::_initRegistryCallback()
 		qDebug() << "email is " << data["email"].toString();
 		});
 	_responseCallbacks.insert(Http::RequestId::ID_REGISTER_USER, [this](const QJsonObject& jsonObj) {
-		qDebug() << "get varify code response is " << jsonObj;
+		qDebug() << "register user response is " << jsonObj;
 		if (jsonObj["status_code"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
 			this->_showMessage("ERROR", jsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::Bottom);
 			return;
@@ -268,6 +271,18 @@ void FKLoginWidget::_initRegistryCallback()
 		QJsonObject data = jsonObj["data"].toObject();
 		this->_showMessage("SUCCESS", jsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::Top);
 		qDebug() << "email is " << data["email"].toString();
+		});
+	_responseCallbacks.insert(Http::RequestId::ID_LOGIN_USER, [this](const QJsonObject& jsonObj) {
+		qDebug() << "login user response is " << jsonObj;
+		if (jsonObj["status_code"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
+			this->_showMessage("ERROR", jsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::Bottom);
+			return;
+		}
+		QJsonObject data = jsonObj["data"].toObject();
+		this->_showMessage("SUCCESS", "登录成功！", NXMessageBarType::Success, NXMessageBarType::Top);
+		
+		// TODO: 登录成功后的处理，如保存用户信息、跳转到主界面等
+		qDebug() << "User logged in: " << data["username"].toString();
 		});
 }
 
@@ -279,6 +294,57 @@ void FKLoginWidget::_showMessage(const QString& title, const QString& text, NXMe
 	_pMessageButton->setPositionPolicy(position);
 	_pMessageButton->setDisplayMsec(displayMsec);
 	Q_EMIT _pMessageButton->showMessage();
+}
+
+void FKLoginWidget::_onLoginButtonClicked()
+{
+	// 获取用户名/邮箱和密码
+	QString usernameOrEmail = _pLoginUsernameLineEdit->text().trimmed();
+	QString password = _pLoginPasswordLineEdit->text();
+	
+	// 验证输入
+	if (usernameOrEmail.isEmpty()) {
+		this->_showMessage("ERROR", "用户名/邮箱不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	
+	if (password.isEmpty()) {
+		this->_showMessage("ERROR", "密码不能为空！", NXMessageBarType::Error, NXMessageBarType::Bottom);
+		return;
+	}
+	
+	// 创建 JSON 请求对象
+	QJsonObject requestObj;
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
+	requestObj["message"] = "Client request for login";
+	
+	// 创建数据对象
+	QJsonObject dataObj;
+	
+	// 判断输入是邮箱还是用户名
+	if (s_email_pattern_regex.match(usernameOrEmail).hasMatch()) {
+		dataObj["email"] = usernameOrEmail;
+		dataObj["username"] = "";
+	} else {
+		dataObj["username"] = usernameOrEmail;
+		dataObj["email"] = "";
+	}
+	
+	// 对密码进行MD5哈希处理
+	QByteArray passwordHash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Md5).toHex();
+	dataObj["password"] = QString(passwordHash);
+	
+	// 记住密码和自动登录选项
+	dataObj["remember_password"] = _pLoginRememberPasswordCheckBox->isChecked();
+	dataObj["auto_login"] = _pLoginAutoLoginCheckBox->isChecked();
+	
+	requestObj["data"] = dataObj;
+	
+	// 发送登录请求
+	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/login_user",
+		requestObj,
+		Http::RequestId::ID_LOGIN_USER,
+		Http::RequestSeviceType::LOGIN_USER);
 }
 
 void FKLoginWidget::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode)

@@ -1,4 +1,4 @@
-﻿/*************************************************************************************
+/*************************************************************************************
  *
  * @ Filename	 : FKLoginWidget.h
  * @ Description : 
@@ -46,6 +46,7 @@ private:
 	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 	Q_SLOT void _onRegisterGetVerifyCodeButtonClicked();
 	Q_SLOT void _onRegisterComfirmButtonClicked();
+	Q_SLOT void _onLoginButtonClicked();
 	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _responseCallbacks;
 	
 	NXMessageButton* _pMessageButton{ nullptr };

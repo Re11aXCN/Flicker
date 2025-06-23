@@ -1,13 +1,16 @@
 ﻿#include "FKLogicSystem.h"
 
 #include <print>
-
+#include <random>
+#include <string>
+#include <vector>
 #include <json/json.h>
 
 #include "FKUtils.h"
 #include "Asio/FKHttpConnection.h"
 #include "Grpc/FKGrpcServiceManager.h"
 #include "Redis/FKRedisConnectionPool.h"
+#include "MySQL/Mapper/FKUserMapper.h"
 
 using namespace FKVerifyGrpc;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
@@ -121,19 +124,6 @@ FKLogicSystem::FKLogicSystem()
 		};
 
 	auto registerUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
-		/*  qt发送的json数据
-			QJsonObject requestObj;
-			requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
-			requestObj["message"] = QStringLiteral("请求注册用户");
-
-			// 创建数据对象
-			QJsonObject dataObj;
-			dataObj["username"] = username;
-			dataObj["email"] = email;
-			dataObj["password"] = password;
-			dataObj["verify_code"] = varifyCode;
-			requestObj["data"] = dataObj;  // 将数据对象添加到请求中
-		*/
 		// 读取请求体
 		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
 		std::println("Received Body: \n{}", body);
@@ -159,6 +149,7 @@ FKLogicSystem::FKLogicSystem()
 
 		// 验证必需字段
 		if (!requestRoot.isMember("data") || 
+			!requestRoot["data"].isMember("uuid") || requestRoot["data"]["uuid"].empty() ||
 			!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() ||
 			!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
 			!requestRoot["data"].isMember("password") || requestRoot["data"]["password"].empty() ||
@@ -172,6 +163,7 @@ FKLogicSystem::FKLogicSystem()
 		}
 
 		// 获取请求数据
+		std::string uuid = requestRoot["data"]["uuid"].asString();
 		std::string username = requestRoot["data"]["username"].asString();
 		std::string email = requestRoot["data"]["email"].asString();
 		std::string password = requestRoot["data"]["password"].asString();
@@ -180,9 +172,11 @@ FKLogicSystem::FKLogicSystem()
 		// 创建data对象（用于响应）
 		Json::Value dataObj;
 		dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
+		dataObj["uuid"] = uuid;
 		dataObj["username"] = username;
 		dataObj["email"] = email;
-		dataObj["password"] = password;
+		// 不在响应中返回密码
+		dataObj["password"] = "*****";
 		dataObj["verify_code"] = verifyCode;
 
 		// 验证码前缀（与JavaScript端constants.js中定义一致）
@@ -233,21 +227,68 @@ FKLogicSystem::FKLogicSystem()
 				return false;
 			}
 
-			// TODO: 3. 检查用户是否已存在（需要MySQL实现）
-			// 这里应该添加MySQL查询代码，检查用户是否已存在
-			// 如果用户已存在，设置错误码Http::RequestStatusCode::USER_EXIST
+			// 2. 检查用户是否已存在
+			auto userMapper = std::make_unique<FKUserMapper>();
+			
+			// 检查用户名是否已存在
+			auto existingUserByUsername = userMapper->findUserByUsername(username);
+			if (existingUserByUsername) {
+				std::println("用户名已存在: {}", username);
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
+				responseRoot["message"] = "Username already exists, please choose another one";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+				boost::beast::ostream(connection->getResponse().body())
+					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+				return false;
+			}
+			
+			// 检查邮箱是否已存在
+			auto existingUserByEmail = userMapper->findUserByEmail(email);
+			if (existingUserByEmail) {
+				std::println("邮箱已存在: {}", email);
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
+				responseRoot["message"] = "Email already exists, please use another one or recover your password";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+				boost::beast::ostream(connection->getResponse().body())
+					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+				return false;
+			}
 
-			// 临时：假设用户不存在，注册成功
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
-			responseRoot["message"] = "If you have successfully registered, please go to Login";
-			responseRoot["data"] = dataObj;
-			connection->getResponse().result(boost::beast::http::status::ok);
+			// 3. 使用BCrypt对密码进行哈希处理
+			auto [hashedPassword, salt] = PasswordUtils::hashPassword(password);
+			
+			// 4. 创建用户实体并保存到数据库
+			FKUserEntity newUser;
+			newUser.setUuid(uuid);
+			newUser.setUsername(username);
+			newUser.setEmail(email);
+			newUser.setPassword(hashedPassword);
+			newUser.setSalt(salt);
+			
+			// 使用事务保存用户
+			bool success = userMapper->insertUser(newUser);
+			
+			if (success) {
+				// 注册成功
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
+				responseRoot["message"] = "Registration successful, please go to Login";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::ok);
+			} else {
+				// 数据库操作失败
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::DATABASE_ERROR);
+				responseRoot["message"] = "Failed to register user due to database error";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::internal_server_error);
+			}
 
 		} catch (const std::exception& e) {
 			// 处理异常
 			std::println("注册过程发生异常: {}", e.what());
 			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
-			responseRoot["message"] = "Server Internal Error:" + std::string(e.what());
+			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
 			responseRoot["data"] = dataObj;
 			connection->getResponse().result(boost::beast::http::status::internal_server_error);
 		}
@@ -257,9 +298,132 @@ FKLogicSystem::FKLogicSystem()
 			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
 		return true;
 	};
+	auto loginUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+		// 读取请求体
+		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
+		std::println("Received Login Body: \n{}", body);
+
+		// 设置响应头
+		connection->getResponse().set(boost::beast::http::field::content_type, "text/json; charset=utf-8");
+		Json::Value responseRoot;
+		// 解析JSON
+		Json::Value requestRoot;
+		Json::CharReaderBuilder readerBuilder;
+		std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+		std::string errors;
+		bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+
+		if (!isValidJson) {
+			std::println("Invalid JSON format: {}", errors);
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
+			responseRoot["message"] = "Invalid JSON format: " + errors;
+			connection->getResponse().result(boost::beast::http::status::bad_request);
+			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+			return false;
+		}
+
+		// 验证必需字段
+		if (!requestRoot.isMember("data") || 
+			((!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty()) && 
+			(!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty())) ||
+			!requestRoot["data"].isMember("password") || requestRoot["data"]["password"].empty()) {
+			
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
+			responseRoot["message"] = "Missing username/email or password";
+			connection->getResponse().result(boost::beast::http::status::bad_request);
+			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+			return false;
+		}
+
+		// 获取请求数据
+		std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
+		std::string email = requestRoot["data"].isMember("email") ? requestRoot["data"]["email"].asString() : "";
+		std::string password = requestRoot["data"]["password"].asString();
+		bool rememberPassword = requestRoot["data"].isMember("remember_password") ? requestRoot["data"]["remember_password"].asBool() : false;
+		bool autoLogin = requestRoot["data"].isMember("auto_login") ? requestRoot["data"]["auto_login"].asBool() : false;
+
+		// 创建data对象（用于响应）
+		Json::Value dataObj;
+		dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
+		dataObj["username"] = username;
+		dataObj["email"] = email;
+		// 不在响应中返回密码
+		dataObj["password"] = "*****";
+		dataObj["remember_password"] = rememberPassword;
+		dataObj["auto_login"] = autoLogin;
+
+		try {
+			// 1. 查询用户
+			auto userMapper = std::make_unique<FKUserMapper>();
+			std::shared_ptr<FKUserEntity> user = nullptr;
+			
+			// 根据提供的用户名或邮箱查询用户
+			if (!username.empty()) {
+				user = userMapper->findUserByUsername(username);
+			} else if (!email.empty()) {
+				user = userMapper->findUserByEmail(email);
+			}
+			
+			// 检查用户是否存在
+			if (!user) {
+				std::println("用户不存在: {} / {}", username, email);
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_NOT_EXIST);
+				responseRoot["message"] = "User does not exist";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+				boost::beast::ostream(connection->getResponse().body())
+					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+				return false;
+			}
+			
+			// 2. 验证密码
+			std::string storedPassword = user->getPassword();
+			bool passwordValid = PasswordUtils::verifyPassword(password, storedPassword);
+			
+			if (!passwordValid) {
+				std::println("密码错误: {}", user->getUsername());
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::PASSWORD_ERROR);
+				responseRoot["message"] = "Incorrect password";
+				responseRoot["data"] = dataObj;
+				connection->getResponse().result(boost::beast::http::status::bad_request);
+				boost::beast::ostream(connection->getResponse().body())
+					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+				return false;
+			}
+			
+			// 3. 登录成功，更新响应数据
+			dataObj["username"] = user->getUsername();
+			dataObj["email"] = user->getEmail();
+			dataObj["uuid"] = user->getUuid();
+			
+			// TODO: 生成会话令牌并存储在Redis中
+			// TODO: 如果选择了记住密码，生成长期令牌
+			
+			// 4. 设置成功响应
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
+			responseRoot["message"] = "Login successful";
+			responseRoot["data"] = dataObj;
+			connection->getResponse().result(boost::beast::http::status::ok);
+
+		} catch (const std::exception& e) {
+			// 处理异常
+			std::println("登录过程发生异常: {}", e.what());
+			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
+			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
+			responseRoot["data"] = dataObj;
+			connection->getResponse().result(boost::beast::http::status::internal_server_error);
+		}
+
+		// 发送响应
+		boost::beast::ostream(connection->getResponse().body())
+			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+		return true;
+	};
+
 	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);
 	this->registerCallback("/get_varify_code", Http::RequestType::POST, getVarifyCodeFunc);
 	this->registerCallback("/register_user", Http::RequestType::POST, registerUserFunc);
+	this->registerCallback("/login_user", Http::RequestType::POST, loginUserFunc);
 
 }
 

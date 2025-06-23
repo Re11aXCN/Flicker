@@ -107,7 +107,14 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
         
         // 读取数据库配置
         if (root.isMember("mysql")) {
-            
+			const Json::Value& mysql = root["mysql"];
+			if (mysql.isMember("host")) _pMySQLConfig.Host = mysql["host"].asString();
+			if (mysql.isMember("port")) _pMySQLConfig.Port = mysql["port"].asInt();
+			if (mysql.isMember("password")) _pMySQLConfig.Password = mysql["password"].asString();
+			if (mysql.isMember("pool_size")) _pMySQLConfig.PoolSize = mysql["pool_size"].asInt();
+			if (mysql.isMember("connection_timeout")) _pMySQLConfig.ConnectionTimeout = std::chrono::seconds{ mysql["connection_timeout"].asInt() };
+			if (mysql.isMember("idle_timeout")) _pMySQLConfig.IdleTimeout = std::chrono::seconds{ mysql["idle_timeout"].asInt() };
+            if (mysql.isMember("monitor_interval")) _pMySQLConfig.MonitorInterval = std::chrono::seconds{ mysql["monitor_interval"].asInt() };
         }
 
         std::println("成功加载配置文件: {}", filePath);
@@ -169,7 +176,14 @@ bool FKConfigManager::saveToFile(const std::string& filePath) const
         root["redis"] = redis;
 
         // 数据库配置
-        // TODO: 数据库配置
+		Json::Value mysql;
+		mysql["host"] = _pMySQLConfig.Host;
+		mysql["port"] = static_cast<Json::UInt>(_pMySQLConfig.Port);
+		mysql["password"] = _pMySQLConfig.Password;
+		mysql["pool_size"] = static_cast<Json::UInt>(_pMySQLConfig.PoolSize);
+		mysql["connection_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.ConnectionTimeout.count());
+		mysql["idle_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.IdleTimeout.count());
+		mysql["monitor_interval"] = static_cast<Json::UInt>(_pMySQLConfig.MonitorInterval.count());
         
         // 写入文件
         std::ofstream configFile(filePath);

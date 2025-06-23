@@ -45,6 +45,18 @@
     <ClCompile Include="Source\Asio\FKServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MySQL\FKUserManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp">
@@ -75,6 +87,18 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Source\Asio\FKServer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\FKUserManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

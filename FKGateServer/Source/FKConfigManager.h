@@ -65,6 +65,19 @@ struct FKRedisConfig {
 	uint16_t PoolSize{ 10 };
 	uint16_t DBIndex{ 0 };                              // 数据库索引
 };
+
+// MySQL连接信息结构体
+struct FKMySQLConfig {
+	std::string Host{ "localhost" };
+	uint16_t Port{ 3306 };
+	uint16_t PoolSize{ 200 };
+	std::string Username{ "root" };
+	std::string Password{};
+	std::string Schema{ "flicker" };
+	std::chrono::seconds ConnectionTimeout{ 10 }; // 连接超时时间
+	std::chrono::seconds IdleTimeout{ 300 };     // 空闲连接超时时间
+	std::chrono::seconds MonitorInterval{ 60 };  // 监控线程检查间隔
+};
 #pragma endregion CONFIG_STRUCT
 
 
@@ -81,7 +94,7 @@ public:
 	const FKAsioThreadPoolConfig& getAsioThreadPoolConfig() const { return _pAsioThreadPoolConfig; }
 	const FKGrpcServiceConfig& getGrpcServiceConfig(gRPC::ServiceType type) const { return _pGrpcServiceConfigs.at(type); }
 	const FKRedisConfig& getRedisConfig() const { return _pRedisConfig; }
-	const std::string& getMysqlConnectionString() const { return _pMysqlConnectionString; }
+	const FKMySQLConfig& getMySQLConnectionString() const { return _pMySQLConfig; }
 	const std::chrono::seconds& getRequestTimeout() const { return _pRequestTimeout; }
 
 private:
@@ -100,8 +113,8 @@ private:
 	// Redis配置
 	FKRedisConfig _pRedisConfig;
 
-    // 数据库配置（预留）
-    std::string _pMysqlConnectionString;
+    // 数据库配置
+	FKMySQLConfig _pMySQLConfig;
 
 	// 超时配置
 	std::chrono::seconds _pRequestTimeout{ 10 };

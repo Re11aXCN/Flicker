@@ -165,6 +165,7 @@
     <QtMoc Include="Source\FKHttpManager.h" />
     <Image Include="Resource\ico\Weixin_IDI_ICON1.ico" />
     <ResourceCompile Include="Resource\ico\Flicker.rc" />
+    <ClInclude Include="Global\SnowflakeGenerator.hpp" />
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>

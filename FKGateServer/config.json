@@ -1,56 +1,61 @@
-{
-    "server": {
-        "host": "localhost",
-        "port": 8080,
-        "use_ssl": false
+﻿{
+  "server": {
+    "host": "localhost",
+    "port": 8080,
+    "use_ssl": false
+  },
+  "asio_thread_pool": {
+    "thread_count": 8,
+    "channel_capacity": 1024
+  },
+  "request_timeout": 30,
+  "grpc_services": {
+    "VERIFY_CODE_SERVICE": {
+      "host": "localhost",
+      "port": 50051,
+      "pool_size": 10,
+      "use_ssl": false,
+      "timeout": 15
     },
-    "asio_thread_pool": {
-        "thread_count": 8,
-        "channel_capacity": 1024
+    "USER_AUTH_SERVICE": {
+      "host": "localhost",
+      "port": 50052,
+      "pool_size": 8,
+      "use_ssl": false,
+      "timeout": 20
     },
-    "request_timeout": 30,
-    "grpc_services": {
-        "VERIFY_CODE_SERVICE": {
-            "host": "localhost",
-            "port": 50051,
-            "pool_size": 10,
-            "use_ssl": false,
-            "timeout": 15
-        },
-        "USER_AUTH_SERVICE": {
-            "host": "localhost",
-            "port": 50052,
-            "pool_size": 8,
-            "use_ssl": false,
-            "timeout": 20
-        },
-        "PROFILE_SERVICE": {
-            "host": "localhost",
-            "port": 50053,
-            "pool_size": 5,
-            "use_ssl": false,
-            "timeout": 10
-        },
-        "MESSAGE_SERVICE": {
-            "host": "localhost",
-            "port": 50054,
-            "pool_size": 12,
-            "use_ssl": false,
-            "timeout": 15
-        }
+    "PROFILE_SERVICE": {
+      "host": "localhost",
+      "port": 50053,
+      "pool_size": 5,
+      "use_ssl": false,
+      "timeout": 10
     },
-    "mysql": {
-        "host": "localhost",
-        "port": 3306,
-        "password": "123456"
-    },
-    "redis": {
-        "host": "localhost",
-        "port": 6379,
-        "password": "123456",
+    "MESSAGE_SERVICE": {
+      "host": "localhost",
+      "port": 50054,
+      "pool_size": 12,
+      "use_ssl": false,
+      "timeout": 15
+    }
+  },
+  "mysql": {
+    "host": "localhost",
+    "port": 3306,
+    "password": "123456",
+    "schema": "flicker",
+    "pool_size": 200,
+    "connection_timeout": 10,
+    "idle_timeout": 300,
+    "monitor_interval": 60
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": "123456",
 		"pool_size": 10,
 		"connection_timeout": 100,
 		"socket_timeout": 100,
 		"db_index": 0
-    }
+  }
 }
