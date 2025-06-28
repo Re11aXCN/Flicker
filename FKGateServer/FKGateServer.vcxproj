@@ -24,8 +24,11 @@
     <ClInclude Include="Source\Asio\FKLogicSystem.h" />
     <ClInclude Include="Source\Asio\FKServer.h" />
     <ClInclude Include="Source\FKConfigManager.h" />
+    <ClInclude Include="Source\FKStructConfig.h" />
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp" />
     <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h" />
+    <ClInclude Include="Source\Grpc\FKPasswordGrpc.grpc.pb.h" />
+    <ClInclude Include="Source\Grpc\FKPasswordGrpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
     <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
@@ -42,6 +45,8 @@
     <ClCompile Include="Source\Asio\FKServer.cpp" />
     <ClCompile Include="Source\FKConfigManager.cpp" />
     <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp" />
+    <ClCompile Include="Source\Grpc\FKPasswordGrpc.grpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\FKPasswordGrpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
     <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
     <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp" />

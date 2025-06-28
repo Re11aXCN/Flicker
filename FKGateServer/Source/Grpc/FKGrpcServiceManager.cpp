@@ -1,5 +1,6 @@
 ﻿#include "FKGrpcServiceManager.h"
 #include <magic_enum/magic_enum.hpp>
+#include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_SHARED_CPP(FKGrpcServiceManager)
 

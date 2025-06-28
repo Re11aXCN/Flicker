@@ -9,6 +9,7 @@ const verifyCodeProto = require('./utils/protoLoader');
 const { ERROR_CODE, VERIFICATION } = require('./utils/constants');
 const { sendVerificationEmail } = require('./services/emailService');
 const { getRedis, queryRedis, setRedisExpire } = require('./utils/redis');
+const { servicesConfig } = require('./config/configLoader');
 
 /**
  * 处理验证码请求并发送邮件
@@ -94,7 +95,8 @@ function startServer() {
         GetVarifyCode: getVerificationCode 
     });
     
-    const serverAddress = '127.0.0.1:50051';
+    const { host, port } = servicesConfig.emailVerification;
+    const serverAddress = `${host}:${port}`;
     server.bindAsync(
         serverAddress, 
         grpc.ServerCredentials.createInsecure(), 

@@ -1,11 +1,16 @@
 ﻿/*************************************************************************************
  *
  * @ Filename	 : FKUserEntity.h
- * @ Description : 用户实体类，定义用户数据结构
- *
+ * @ Description : 
+ * 
  * @ Version	 : V1.0
- * @ Author	 : Re11a
- * @ Date Created: 2025/7/15
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/22
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
 *************************************************************************************/
 #ifndef FK_USER_ENTITY_H_
 #define FK_USER_ENTITY_H_
@@ -51,9 +56,6 @@ public:
     void setSalt(const std::string& salt) { _salt = salt; }
     void setCreateTime(const std::chrono::system_clock::time_point& createTime) { _createTime = createTime; }
     void setUpdateTime(const std::optional<std::chrono::system_clock::time_point>& updateTime) { _updateTime = updateTime; }
-
-    // 生成UUID
-    //static std::string generateUuid();
 
     // 转换为字符串表示
     std::string toString() const;

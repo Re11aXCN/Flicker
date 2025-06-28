@@ -150,18 +150,22 @@
     <QtRcc Include="Resource\Flicker.qrc" />
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="UI\Components\FKIconLabel.h" />
+    <QtMoc Include="UI\Components\FKPushButton.h" />
+    <QtMoc Include="UI\Components\FKSwitchPannel.h" />
+    <QtMoc Include="UI\Components\FKLineEdit.h" />
+    <ClInclude Include="Global\FKConstant.h" />
     <ClInclude Include="Global\FKMacro.h" />
-    <ClInclude Include="Global\FKDef.h" />
+    <ClInclude Include="Global\FKDef.h">
+      <!-- <Generator>QtMoc</Generator> -->
+      <!-- <CustomToolNamespace>Launcher</CustomToolNamespace> -->
+      <!-- <SubType>moc</SubType> -->
+      <!-- <QtMocEnabled>true</QtMocEnabled> -->
+      <!-- <MocOutputFile>moc_%(Filename).cpp</MocOutputFile> -->
+    </ClInclude>
     <ClInclude Include="Global\FKUtils.h" />
-    <QtMoc Include="UI\Login_interface\transparent_transition_interface.h" />
-    <QtMoc Include="UI\Login_interface\scroll_bar.h" />
-    <QtMoc Include="UI\Login_interface\responsive_form.h" />
-    <QtMoc Include="UI\Login_interface\registration_form.h" />
-    <QtMoc Include="UI\Login_interface\other_login_buttons.h" />
-    <QtMoc Include="UI\Login_interface\login_form.h" />
-    <QtMoc Include="UI\Login_interface\login_button.h" />
-    <QtMoc Include="UI\Login_interface\input_box.h" />
-    <QtMoc Include="UI\Login_interface\hollow_button.h" />
+    <QtMoc Include="UI\Components\FKFormPannel.h" />
+    <QtMoc Include="UI\FKLauncherShell.h" />
     <QtMoc Include="Source\FKHttpManager.h" />
     <Image Include="Resource\ico\Weixin_IDI_ICON1.ico" />
     <ResourceCompile Include="Resource\ico\Flicker.rc" />
@@ -169,22 +173,20 @@
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="UI\Components\FKIconLabel.cpp" />
+    <ClCompile Include="UI\Components\FKLineEdit.cpp" />
+    <ClCompile Include="UI\Components\FKPushButton.cpp" />
+    <ClCompile Include="UI\Components\FKSwitchPannel.cpp" />
     <ClCompile Include="Global\FKUtils.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="main.cpp">
+      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">input</DynamicSource>
+      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).moc</QtMocFileName>
+      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Release|x64'">input</DynamicSource>
+      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).moc</QtMocFileName>
+    </ClCompile>
     <ClCompile Include="Source\FKHttpManager.cpp" />
-    <ClCompile Include="UI\FKLoginWidget.cpp" />
-    <ClCompile Include="UI\Login_interface\hollow_button.cpp" />
-    <ClCompile Include="UI\Login_interface\input_box.cpp" />
-    <ClCompile Include="UI\Login_interface\login_button.cpp" />
-    <ClCompile Include="UI\Login_interface\login_form.cpp" />
-    <ClCompile Include="UI\Login_interface\other_login_buttons.cpp" />
-    <ClCompile Include="UI\Login_interface\registration_form.cpp" />
-    <ClCompile Include="UI\Login_interface\responsive_form.cpp" />
-    <ClCompile Include="UI\Login_interface\scroll_bar.cpp" />
-    <ClCompile Include="UI\Login_interface\transparent_transition_interface.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="UI\FKLoginWidget.h" />
+    <ClCompile Include="UI\Components\FKFormPannel.cpp" />
+    <ClCompile Include="UI\FKLauncherShell.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

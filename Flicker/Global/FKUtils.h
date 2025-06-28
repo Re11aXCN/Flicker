@@ -24,6 +24,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <chrono>
+#ifdef QT_CORE_LIB
+#include <QString>
+#include <QColor>
+#endif
 namespace FKUtils {
 	namespace helper {
 		// 辅助函数：将半字节(0-15)转换为16进制字符（大写）
@@ -244,6 +248,21 @@ namespace FKUtils {
 		return params;
 	}
 
+	// 静态方法：将时间点转换为格式化字符串
+	inline std::string format_time_point(const std::chrono::system_clock::time_point& timePoint) {
+		auto time = std::chrono::system_clock::to_time_t(timePoint);
+		std::stringstream ss;
+		// 使用线程安全的方式格式化时间
+		std::tm tmBuf{};
+#ifdef _WIN32
+		localtime_s(&tmBuf, &time);
+#else
+		localtime_r(&time, &tmBuf);
+#endif
+		ss << std::put_time(&tmBuf, "%Y-%m-%d %H:%M:%S");
+		return ss.str();
+	}
+
 	// 获取HTTP日期格式的当前时间
 	inline std::string get_http_date() {
 		// 获取当前时间点
@@ -265,5 +284,87 @@ namespace FKUtils {
 		return ss.str();
 	}
 };
+#ifdef QT_CORE_LIB
+namespace FKUtils {
+	// 颜色字符串格式枚举
+	enum class ColorStringFormat {
+		HexARGB,    // #AARRGGBB格式
+		RGBAFunction // rgba(r,g,b,a)格式
+	};
 
+	namespace helper {
+		inline QString toQString(const QString& str) { return str; }
+		inline QString toQString(const char* str) { return QString(str); }
+		inline QString toQString(const std::string& str) { return QString::fromStdString(str); }
+		inline QString toQString(const QLatin1String& str) { return QString(str); }
+		
+		template<typename T>
+		inline auto toQString(const T& value) ->
+			typename std::enable_if_t<std::is_arithmetic_v<T>, QString> {
+			return QString::number(value);
+		}
+
+		inline QString toHexString(uint value, int width = 2) {
+			// 直接构造16进制字符串避免格式化开销
+			constexpr const char* hexDigits = "0123456789ABCDEF";
+			QString result(width, Qt::Uninitialized);
+			QChar* data = result.data();
+
+			for (int i = width - 1; i >= 0; --i) {
+				data[i] = QLatin1Char(hexDigits[value & 0xF]);
+				value >>= 4;
+			}
+			return result;
+		}
+	};
+
+	template<typename... Args>
+	inline QString concat(Args&&... args) {
+		int totalSize = (0 + ... + helper::toQString(args).size());
+		QString result;
+		result.reserve(totalSize);
+		(result += ... += helper::toQString(std::forward<Args>(args)));
+		return result;
+	}
+
+	template<typename... Args>
+	inline QString join(const QString& separator, Args&&... args) {
+		if constexpr (sizeof...(args) == 0) return QString();
+		int separatorCount = sizeof...(args) - 1;
+		int totalSize = (0 + ... + toQString(args).size()) + separatorCount * separator.size();
+		QString result;
+		result.reserve(totalSize);
+		int index = 0;
+		((result += (index++ > 0 ? separator : QString()) +
+			toQString(std::forward<Args>(args))), ...);
+		return result;
+	}
+
+	// 主转换函数模板
+	template<ColorStringFormat Format = ColorStringFormat::HexARGB>
+	QString colorToCssString(const QColor& color) {
+		if (!color.isValid()) return QLatin1String("invalid");
+
+		using namespace helper;
+
+		if constexpr (Format == ColorStringFormat::HexARGB) {
+			// 使用concat高效拼接
+			return concat(QLatin1String("#"),
+				toHexString(color.alpha()),
+				toHexString(color.red()),
+				toHexString(color.green()),
+				toHexString(color.blue()));
+		}
+		else {
+			// 使用join构建RGBA函数
+			return join(QLatin1String(", "),
+				concat(QLatin1String("rgba("), color.red()),
+				color.green(),
+				color.blue(),
+				concat(QString::number(color.alphaF(), 'f', 3),
+					QLatin1String(")")));
+		}
+	}
+};
+#endif
 #endif // !FK_UTILS_H_

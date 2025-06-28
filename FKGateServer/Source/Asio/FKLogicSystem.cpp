@@ -5,12 +5,128 @@
 #include <string>
 #include <vector>
 #include <json/json.h>
+#include "Grpc/FKPasswordGrpc.grpc.pb.h"
 
 #include "FKUtils.h"
 #include "Asio/FKHttpConnection.h"
 #include "Grpc/FKGrpcServiceManager.h"
 #include "Redis/FKRedisConnectionPool.h"
 #include "MySQL/Mapper/FKUserMapper.h"
+#include "MySQL/FKMySQLConnectionPool.h"
+namespace gRPC {
+	// 创建gRPC通道和存根
+	static std::shared_ptr<FKPasswordGrpc::PasswordService::Stub> CreateStub() {
+		// 创建到密码服务的通道
+		auto channel = grpc::CreateChannel("127.0.0.1:50052", grpc::InsecureChannelCredentials());
+
+		// 创建存根
+		return FKPasswordGrpc::PasswordService::NewStub(channel);
+	}
+	/**
+	* 使用bcrypt对密码进行哈希处理
+	* @param password 原始密码
+	* @return 返回一个元组，包含哈希后的密码和盐值
+	*/
+	static std::tuple<std::string, std::string> HashPassword(const std::string& password) {
+		try {
+			// 创建请求对象
+			FKPasswordGrpc::HashPasswordRequest request;
+			request.set_password(password);
+
+			// 创建响应对象
+			FKPasswordGrpc::HashPasswordResponse response;
+
+			// 创建gRPC上下文
+			grpc::ClientContext context;
+
+			// 设置超时时间（5秒）
+			std::chrono::system_clock::time_point deadline =
+				std::chrono::system_clock::now() + std::chrono::seconds(5);
+			context.set_deadline(deadline);
+
+			// 创建存根并调用服务
+			auto stub = CreateStub();
+			grpc::Status status = stub->HashPassword(&context, request, &response);
+
+			// 检查调用状态
+			if (status.ok()) {
+				// 调用成功，检查业务状态码
+				if (response.status_code() == 0) { // SUCCESS
+					std::println("密码加密成功");
+					return { response.hashed_password(), response.salt() };
+				}
+				else {
+					std::println("密码加密业务错误: {}", response.message());
+					return { "", "" };
+				}
+			}
+			else {
+				// gRPC调用失败
+				std::println("密码加密gRPC调用失败: {}, {}",
+					status.error_code(), status.error_message());
+				return { "", "" };
+			}
+		}
+		catch (const std::exception& e) {
+			std::println("密码加密异常: {}", e.what());
+			return { "", "" };
+		}
+	}
+
+	/**
+	 * 验证密码是否匹配
+	 * @param password 待验证的密码
+	 * @param hashedPassword 数据库中存储的哈希密码
+	 * @return 如果密码匹配返回true，否则返回false
+	 */
+	static bool verifyPassword(const std::string& password, const std::string& hashedPassword) {
+		try {
+			// 创建请求对象
+			FKPasswordGrpc::VerifyPasswordRequest request;
+			request.set_password(password);
+			request.set_hashed_password(hashedPassword);
+
+			// 创建响应对象
+			FKPasswordGrpc::VerifyPasswordResponse response;
+
+			// 创建gRPC上下文
+			grpc::ClientContext context;
+
+			// 设置超时时间（5秒）
+			std::chrono::system_clock::time_point deadline =
+				std::chrono::system_clock::now() + std::chrono::seconds(5);
+			context.set_deadline(deadline);
+
+			// 创建存根并调用服务
+			auto stub = CreateStub();
+			grpc::Status status = stub->VerifyPassword(&context, request, &response);
+
+			// 检查调用状态
+			if (status.ok()) {
+				// 调用成功，检查业务状态码
+				if (response.status_code() == 0) { // SUCCESS
+					std::println("密码验证完成，结果: {}", response.is_valid() ? "有效" : "无效");
+					return response.is_valid();
+				}
+				else {
+					std::println("密码验证业务错误: {}", response.message());
+					return false;
+				}
+			}
+			else {
+				// gRPC调用失败
+				std::println("密码验证gRPC调用失败: {}, {}",
+					status.error_code(), status.error_message());
+				return false;
+			}
+		}
+		catch (const std::exception& e) {
+			std::println("密码验证异常: {}", e.what());
+			return false;
+		}
+	}
+
+}
 
 using namespace FKVerifyGrpc;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
@@ -228,10 +344,10 @@ FKLogicSystem::FKLogicSystem()
 			}
 
 			// 2. 检查用户是否已存在
-			auto userMapper = std::make_unique<FKUserMapper>();
-			
-			// 检查用户名是否已存在
-			auto existingUserByUsername = userMapper->findUserByUsername(username);
+			auto existingUserByUsername = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
+				FKUserMapper userMapper(session);
+				return userMapper.findUserByUsername(username);
+			});
 			if (existingUserByUsername) {
 				std::println("用户名已存在: {}", username);
 				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
@@ -244,7 +360,10 @@ FKLogicSystem::FKLogicSystem()
 			}
 			
 			// 检查邮箱是否已存在
-			auto existingUserByEmail = userMapper->findUserByEmail(email);
+			auto existingUserByEmail = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
+				FKUserMapper userMapper(session);
+				return userMapper.findUserByEmail(email);
+			});
 			if (existingUserByEmail) {
 				std::println("邮箱已存在: {}", email);
 				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
@@ -257,7 +376,7 @@ FKLogicSystem::FKLogicSystem()
 			}
 
 			// 3. 使用BCrypt对密码进行哈希处理
-			auto [hashedPassword, salt] = PasswordUtils::hashPassword(password);
+			auto [hashedPassword, salt] = gRPC::HashPassword(password);
 			
 			// 4. 创建用户实体并保存到数据库
 			FKUserEntity newUser;
@@ -268,8 +387,10 @@ FKLogicSystem::FKLogicSystem()
 			newUser.setSalt(salt);
 			
 			// 使用事务保存用户
-			bool success = userMapper->insertUser(newUser);
-			
+			bool success = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
+				FKUserMapper userMapper(session);
+				return userMapper.insertUser(newUser);
+			});
 			if (success) {
 				// 注册成功
 				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
@@ -354,20 +475,20 @@ FKLogicSystem::FKLogicSystem()
 
 		try {
 			// 1. 查询用户
-			auto userMapper = std::make_unique<FKUserMapper>();
-			std::shared_ptr<FKUserEntity> user = nullptr;
-			
-			// 根据提供的用户名或邮箱查询用户
-			if (!username.empty()) {
-				user = userMapper->findUserByUsername(username);
-			} else if (!email.empty()) {
-				user = userMapper->findUserByEmail(email);
-			}
+			 std::optional<FKUserEntity> user = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
+				FKUserMapper userMapper(session);
+				if (!username.empty()) {
+					return userMapper.findUserByUsername(username);
+				} else if (!email.empty()) {
+					return userMapper.findUserByEmail(email);
+				}
+				return std::optional<FKUserEntity>();
+			});
 			
 			// 检查用户是否存在
-			if (!user) {
+			if (!user.has_value()) {
 				std::println("用户不存在: {} / {}", username, email);
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_NOT_EXIST);
+				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NOT_FIND_USER);
 				responseRoot["message"] = "User does not exist";
 				responseRoot["data"] = dataObj;
 				connection->getResponse().result(boost::beast::http::status::bad_request);
@@ -378,7 +499,7 @@ FKLogicSystem::FKLogicSystem()
 			
 			// 2. 验证密码
 			std::string storedPassword = user->getPassword();
-			bool passwordValid = PasswordUtils::verifyPassword(password, storedPassword);
+			bool passwordValid = gRPC::verifyPassword(password, storedPassword);
 			
 			if (!passwordValid) {
 				std::println("密码错误: {}", user->getUsername());
@@ -420,11 +541,15 @@ FKLogicSystem::FKLogicSystem()
 		return true;
 	};
 
+	auto resetPasswordFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+
+		};
+
 	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);
 	this->registerCallback("/get_varify_code", Http::RequestType::POST, getVarifyCodeFunc);
 	this->registerCallback("/register_user", Http::RequestType::POST, registerUserFunc);
 	this->registerCallback("/login_user", Http::RequestType::POST, loginUserFunc);
-
+	this->registerCallback("/reset_password", Http::RequestType::POST, resetPasswordFunc);
 }
 
 bool FKLogicSystem::callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection)

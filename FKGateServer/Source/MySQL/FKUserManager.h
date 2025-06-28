@@ -1,11 +1,16 @@
 ﻿/*************************************************************************************
  *
  * @ Filename	 : FKUserManager.h
- * @ Description : 用户管理类，提供用户注册、登录等功能
- *
+ * @ Description : 
+ * 
  * @ Version	 : V1.0
- * @ Author	 : Re11a
- * @ Date Created: 2025/7/15
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/22
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
 *************************************************************************************/
 #ifndef FK_USER_MANAGER_H_
 #define FK_USER_MANAGER_H_
@@ -13,18 +18,10 @@
 #include <string>
 #include <memory>
 #include <optional>
+#include "FKDef.h"
 #include "FKMacro.h"
 #include "Entity/FKUserEntity.h"
 #include "FKMySQLConnectionPool.h"
-
-// 用户注册结果枚举
-enum class UserRegisterResult {
-    SUCCESS,                // 注册成功
-    USERNAME_EXISTS,        // 用户名已存在
-    EMAIL_EXISTS,           // 邮箱已存在
-    DATABASE_ERROR,         // 数据库错误
-    INVALID_PARAMETERS      // 参数无效
-};
 
 // 用户管理类，使用单例模式
 class FKUserManager {
@@ -33,7 +30,7 @@ class FKUserManager {
 public:
 
     // 注册用户
-    UserRegisterResult registerUser(const std::string& username, const std::string& email, 
+    DbOperator::UserRegisterResult registerUser(const std::string& username, const std::string& email,
                                    const std::string& password);
 
     // 检查用户名是否存在

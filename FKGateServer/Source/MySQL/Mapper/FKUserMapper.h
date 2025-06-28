@@ -1,11 +1,16 @@
-/*************************************************************************************
+﻿/*************************************************************************************
  *
  * @ Filename	 : FKUserMapper.h
- * @ Description : 用户数据访问层，提供用户相关的数据库操作
- *
+ * @ Description : 
+ * 
  * @ Version	 : V1.0
- * @ Author	 : Re11a
- * @ Date Created: 2025/7/15
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/22
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
 *************************************************************************************/
 #ifndef FK_USER_MAPPER_H_
 #define FK_USER_MAPPER_H_
@@ -14,7 +19,7 @@
 #include <vector>
 #include <optional>
 #include <mysqlx/xdevapi.h>
-#include "../Entity/FKUserEntity.h"
+#include "MySQL/Entity/FKUserEntity.h"
 
 // 用户数据访问层
 class FKUserMapper {
@@ -50,6 +55,11 @@ public:
     std::vector<FKUserEntity> findAllUsers();
 
 private:
+    // 通用查询方法，根据条件查询单个用户
+    std::optional<FKUserEntity> _findUserByCondition(const std::string& whereClause, 
+                                                    const std::string& paramName, 
+                                                    const auto& paramValue);
+
     // 从结果集构建用户实体
     FKUserEntity _buildUserFromRow(const mysqlx::Row& row);
 

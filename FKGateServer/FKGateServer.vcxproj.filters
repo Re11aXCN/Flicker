@@ -21,12 +21,6 @@
     <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -45,16 +39,28 @@
     <ClCompile Include="Source\Asio\FKServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Grpc\FKPasswordGrpc.grpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKPasswordGrpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\FKUserManager.cpp">
+    <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp">
+    <ClCompile Include="Source\MySQL\FKUserManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -63,12 +69,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Source\Redis\FKRedisConnectionPool.h">
@@ -89,16 +89,31 @@
     <ClInclude Include="Source\Asio\FKServer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Grpc\FKPasswordGrpc.grpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKPasswordGrpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MySQL\FKUserManager.h">
+    <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h">
+    <ClInclude Include="Source\FKStructConfig.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\FKUserManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

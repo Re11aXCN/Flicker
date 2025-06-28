@@ -1,11 +1,16 @@
 ﻿/*************************************************************************************
  *
  * @ Filename	 : FKRedisConnectionPool.h
- * @ Description : Redis连接池，管理Redis连接的创建、获取和释放
- *
+ * @ Description : 
+ * 
  * @ Version	 : V1.0
- * @ Author	 : Re11a
- * @ Date Created: 2025/7/10
+ * @ Author		 : Re11a
+ * @ Date Created: 2025/6/22
+ * ======================================
+ * HISTORICAL UPDATE HISTORY
+ * Version: V          Modify Time:         Modified By: 
+ * Modifications: 
+ * ======================================
 *************************************************************************************/
 #ifndef FK_REDIS_CONNECTION_POOL_H_
 #define FK_REDIS_CONNECTION_POOL_H_
@@ -20,7 +25,7 @@
 #include <functional>
 #include <sw/redis++/redis++.h>
 #include "FKMacro.h"
-#include "../FKConfigManager.h"
+#include "Source/FKStructConfig.h"
 
 // Redis连接池类，使用单例模式
 class FKRedisConnectionPool {

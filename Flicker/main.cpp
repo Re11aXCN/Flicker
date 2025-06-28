@@ -1,16 +1,14 @@
 ﻿#include <QApplication>
 #include <QScreen>
-
+#include <QFontDatabase>
 #include "NXApplication.h"
-#include "FKLoginWidget.h"
-#include "Login_interface/responsive_form.h"
+#include "FKLauncherShell.h"
 int main(int argc, char* argv[])
 {
 	QApplication a(argc, argv);
 	nxApp->init();
-	FKLoginWidget w;
+	QFontDatabase::addApplicationFont(":/Resource/Font/iconfont.ttf");
+	FKLauncherShell w;
 	w.show();
-	/*Responsive_form login_form;
-	login_form.show();*/
 	return a.exec();
 }

@@ -28,7 +28,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/experimental/channel.hpp>
 #include "FKMacro.h"
-#include "../FKConfigManager.h"
+#include "Source/FKStructConfig.h"
 /**
  * @brief 高效的线程池类，管理多个工作线程，每个线程运行一个io_context
  * 使用单例模式确保全局唯一实例

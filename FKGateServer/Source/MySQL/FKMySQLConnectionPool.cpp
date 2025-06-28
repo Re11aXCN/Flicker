@@ -1,16 +1,17 @@
 ﻿#include "FKMySQLConnectionPool.h"
 #include <sstream>
+#include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
 
 FKMySQLConnectionPool::FKMySQLConnectionPool() {
-    _initialize(FKConfigManager::getInstance()->getMySQLConnectionString());
+	_initialize(FKConfigManager::getInstance()->getMySQLConnectionString());
 	std::println("FKMySQLConnectionPool 已创建");
 }
 
 FKMySQLConnectionPool::~FKMySQLConnectionPool() {
-    shutdown();
-    std::println("FKMySQLConnectionPool 已销毁");
+	shutdown();
+	std::println("FKMySQLConnectionPool 已销毁");
 }
 
 void FKMySQLConnectionPool::_initialize(const FKMySQLConfig& config) {

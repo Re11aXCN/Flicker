@@ -25,7 +25,7 @@
 #include "FKDef.h"
 #include "FKMacro.h"
 #include "FKGrpcConnectionPool.hpp"
-#include "../FKConfigManager.h"
+#include "Source/FKStructConfig.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
 #include "FKVerifyGrpc.grpc.pb.h"

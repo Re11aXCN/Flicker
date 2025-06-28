@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 配置加载器
  * 负责加载和解析配置文件
  */
@@ -34,7 +34,8 @@ const config = loadConfig();
 // 邮件配置
 const emailConfig = {
     user: config.email.user,
-    authcode: config.email.authcode
+    authcode: config.email.authcode,
+    smtp: config.email.smtp
 };
 
 // MySQL配置
@@ -51,8 +52,15 @@ const redisConfig = {
     password: config.redis.password
 };
 
+// 服务配置
+const servicesConfig = {
+    emailVerification: config.services.emailVerification,
+    password: config.services.password
+};
+
 module.exports = {
     emailConfig,
     mysqlConfig,
-    redisConfig
+    redisConfig,
+    servicesConfig
 };

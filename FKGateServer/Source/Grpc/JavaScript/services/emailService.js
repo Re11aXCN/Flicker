@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 邮件服务模块
  * 负责处理邮件发送功能
  */
@@ -11,9 +11,9 @@ const { emailConfig } = require('../config/configLoader');
  * 配置SMTP服务器连接信息
  */
 const transporter = nodemailer.createTransport({
-    host: 'smtp.qq.com',
-    port: 465,
-    secure: true, // 使用SSL
+    host: emailConfig.smtp.host,
+    port: emailConfig.smtp.port,
+    secure: emailConfig.smtp.secure, // 使用SSL
     auth: {
         user: emailConfig.user,
         pass: emailConfig.authcode // 授权码，非邮箱密码

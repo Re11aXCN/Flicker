@@ -26,56 +26,38 @@
     <QtRcc Include="Resource\Flicker.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
-    <QtMoc Include="UI\FKLoginWidget.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <ClCompile Include="UI\FKLoginWidget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\FKHttpManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Global\FKUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\hollow_button.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\input_box.cpp">
+    <ClCompile Include="UI\FKLauncherShell.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\login_button.cpp">
+    <ClCompile Include="UI\Components\FKFormPannel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\login_form.cpp">
+    <ClCompile Include="UI\Components\FKSwitchPannel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\other_login_buttons.cpp">
+    <ClCompile Include="UI\Components\FKPushButton.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\registration_form.cpp">
+    <ClCompile Include="UI\Components\FKLineEdit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Login_interface\responsive_form.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UI\Login_interface\scroll_bar.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UI\Login_interface\transparent_transition_interface.cpp">
+    <ClCompile Include="UI\Components\FKIconLabel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Resource\ico\resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\FKDef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Global\FKUtils.h">
@@ -85,6 +67,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Global\SnowflakeGenerator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Global\FKConstant.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Global\FKDef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -102,31 +90,22 @@
     <QtMoc Include="Source\FKHttpManager.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\hollow_button.h">
+    <QtMoc Include="UI\FKLauncherShell.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\input_box.h">
+    <QtMoc Include="UI\Components\FKFormPannel.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\login_button.h">
+    <QtMoc Include="UI\Components\FKSwitchPannel.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\login_form.h">
+    <QtMoc Include="UI\Components\FKPushButton.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\other_login_buttons.h">
+    <QtMoc Include="UI\Components\FKLineEdit.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Login_interface\registration_form.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="UI\Login_interface\responsive_form.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="UI\Login_interface\scroll_bar.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="UI\Login_interface\transparent_transition_interface.h">
+    <QtMoc Include="UI\Components\FKIconLabel.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

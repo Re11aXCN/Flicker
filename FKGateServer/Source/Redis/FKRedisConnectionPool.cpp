@@ -1,5 +1,6 @@
 ﻿#include "FKRedisConnectionPool.h"
 #include <sstream>
+#include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_SHARED_CPP(FKRedisConnectionPool)
 

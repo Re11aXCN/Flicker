@@ -1,5 +1,6 @@
-﻿#include "FKUserMapper.h"
+#include "FKUserMapper.h"
 #include <print>
+#include <unordered_map>
 
 // 创建用户表（如果不存在）
 bool FKUserMapper::createTableIfNotExists() {
@@ -54,112 +55,67 @@ bool FKUserMapper::insertUser(FKUserEntity& user) {
     }
 }
 
-// 根据ID查询用户
-std::optional<FKUserEntity> FKUserMapper::findUserById(int id) {
+// 通用查询方法，根据条件查询单个用户
+std::optional<FKUserEntity> FKUserMapper::_findUserByCondition(const std::string& whereClause, 
+                                                             const std::string& paramName, 
+                                                             const auto& paramValue) {
     try {
         // 获取表对象
         auto schema = _session->getSchema("");
         auto table = schema.getTable(_tableName);
 
-        // 查询用户
+        // 查询用户 - 使用fetchOne而不是fetchAll，因为id、uuid、用户名和邮箱都是唯一的
         auto result = table.select("*")
-            .where("id = :id")
-            .bind("id", id)
+            .where(whereClause)
+            .bind(paramName, paramValue)
             .execute();
 
-        // 处理结果
-        auto results = result.fetchAll();
-        std::vector<mysqlx::Row> rows{ results.begin(), results.end() };
-        if (rows.empty()) {
+        // 处理结果 - 直接使用fetchOne获取单条记录
+        auto row = result.fetchOne();
+        if (!row) {
             return std::nullopt;
         }
-
-        return _buildUserFromRow(rows[0]);
+        return _buildUserFromRow(row);
     } catch (const std::exception& e) {
-        std::println("根据ID查询用户失败: {}", e.what());
+        std::println("查询用户失败 ({}={}): {}", whereClause, paramValue, e.what());
         return std::nullopt;
     }
+}
+
+// 根据ID查询用户
+std::optional<FKUserEntity> FKUserMapper::findUserById(int id) {
+    auto result = _findUserByCondition("id = :id", "id", id);
+    if (!result) {
+        std::println("根据ID查询用户失败: {}", id);
+    }
+    return result;
 }
 
 // 根据UUID查询用户
 std::optional<FKUserEntity> FKUserMapper::findUserByUuid(const std::string& uuid) {
-    try {
-        // 获取表对象
-        auto schema = _session->getSchema("");
-        auto table = schema.getTable(_tableName);
-
-        // 查询用户
-        auto result = table.select("*")
-            .where("uuid = :uuid")
-            .bind("uuid", uuid)
-            .execute();
-
-        // 处理结果
-		auto results = result.fetchAll();
-		std::vector<mysqlx::Row> rows{ results.begin(), results.end() };
-        if (rows.empty()) {
-            return std::nullopt;
-        }
-
-        return _buildUserFromRow(rows[0]);
-    } catch (const std::exception& e) {
-        std::println("根据UUID查询用户失败: {}", e.what());
-        return std::nullopt;
+    auto result = _findUserByCondition("uuid = :uuid", "uuid", uuid);
+    if (!result) {
+        std::println("根据UUID查询用户失败: {}", uuid);
     }
+    return result;
 }
 
 // 根据用户名查询用户
 std::optional<FKUserEntity> FKUserMapper::findUserByUsername(const std::string& username) {
-    try {
-        // 获取表对象
-        auto schema = _session->getSchema("");
-        auto table = schema.getTable(_tableName);
-
-        // 查询用户
-        auto result = table.select("*")
-            .where("username = :username")
-            .bind("username", username)
-            .execute();
-
-        // 处理结果
-		auto results = result.fetchAll();
-		std::vector<mysqlx::Row> rows{ results.begin(), results.end() };
-        if (rows.empty()) {
-            return std::nullopt;
-        }
-
-        return _buildUserFromRow(rows[0]);
-    } catch (const std::exception& e) {
-        std::println("根据用户名查询用户失败: {}", e.what());
-        return std::nullopt;
+    auto result = _findUserByCondition("username = :username", "username", username);
+    if (!result) {
+        std::println("根据用户名查询用户失败: {}", username);
     }
+    return result;
 }
 
 // 根据邮箱查询用户
 std::optional<FKUserEntity> FKUserMapper::findUserByEmail(const std::string& email) {
-    try {
-        // 获取表对象
-        auto schema = _session->getSchema("");
-        auto table = schema.getTable(_tableName);
-
-        // 查询用户
-        auto result = table.select("*")
-            .where("email = :email")
-            .bind("email", email)
-            .execute();
-
-        // 处理结果
-		auto results = result.fetchAll();
-		std::vector<mysqlx::Row> rows{ results.begin(), results.end() };
-        if (rows.empty()) {
-            return std::nullopt;
-        }
-
-        return _buildUserFromRow(rows[0]);
-    } catch (const std::exception& e) {
-        std::println("根据邮箱查询用户失败: {}", e.what());
-        return std::nullopt;
+    auto result = _findUserByCondition("email = :email", "email", email);
+    if (!result) {
+        std::println("根据邮箱查询用户失败: {}", email);
     }
+    return result;
 }
 
 // 更新用户信息
@@ -234,30 +190,49 @@ std::vector<FKUserEntity> FKUserMapper::findAllUsers() {
     return users;
 }
 
-// 从结果集构建用户实体
+// 从结果集构建用户实体 - 使用列名而不是索引，提高代码健壮性
 FKUserEntity FKUserMapper::_buildUserFromRow(const mysqlx::Row& row) {
-    int id = row[0].get<int>();
-    std::string uuid = row[1].get<std::string>();
-    std::string username = row[2].get<std::string>();
-    std::string email = row[3].get<std::string>();
-    std::string password = row[4].get<std::string>();
-    std::string salt = row[5].get<std::string>();
+    // 获取列索引映射
+    const auto& columns = row.getColumns();
     
-    // 处理时间字段
-    auto createTimeStr = row[6].get<std::string>();
-    std::tm createTm = {};
-    std::istringstream createSs(createTimeStr);
-    createSs >> std::get_time(&createTm, "%Y-%m-%d %H:%M:%S");
-    auto createTime = std::chrono::system_clock::from_time_t(std::mktime(&createTm));
+    // 创建列名到索引的映射
+    std::unordered_map<std::string, size_t> columnMap;
+    for (size_t i = 0; i < columns.size(); ++i) {
+        columnMap[columns[i].getColumnName()] = i;
+    }
+    
+    // 使用列名获取数据，避免依赖列的顺序
+    int id = row[columnMap["id"]].get<int>();
+    std::string uuid = row[columnMap["uuid"]].get<std::string>();
+    std::string username = row[columnMap["username"]].get<std::string>();
+    std::string email = row[columnMap["email"]].get<std::string>();
+    std::string password = row[columnMap["password"]].get<std::string>();
+    std::string salt = row[columnMap["salt"]].get<std::string>();
+    
+    // 处理时间字段 - 使用线程安全的方式
+    auto parseTimeString = [](const std::string& timeStr) -> std::chrono::system_clock::time_point {
+        std::tm tm = {};
+        std::istringstream ss(timeStr);
+        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+        
+        // 检查解析是否成功
+        if (ss.fail()) {
+            std::println("时间解析失败: {}", timeStr);
+            return std::chrono::system_clock::now(); // 返回当前时间作为默认值
+        }
+        
+        return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    };
+    
+    auto createTimeStr = row[columnMap["create_time"]].get<std::string>();
+    auto createTime = parseTimeString(createTimeStr);
     
     std::optional<std::chrono::system_clock::time_point> updateTime;
-    if (!row[7].isNull()) {
-        auto updateTimeStr = row[7].get<std::string>();
-        std::tm updateTm = {};
-        std::istringstream updateSs(updateTimeStr);
-        updateSs >> std::get_time(&updateTm, "%Y-%m-%d %H:%M:%S");
-        updateTime = std::chrono::system_clock::from_time_t(std::mktime(&updateTm));
+    if (!row[columnMap["update_time"]].isNull()) {
+        auto updateTimeStr = row[columnMap["update_time"]].get<std::string>();
+        updateTime = parseTimeString(updateTimeStr);
     }
     
     return FKUserEntity(id, uuid, username, email, password, salt, createTime, updateTime);
+
 }

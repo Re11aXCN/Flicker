@@ -27,12 +27,12 @@ bool FKUserManager::_initialize() {
     }
 }
 
-UserRegisterResult FKUserManager::registerUser(const std::string& username, const std::string& email, 
+DbOperator::UserRegisterResult FKUserManager::registerUser(const std::string& username, const std::string& email, 
                                              const std::string& password) {
     // 参数验证
     if (username.empty() || email.empty() || password.empty()) {
         std::println("注册用户失败: 参数无效");
-        return UserRegisterResult::INVALID_PARAMETERS;
+        return DbOperator::UserRegisterResult::INVALID_PARAMETERS;
     }
 
     try {
@@ -43,13 +43,13 @@ UserRegisterResult FKUserManager::registerUser(const std::string& username, cons
             // 检查用户名是否存在
             if (mapper.findUserByUsername(username)) {
                 std::println("注册用户失败: 用户名已存在 {}", username);
-                return UserRegisterResult::USERNAME_EXISTS;
+                return DbOperator::UserRegisterResult::USERNAME_EXISTS;
             }
 
             // 检查邮箱是否存在
             if (mapper.findUserByEmail(email)) {
                 std::println("注册用户失败: 邮箱已存在 {}", email);
-                return UserRegisterResult::EMAIL_EXISTS;
+                return DbOperator::UserRegisterResult::EMAIL_EXISTS;
             }
 
             // 创建用户实体
@@ -58,15 +58,15 @@ UserRegisterResult FKUserManager::registerUser(const std::string& username, cons
             // 插入用户
             if (!mapper.insertUser(user)) {
                 std::println("注册用户失败: 数据库错误");
-                return UserRegisterResult::DATABASE_ERROR;
+                return DbOperator::UserRegisterResult::DATABASE_ERROR;
             }
 
             std::println("用户注册成功: {}", user.toString());
-            return UserRegisterResult::SUCCESS;
+            return DbOperator::UserRegisterResult::SUCCESS;
         });
     } catch (const std::exception& e) {
         std::println("注册用户异常: {}", e.what());
-        return UserRegisterResult::DATABASE_ERROR;
+        return DbOperator::UserRegisterResult::DATABASE_ERROR;
     }
 }
 

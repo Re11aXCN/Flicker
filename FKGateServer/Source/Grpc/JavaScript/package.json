@@ -1,11 +1,15 @@
 {
-  "name": "email-verification-service",
+  "name": "flicker-grpc-services",
   "version": "1.0.0",
-  "description": "SMTP邮箱验证码服务，用于Flicker应用的用户注册验证",
-  "main": "emailVerificationServer.js",
+  "description": "Flicker应用的gRPC服务，包括邮箱验证码和密码加密服务",
+  "main": "index.js",
   "scripts": {
-    "start": "node emailVerificationServer.js",
-    "dev": "nodemon emailVerificationServer.js"
+    "start": "node index.js",
+    "start:email": "node emailVerificationServer.js",
+    "start:password": "node passwordService.js",
+    "dev:email": "nodemon emailVerificationServer.js",
+    "dev:password": "nodemon passwordService.js",
+    "dev": "concurrently \"npm run dev:email\" \"npm run dev:password\""
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",
@@ -16,7 +20,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "concurrently": "^8.2.2"
   },
   "author": "",
   "license": "ISC"

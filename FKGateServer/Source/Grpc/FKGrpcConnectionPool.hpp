@@ -28,7 +28,7 @@
 #include <functional>
 #include <print>
 
-#include "../FKConfigManager.h"
+#include "Source/FKStructConfig.h"
 struct FKGrpcServiceConfig;
 template <typename ServiceType>
 class FKGrpcConnectionPool {
