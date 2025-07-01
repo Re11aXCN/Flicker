@@ -9,6 +9,7 @@
 #include "Components/FKFormPannel.h"
 #include "Components/FKSwitchPannel.h"
 FKLauncherShell::FKLauncherShell(QWidget* parent /*= nullptr*/)
+	: NXWidget(parent)
 {
 	_initUi();
 	_initAnimation();
@@ -59,7 +60,10 @@ void FKLauncherShell::_initUi()
 	_pFormPannel->move(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, 0);
 
 	// 防止 Pannel 遮挡 最小化 和 关闭按钮的点击事件
-	this->appBar()->raise();
+	NXAppBar* appBar = this->appBar();
+	QWidget* appBarWindow = appBar->window();
+	appBarWindow->setWindowFlags((appBarWindow->windowFlags()) | Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
+	appBar->raise();
 }
 
 void FKLauncherShell::_initAnimation()

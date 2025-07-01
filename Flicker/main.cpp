@@ -10,5 +10,6 @@ int main(int argc, char* argv[])
 	QFontDatabase::addApplicationFont(":/Resource/Font/iconfont.ttf");
 	FKLauncherShell w;
 	w.show();
+
 	return a.exec();
 }

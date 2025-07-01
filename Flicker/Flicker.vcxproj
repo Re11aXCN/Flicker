@@ -96,12 +96,12 @@
     </QtUic>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>NexUs.lib;jsoncpp.lib</AdditionalDependencies>
+      <AdditionalDependencies>NexUsd.lib;jsoncpp.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)ThirdParty\NexUs\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>

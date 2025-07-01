@@ -23,6 +23,8 @@ TODO:
 
 #include <NXLineEdit.h>
 #include <NXText.h>
+#include <NXCentralStackedWidget.h>
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPropertyAnimation>
@@ -63,7 +65,8 @@ private:
 	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 	Q_SLOT void _onGetVerifyCodeButtonClicked();
 	Q_SLOT void _onComfirmButtonClicked();
-	
+	Q_SLOT void _onResetPasswordTextClicked();
+
 	// 输入验证槽
 	Q_SLOT void _onUsernameTextChanged(const QString& text);
 	Q_SLOT void _onEmailTextChanged(const QString& text);
@@ -85,7 +88,7 @@ private:
 
 	bool _pIsLoginState{ true }; // true表示登录状态，false表示注册状态
 	int _pRemainingSeconds{ 0 };     // 剩余秒数
-
+	bool TestBool{ false };
 	// 验证状态标志
 	Launcher::InputValidationFlags _pValidationFlags{ Launcher::InputValidationFlag::None };
 	QString _pErrorStyleSheet{};
@@ -94,6 +97,9 @@ private:
 	QIcon _pHidePasswordIcon;
 	QHash<Http::RequestId, std::function<void(const QJsonObject&)>> _pResponseCallbacks;
 
+	QWidget* _pLoginRegisterWidget{ nullptr };
+	QWidget* _pResetPasswordWidget{ nullptr };
+	QVBoxLayout* _pTestLayout{ nullptr };
 	// 登录/注册界面控件
 	NXLineEdit* _pEmailLineEdit{ nullptr };
 	NXLineEdit* _pConfirmPasswordLineEdit{ nullptr };
@@ -104,6 +110,7 @@ private:
 	FKIconLabel* _pQQIconLabel{ nullptr };
 	FKIconLabel* _pWechatIconLabel{ nullptr };
 	FKIconLabel* _pBiliBiliIconLabel{ nullptr };
+	NXCentralStackedWidget* _pCentralStackedWidget{ nullptr };
 
 	// 公共控件
 	NXText* _pTitleText{ nullptr };
