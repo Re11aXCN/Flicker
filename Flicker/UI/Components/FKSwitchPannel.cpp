@@ -3,8 +3,10 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QVBoxLayout>
+#include <QPauseAnimation>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
+#include <QSequentialAnimationGroup>
 #include <QEasingCurve>
 #include "FKConstant.h"
 #include "FKUtils.h"
@@ -20,55 +22,11 @@ FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 	_initUI();
 	_initAnimations();
 
-	QObject::connect(_pLoginSwitchBtn, &FKPushButton::clicked, this, [this]() {
-		_pLoginOpacityAnimation->setDuration(1000);
-		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
-		_pLoginOpacityAnimation->setStartValue(1.0);
-		_pLoginOpacityAnimation->setEndValue(0.0);
-		_pLoginOpacityAnimation->setKeyValueAt(0.1, 1.0);
-		_pLoginOpacityAnimation->setKeyValueAt(0.9, 0.0);
-
-		_pRegisterOpacityAnimation->setDuration(700);
-		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
-		_pRegisterOpacityAnimation->setStartValue(0.3);
-		_pRegisterOpacityAnimation->setEndValue(1.0);
-		_pLoginSwitchBtn->setEnabled(false);
-		_pRegisterSwitchBtn->setEnabled(true);
-		_pRegisterSwitchBtn->raise();
-		toggleFormType();
-		Q_EMIT switchClicked();
-		});
-	QObject::connect(_pRegisterSwitchBtn, &FKPushButton::clicked, this, [this]() {
-		_pRegisterOpacityAnimation->setDuration(1000);
-		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
-		_pRegisterOpacityAnimation->setStartValue(1.0);
-		_pRegisterOpacityAnimation->setEndValue(0.0);
-		_pRegisterOpacityAnimation->setKeyValueAt(0.1, 1.0);
-		_pRegisterOpacityAnimation->setKeyValueAt(0.9, 0.0);
-
-		_pLoginOpacityAnimation->setDuration(700);
-		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
-		_pLoginOpacityAnimation->setStartValue(0.3);
-		_pLoginOpacityAnimation->setEndValue(1.0);
-		_pLoginSwitchBtn->setEnabled(true);
-		_pRegisterSwitchBtn->setEnabled(false);
-		_pLoginSwitchBtn->raise();
-		toggleFormType();
-		Q_EMIT switchClicked();
-		});
+	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
+	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
+	QObject::connect(_pRegisterOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateRegisterOpacity);
 	QObject::connect(_pAnimationGroup, &QParallelAnimationGroup::finished, this, [this]() {
-		_updateUI();
-		});
-	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, [this](const QVariant& value) {
-		//qreal opacity = value.toReal();
-		_pLoginTitleEffect->setOpacity(_pLoginOpacity);
-		_pLoginDescriptionEffect->setOpacity(_pLoginOpacity);
-		_pLoginSwitchBtnEffect->setOpacity(_pLoginOpacity);
-		});
-	QObject::connect(_pRegisterOpacityAnimation, &QPropertyAnimation::valueChanged, this, [this](const QVariant& value) {
-		_pRegisterTitleEffect->setOpacity(_pRegisterOpacity);
-		_pRegisterDescriptionEffect->setOpacity(_pRegisterOpacity);
-		_pRegisterSwitchBtnEffect->setOpacity(_pRegisterOpacity);
+
 		});
 }
 
@@ -95,6 +53,15 @@ void FKSwitchPannel::toggleFormType()
 
 		_pTopCircleAnimation->setStartValue(_pTopCirclePos);
 		_pTopCircleAnimation->setEndValue(rect().topLeft());
+
+		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+		_pLoginOpacityAnimation->setStartValue(1.0);
+		_pLoginOpacityAnimation->setEndValue(0.0);
+		//_pLoginOpacityAnimation->setKeyValueAt(0.2, 1.0);
+		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+		_pRegisterOpacityAnimation->setStartValue(0.3);
+		_pRegisterOpacityAnimation->setEndValue(1.0);
+		//_pRegisterOpacityAnimation->setKeyValueAt(0.44, 0.3);
 	}
 	else {
 		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
@@ -102,11 +69,21 @@ void FKSwitchPannel::toggleFormType()
 
 		_pTopCircleAnimation->setStartValue(_pTopCirclePos);
 		_pTopCircleAnimation->setEndValue(rect().topRight());
+
+		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+		_pRegisterOpacityAnimation->setStartValue(1.0);
+		_pRegisterOpacityAnimation->setEndValue(0.0);
+		//_pRegisterOpacityAnimation->setKeyValueAt(0.2, 1.0);
+		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+		_pLoginOpacityAnimation->setStartValue(0.3);
+		_pLoginOpacityAnimation->setEndValue(1.0);
+		//_pLoginOpacityAnimation->setKeyValueAt(0.44, 0.3);
 	}
-
 	_isLoginState = !_isLoginState;
-
 	_pAnimationGroup->start();
+	_pSwitchBtn->setText(_isLoginState ? "REGISTER" : "LOGIN");
+
+	Q_EMIT switchClicked();
 }
 
 void FKSwitchPannel::paintEvent(QPaintEvent* event)
@@ -171,18 +148,9 @@ void FKSwitchPannel::_initUI()
 	QFont SimSunFont("SimSun");
 	_pLoginTitleEffect = new QGraphicsOpacityEffect(this);
 	_pLoginDescriptionEffect = new QGraphicsOpacityEffect(this);
-	_pLoginSwitchBtnEffect = new QGraphicsOpacityEffect(this);
 	_pRegisterTitleEffect = new QGraphicsOpacityEffect(this);
 	_pRegisterDescriptionEffect = new QGraphicsOpacityEffect(this);
-	_pRegisterSwitchBtnEffect = new QGraphicsOpacityEffect(this);
-
-	_pLoginTitleEffect->setOpacity(1.0);
-	_pLoginDescriptionEffect->setOpacity(1.0);
-	_pLoginSwitchBtnEffect->setOpacity(1.0);
-
-	_pRegisterTitleEffect->setOpacity(0.0);
-	_pRegisterDescriptionEffect->setOpacity(0.0);
-	_pRegisterSwitchBtnEffect->setOpacity(0.0);
+	_pSwitchBtnEffect = new QGraphicsOpacityEffect(this);
 
 	_pLoginTitleText = new NXText(FKUtils::concat(
 		"<font color='",
@@ -194,7 +162,25 @@ void FKSwitchPannel::_initUI()
 		FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
 		"'>去注册一个账号，成为尊贵的粉丝会员，让我们踏入奇妙的旅途！</font>"
 	), this);
-	_pLoginSwitchBtn = new FKPushButton("SIGN UP", this);
+
+	_pRegisterTitleText = new NXText(FKUtils::concat(
+		"<font color='",
+		FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
+		"'>Welcome Back！</font>"
+	), this);
+	_pRegisterDescriptionText = new NXText(FKUtils::concat(
+		"<font color='",
+		FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+		"'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
+	), this);
+
+	_pSwitchBtn = new FKPushButton("REGISTER", this);
+
+	_pLoginTitleEffect->setOpacity(1.0);
+	_pLoginDescriptionEffect->setOpacity(1.0);
+	_pRegisterTitleEffect->setOpacity(0.0);
+	_pRegisterDescriptionEffect->setOpacity(0.0);
+	_pSwitchBtnEffect->setOpacity(1.0);
 
 	_pLoginTitleText->setFont(SitkaHeadingFont);
 	_pLoginTitleText->setFixedWidth(280);
@@ -208,24 +194,10 @@ void FKSwitchPannel::_initUI()
 	_pLoginDescriptionText->setTextStyle(NXTextType::CustomStyle, 15, QFont::Weight::Medium);
 	_pLoginDescriptionText->setGraphicsEffect(_pLoginDescriptionEffect);
 
-	_pLoginSwitchBtn->setGraphicsEffect(_pLoginSwitchBtnEffect);
-
-	_pRegisterTitleText = new NXText(FKUtils::concat(
-		"<font color='",
-		FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
-		"'>Welcome Back！</font>"
-	), this);
-	_pRegisterDescriptionText = new NXText(FKUtils::concat(
-		"<font color='",
-		FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
-		"'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
-	), this);
-	_pRegisterSwitchBtn = new FKPushButton("SIGN IN", this);
-
 	_pRegisterTitleText->setFont(SitkaHeadingFont);
 	_pRegisterTitleText->setFixedWidth(280);
 	_pRegisterTitleText->setAlignment(Qt::AlignCenter);
-	_pRegisterTitleText->setTextStyle(NXTextType::CustomStyle, 28, QFont::Weight::ExtraBold);
+	_pRegisterTitleText->setTextStyle(NXTextType::CustomStyle, 32, QFont::Weight::Black);
 	_pRegisterTitleText->setGraphicsEffect(_pRegisterTitleEffect);
 
 	_pRegisterDescriptionText->setFont(SimSunFont);
@@ -234,45 +206,21 @@ void FKSwitchPannel::_initUI()
 	_pRegisterDescriptionText->setTextStyle(NXTextType::CustomStyle, 15, QFont::Weight::Medium);
 	_pRegisterDescriptionText->setGraphicsEffect(_pRegisterDescriptionEffect);
 
-	_pRegisterSwitchBtn->setGraphicsEffect(_pRegisterSwitchBtnEffect);
-	_pRegisterSwitchBtn->setEnabled(false);
+	_pSwitchBtn->setGraphicsEffect(_pSwitchBtnEffect);
 
-	_pLoginSwitchBtn->raise();
-	/*QVBoxLayout* loginLayout = new QVBoxLayout();
-	loginLayout->setContentsMargins(50, 55, 50, 85);
-	loginLayout->setSpacing(0);
-	loginLayout->addStretch();
-	loginLayout->addWidget(_pLoginTitleText, 0, Qt::AlignCenter);
-	loginLayout->addSpacing(40);
-	loginLayout->addWidget(_pLoginDescriptionText, 0, Qt::AlignCenter);
-	loginLayout->addSpacing(50);
-	loginLayout->addWidget(_pLoginSwitchBtn, 0, Qt::AlignCenter);
-	loginLayout->addStretch();
-
-	QVBoxLayout* registerLayout = new QVBoxLayout();
-	registerLayout->setContentsMargins(50, 55, 50, 85);
-	registerLayout->setSpacing(0);
-	registerLayout->addStretch();
-	registerLayout->addWidget(_pRegisterTitleText, 0, Qt::AlignCenter);
-	registerLayout->addSpacing(40);
-	registerLayout->addWidget(_pRegisterDescriptionText, 0, Qt::AlignCenter);
-	registerLayout->addSpacing(50);
-	registerLayout->addWidget(_pRegisterSwitchBtn, 0, Qt::AlignCenter);
-	registerLayout->addStretch();*/
 	constexpr int XOffset = (Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT) / 2;
 	constexpr int YOffset = Constant::WIDGET_HEIGHT / 2;
 	const QSize loginTitleSize = _pLoginTitleText->size();
 	const QSize loginDescriptionSize = _pLoginDescriptionText->size();
-	const QSize loginSwitchBtnSize = _pLoginSwitchBtn->size();
+	const QSize switchBtnSize = _pSwitchBtn->size();
 
 	const int half = _pLoginDescriptionText->height() / 2;
 	_pLoginTitleText->move(XOffset - loginTitleSize.width() / 2, YOffset - loginTitleSize.height() / 2 - half - 70);
 	_pLoginDescriptionText->move(XOffset - loginDescriptionSize.width() / 2, YOffset - half);
-	_pLoginSwitchBtn->move(XOffset - loginSwitchBtnSize.width() / 2, YOffset + loginSwitchBtnSize.height() / 2 + half + 40);
-
 	_pRegisterTitleText->move(_pLoginTitleText->pos());
 	_pRegisterDescriptionText->move(_pLoginDescriptionText->pos());
-	_pRegisterSwitchBtn->move(_pLoginSwitchBtn->pos());
+
+	_pSwitchBtn->move(XOffset - switchBtnSize.width() / 2, YOffset + switchBtnSize.height() / 2 + half + 40);
 }
 
 void FKSwitchPannel::_initAnimations()
@@ -288,26 +236,30 @@ void FKSwitchPannel::_initAnimations()
 	_pTopCircleAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
 	_pLoginOpacityAnimation = new QPropertyAnimation(this, "pLoginOpacity");
-	_pLoginOpacityAnimation->setDuration(1000);
-	_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
-	_pLoginOpacityAnimation->setStartValue(1.0);
-	_pLoginOpacityAnimation->setEndValue(0.0);
-	_pLoginOpacityAnimation->setKeyValueAt(0.1, 1.0);
-	_pLoginOpacityAnimation->setKeyValueAt(0.9, 0.0);
+	_pLoginOpacityAnimation->setDuration(1250);
 
 	_pRegisterOpacityAnimation = new QPropertyAnimation(this, "pRegisterOpacity");
-	_pRegisterOpacityAnimation->setDuration(700);
-	_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
-	_pRegisterOpacityAnimation->setStartValue(0.3);
-	_pRegisterOpacityAnimation->setEndValue(1.0);
+	_pRegisterOpacityAnimation->setDuration(1250);
+	// 仅适用于QSequentialAnimationGroup
+	//QPauseAnimation* loginDelayAnimation = new QPauseAnimation(250, this);
+	//QPauseAnimation* registerDelayAnimation = new QPauseAnimation(550, this);
 
 	_pAnimationGroup->addAnimation(_pBottomCircleAnimation);
 	_pAnimationGroup->addAnimation(_pTopCircleAnimation);
+	//_pAnimationGroup->addAnimation(loginDelayAnimation);
 	_pAnimationGroup->addAnimation(_pLoginOpacityAnimation);
+	//_pAnimationGroup->addAnimation(registerDelayAnimation);
 	_pAnimationGroup->addAnimation(_pRegisterOpacityAnimation);
 }
 
-void FKSwitchPannel::_updateUI()
+void FKSwitchPannel::_updateLoginOpacity(const QVariant& value)
 {
-	
+	_pLoginTitleEffect->setOpacity(value.toReal());
+	_pLoginDescriptionEffect->setOpacity(value.toReal());
+}
+
+void FKSwitchPannel::_updateRegisterOpacity(const QVariant& value)
+{
+	_pRegisterTitleEffect->setOpacity(value.toReal());
+	_pRegisterDescriptionEffect->setOpacity(value.toReal());
 }

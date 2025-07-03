@@ -2,10 +2,12 @@
 #define FK_SWITCH_PANNEL_H_
 
 #include <QWidget>
-#include <NXText.h>
-#include <QPropertyAnimation>
-#include <QParallelAnimationGroup>
 #include <QGraphicsOpacityEffect>
+#include <NXText.h>
+
+class QPropertyAnimation;
+class QSequentialAnimationGroup;
+class QParallelAnimationGroup;
 
 class FKPushButton;
 class FKSwitchPannel : public QWidget
@@ -21,7 +23,7 @@ public:
 	~FKSwitchPannel();
 
 	// 切换状态
-	void toggleFormType();
+	Q_SLOT void toggleFormType();
 
 Q_SIGNALS:
 	void switchClicked(); // 当切换按钮被点击时发出信号
@@ -32,20 +34,20 @@ protected:
 private:
 	void _initUI();
 	void _initAnimations();
-	void _updateUI(); // 更新UI显示
+	Q_SLOT void _updateLoginOpacity(const QVariant& value);
+	Q_SLOT void _updateRegisterOpacity(const QVariant& value);
 	NXText* _pLoginTitleText{ nullptr };
 	NXText* _pLoginDescriptionText{ nullptr };
-	FKPushButton* _pLoginSwitchBtn{ nullptr };
 	QGraphicsOpacityEffect* _pLoginTitleEffect{ nullptr };
 	QGraphicsOpacityEffect* _pLoginDescriptionEffect{ nullptr };
-	QGraphicsOpacityEffect* _pLoginSwitchBtnEffect{ nullptr };
 
 	NXText* _pRegisterTitleText{ nullptr };
 	NXText* _pRegisterDescriptionText{ nullptr };
-	FKPushButton* _pRegisterSwitchBtn{ nullptr };
 	QGraphicsOpacityEffect* _pRegisterTitleEffect{ nullptr };
 	QGraphicsOpacityEffect* _pRegisterDescriptionEffect{ nullptr };
-	QGraphicsOpacityEffect* _pRegisterSwitchBtnEffect{ nullptr };
+
+	QGraphicsOpacityEffect* _pSwitchBtnEffect{ nullptr };
+	FKPushButton* _pSwitchBtn{ nullptr };
 
 	QParallelAnimationGroup* _pAnimationGroup{ nullptr };
 	QPropertyAnimation* _pBottomCircleAnimation{ nullptr };
