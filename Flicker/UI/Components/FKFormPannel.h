@@ -40,7 +40,7 @@ class FKFormPannel : public QWidget
 public:
 	explicit FKFormPannel(QWidget* parent = nullptr);
 	~FKFormPannel() override;
-	void toggleState();
+	void toggleFormType();
 protected:
 	void paintEvent(QPaintEvent* event) override;
 
@@ -48,7 +48,9 @@ private:
 	void _initUI();
 	void _initRegistryCallback();
 	
-	void _updateUI(); // 更新UI显示
+	void _updateSwitchedUI(); // 更新UI显示
+	void _updateConfirmButtonState(); // 更新按钮状态
+
 	void _drawEdgeShadow(QPainter& painter, const QRect& rect,
 		const QColor& color, int shadowWidth) const noexcept;
 
@@ -59,13 +61,12 @@ private:
 	bool _validatePassword(const QString& password);
 	bool _validateConfirmPassword(const QString& password, const QString& confirmPassword);
 	bool _validateVerifyCode(const QString& verifyCode);
-	void _updateButtonState(); // 更新按钮状态
 
 	// private slots
 	Q_SLOT void _handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode);
 	Q_SLOT void _onGetVerifyCodeButtonClicked();
 	Q_SLOT void _onComfirmButtonClicked();
-	Q_SLOT void _onResetPasswordTextClicked();
+	Q_SLOT void _onSwitchSigninOrResetTextClicked();
 
 	// 输入验证槽
 	Q_SLOT void _onUsernameTextChanged(const QString& text);
@@ -86,9 +87,10 @@ private:
 
 	Q_SLOT void _updateVerifyCodeTimer();
 
-	bool _pIsLoginState{ true }; // true表示登录状态，false表示注册状态
-	int _pRemainingSeconds{ 0 };     // 剩余秒数
-	bool TestBool{ false };
+	bool _pIsSwitchStackedWidget{ false };
+	int _pRemainingSeconds{ 0 };
+
+	Launcher::FormType _pFormType{ Launcher::FormType::Login };
 	// 验证状态标志
 	Launcher::InputValidationFlags _pValidationFlags{ Launcher::InputValidationFlag::None };
 	QString _pErrorStyleSheet{};
@@ -99,13 +101,13 @@ private:
 
 	QWidget* _pLoginRegisterWidget{ nullptr };
 	QWidget* _pResetPasswordWidget{ nullptr };
-	QVBoxLayout* _pTestLayout{ nullptr };
+	QVBoxLayout* _pUniqueLayout{ nullptr };
 	// 登录/注册界面控件
 	NXLineEdit* _pEmailLineEdit{ nullptr };
 	NXLineEdit* _pConfirmPasswordLineEdit{ nullptr };
 	FKLineEdit* _pVerifyCodeLineEdit{ nullptr };
 	NXText* _pDescriptionText{ nullptr };
-	NXText* _pResetPasswordText{ nullptr };
+	NXText* _pSwitchSigninOrResetText{ nullptr };
 	QAction* _pShowConfirmPasswordAction{ nullptr };
 	FKIconLabel* _pQQIconLabel{ nullptr };
 	FKIconLabel* _pWechatIconLabel{ nullptr };

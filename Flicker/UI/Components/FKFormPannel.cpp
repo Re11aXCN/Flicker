@@ -50,28 +50,27 @@ FKFormPannel::FKFormPannel(QWidget* parent /*= nullptr*/)
 	QObject::connect(_pShowPasswordAction, &QAction::triggered, this, &FKFormPannel::_onShowPasswordActionTriggered);
 	QObject::connect(_pShowConfirmPasswordAction, &QAction::triggered, this, &FKFormPannel::_onShowConfirmPasswordActionTriggered);
 	
-	QObject::connect(_pResetPasswordText, &NXText::clicked, this, &FKFormPannel::_onResetPasswordTextClicked);
+	QObject::connect(_pSwitchSigninOrResetText, &NXText::clicked, this, &FKFormPannel::_onSwitchSigninOrResetTextClicked);
 }
 
 FKFormPannel::~FKFormPannel()
 {
 }
 
-void FKFormPannel::toggleState()
+void FKFormPannel::toggleFormType()
 {
-	_pIsLoginState = !_pIsLoginState;
-	
+	_pIsSwitchStackedWidget = false;
 	// 重置验证状态
 	_pValidationFlags = Launcher::InputValidationFlag::None;
 	
-	// 清空所有输入框
+	// 清空所有输入框（可能当前输入LineEdit有信息，切换后要清空）
 	_pUsernameLineEdit->clear();
 	_pPasswordLineEdit->clear();
 	_pEmailLineEdit->clear();
 	_pConfirmPasswordLineEdit->clear();
 	_pVerifyCodeLineEdit->clear();
 	
-	// 重置样式
+	// 重置样式（可能当前输入LineEdit内容错误，切换后要重置样式）
 	_pUsernameLineEdit->setStyleSheet(_pNormalStyleSheet);
 	_pPasswordLineEdit->setStyleSheet(_pNormalStyleSheet);
 	_pEmailLineEdit->setStyleSheet(_pNormalStyleSheet);
@@ -86,16 +85,20 @@ void FKFormPannel::toggleState()
 	_pShowConfirmPasswordAction->setIcon(_pShowPasswordIcon);
 	_pShowConfirmPasswordAction->setText("显示密码");
 
-	/*// 重置验证码倒计时
+	//< TODO:
+	//< 最好能够有一个cache，记录邮箱和时间，一分钟计时
+	//< 如果用户再次输入缓存的邮箱，就更新按钮为剩余时间，而不是enabled(true)
+	//< 防止用户切换Switch进行恶意刷新时间
+	// 重置验证码倒计时
 	if (_pVerifyCodeTimer->isActive()) {
 		_pVerifyCodeTimer->stop();
 	}
-	_pVerifyCodeLineEdit->setButtonEnabled(true);
-	_pVerifyCodeLineEdit->setButtonText("获取验证码");*/
-	
+	_pVerifyCodeLineEdit->setButtonEnabled(false);
+	_pVerifyCodeLineEdit->setButtonText("获取验证码");
+
 	QTimer::singleShot(200, this, [this]() { 
-		_updateUI(); 
-		_updateButtonState(); 
+		_updateSwitchedUI();
+		_updateConfirmButtonState(); 
 	});
 }
 
@@ -117,7 +120,7 @@ void FKFormPannel::_initUI()
 	_pLoginRegisterWidget = new QWidget(this);
 	_pResetPasswordWidget = new QWidget(this);
 	_pCentralStackedWidget = new NXCentralStackedWidget(this);
-	_pCentralStackedWidget->setIsTransparent(false);
+	_pCentralStackedWidget->setIsTransparent(true);
 	_pCentralStackedWidget->setIsHasRadius(false);
 	_pCentralStackedWidget->insertWidget(0, _pLoginRegisterWidget);
 	_pCentralStackedWidget->insertWidget(1, _pResetPasswordWidget);
@@ -135,12 +138,13 @@ void FKFormPannel::_initUI()
 	_pUsernameLineEdit = new NXLineEdit(_pLoginRegisterWidget);
 	_pPasswordLineEdit = new NXLineEdit(_pLoginRegisterWidget);
 	_pConfirmButton = new FKPushButton("SIGN IN", _pLoginRegisterWidget);
-	_pResetPasswordText = new NXText(_pLoginRegisterWidget);
+	_pSwitchSigninOrResetText = new NXText(_pLoginRegisterWidget);
 	_pShowPasswordAction = new QAction(_pShowPasswordIcon, "显示密码", _pPasswordLineEdit);
 
 	_pTitleText->setText("登 录 账 号");
+	_pTitleText->setFont(QFont{"华文宋体"});
 	_pTitleText->setStyleSheet(FKUtils::concat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
-	_pTitleText->setTextStyle(NXTextType::Title);
+	_pTitleText->setTextStyle(NXTextType::CustomStyle, 32, QFont::Weight::Black);
 	_pQQIconLabel->setFixedSize(32, 32);
 	_pWechatIconLabel->setFixedSize(32, 32);
 	_pBiliBiliIconLabel->setFixedSize(32, 32);
@@ -163,13 +167,13 @@ void FKFormPannel::_initUI()
 	_pPasswordLineEdit->setEchoMode(QLineEdit::Password);
 	_pPasswordLineEdit->addAction(_pShowPasswordAction, QLineEdit::ActionPosition::TrailingPosition);
 
-	_pResetPasswordText->setText("忘记密码?");
-	_pResetPasswordText->setFixedSize(70, 17);
-	_pResetPasswordText->setIsAllowClick(true);
-	_pResetPasswordText->setAlignment(Qt::AlignCenter);
-	_pResetPasswordText->setStyleSheet(FKUtils::concat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
-	_pResetPasswordText->setBorderStyle(1, NXWidgetBorder::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
-	_pResetPasswordText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Light);
+	_pSwitchSigninOrResetText->setText("忘记密码?");
+	_pSwitchSigninOrResetText->setFixedSize(70, 17);
+	_pSwitchSigninOrResetText->setIsAllowClick(true);
+	_pSwitchSigninOrResetText->setAlignment(Qt::AlignCenter);
+	_pSwitchSigninOrResetText->setStyleSheet(FKUtils::concat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
+	_pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetBorder::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
+	_pSwitchSigninOrResetText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Light);
 	_pConfirmButton->setEnabled(false);
 
 	// Register
@@ -212,69 +216,100 @@ void FKFormPannel::_initUI()
 	_pIconLabelLayout->addStretch();
 
 	// 提示：addSpacing和addStretch都会让 layout->count() 增加1，下标从0开始
-	_pTestLayout = new QVBoxLayout(_pLoginRegisterWidget);
-	_pTestLayout->setContentsMargins(0, 0, 0, 0);
-	_pTestLayout->setAlignment(Qt::AlignCenter);
-	_pTestLayout->setSpacing(0);
-	_pTestLayout->addSpacing(100);
-	_pTestLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
-	_pTestLayout->addSpacing(24);
-	_pTestLayout->addLayout(_pIconLabelLayout, 0);
-	_pTestLayout->addSpacing(24);
-	_pTestLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
-	_pTestLayout->addSpacing(15);
-	_pTestLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter); // 7
-	_pTestLayout->addSpacing(5);
-	_pTestLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter); // 9
-	_pTestLayout->addSpacing(30);
-	_pTestLayout->addWidget(_pResetPasswordText, 0, Qt::AlignCenter);
-	_pTestLayout->addSpacing(50);
-	_pTestLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
-	_pTestLayout->addStretch();
+	_pUniqueLayout = new QVBoxLayout(_pLoginRegisterWidget);
+	_pUniqueLayout->setContentsMargins(0, 0, 0, 0);
+	_pUniqueLayout->setAlignment(Qt::AlignCenter);
+	_pUniqueLayout->setSpacing(0);
+	_pUniqueLayout->addSpacing(100);
+	_pUniqueLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
+	_pUniqueLayout->addSpacing(24);
+	_pUniqueLayout->addLayout(_pIconLabelLayout, 0);
+	_pUniqueLayout->addSpacing(24);
+	_pUniqueLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
+	_pUniqueLayout->addSpacing(15);
+	_pUniqueLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter); // 7
+	_pUniqueLayout->addSpacing(5);
+	_pUniqueLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter); // 9
+	_pUniqueLayout->addSpacing(30);
+	_pUniqueLayout->addWidget(_pSwitchSigninOrResetText, 0, Qt::AlignCenter);
+	_pUniqueLayout->addSpacing(50);
+	_pUniqueLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
+	_pUniqueLayout->addStretch();
 }
 
-void FKFormPannel::_updateUI()
+void FKFormPannel::_updateSwitchedUI()
 {
-	QVBoxLayout* loginRegisterLayout = static_cast<QVBoxLayout*>(_pLoginRegisterWidget->layout());
-	while (loginRegisterLayout->count())
-	{
-		QLayoutItem* item = loginRegisterLayout->takeAt(0);
-		/*if (QLayout* subLayout = item->layout()) {
-			qDebug() << subLayout->count();
-			while (subLayout->count()) {
-				subLayout->takeAt(0);
+	if (_pCentralStackedWidget->currentIndex() == 0) {
+		if (_pIsSwitchStackedWidget) {
+			_pFormType = Launcher::FormType::Authentication;
+
+			_pUniqueLayout->takeAt(9); // _pPasswordLineEdit
+			_pUniqueLayout->takeAt(7); // _pUsernameLineEdit
+		}
+		else {
+			_pFormType = (_pFormType == Launcher::FormType::Login)
+				? Launcher::FormType::Register
+				: Launcher::FormType::Login;
+
+			while (_pUniqueLayout->count())
+			{
+				QLayoutItem* item = _pUniqueLayout->takeAt(0);
 			}
-		}*/
+		}
 	}
-	// 根据当前状态设置UI
-	if (_pIsLoginState) {
+	else {
+		if (_pIsSwitchStackedWidget) {
+			_pFormType = Launcher::FormType::Login;
+		}
+		else {
+			_pFormType = (_pFormType == Launcher::FormType::Authentication)
+				? Launcher::FormType::ResetPassword
+				: Launcher::FormType::Authentication;
+		}
+
+		_pUniqueLayout->takeAt(9); // _pVerifyCodeLineEdit/_pConfirmPasswordLineEdit
+		_pUniqueLayout->takeAt(7); // _pEmailLineEdit/_pPasswordLineEdit
+	}
+
+	switch (_pFormType) {
+	case Launcher::FormType::Login: {// 其他状态都可以切换到Login
 		_pTitleText->setText("登 录 账 号");
 		_pDescriptionText->setText("选择登录方式或输入用户名/邮箱登录");
 		_pUsernameLineEdit->setPlaceholderText("用户名/邮箱");
 		_pUsernameLineEdit->setIsClearButtonEnabled(false);
 		_pPasswordLineEdit->setPlaceholderText("密码");
 		_pPasswordLineEdit->setIsClearButtonEnabled(false);
+		_pSwitchSigninOrResetText->setText("忘记密码?");
 		_pConfirmButton->setText("SIGN IN");
 		_pConfirmButton->setEnabled(false); // 默认禁用，等待验证通过
 
-		loginRegisterLayout->addSpacing(100);
-		loginRegisterLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(24);
-		loginRegisterLayout->addLayout(_pIconLabelLayout, 0);
-		loginRegisterLayout->addSpacing(24);
-		loginRegisterLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(15);
-		loginRegisterLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(5);
-		loginRegisterLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(30);
-		loginRegisterLayout->addWidget(_pResetPasswordText, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(50);
-		loginRegisterLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
-		loginRegisterLayout->addStretch();
+		if (_pIsSwitchStackedWidget) {
+			_pUniqueLayout->insertWidget(7, _pUsernameLineEdit, 0, Qt::AlignCenter);
+			_pUniqueLayout->insertWidget(9, _pPasswordLineEdit, 0, Qt::AlignCenter);
+			_pLoginRegisterWidget->setLayout(_pUniqueLayout);
+		}
+		else {
+			_pUniqueLayout->addSpacing(100);
+			_pUniqueLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
+			_pUniqueLayout->addSpacing(24);
+			_pUniqueLayout->addLayout(_pIconLabelLayout, 0);
+			_pUniqueLayout->addSpacing(24);
+			_pUniqueLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
+			_pUniqueLayout->addSpacing(15);
+			_pUniqueLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter);
+			_pUniqueLayout->addSpacing(5);
+			_pUniqueLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter);
+			_pUniqueLayout->addSpacing(30);
+			_pUniqueLayout->addWidget(_pSwitchSigninOrResetText, 0, Qt::AlignCenter);
+			_pUniqueLayout->addSpacing(50);
+			_pUniqueLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
+			_pUniqueLayout->addStretch();
+		}
 
 		// 显示登录控件，隐藏注册控件
-		_pResetPasswordText->show();
+		_pUsernameLineEdit->show();
+		_pPasswordLineEdit->show();
+		_pSwitchSigninOrResetText->show();
 		//<_pDescriptionText->show();
 		//<_pQQIconLabel->show();
 		//<_pWechatIconLabel->show();
@@ -283,8 +318,9 @@ void FKFormPannel::_updateUI()
 		_pEmailLineEdit->hide();
 		_pConfirmPasswordLineEdit->hide();
 		_pVerifyCodeLineEdit->hide();
+		break;
 	}
-	else {
+	case Launcher::FormType::Register: {// 只能由Login切换到Register
 		_pTitleText->setText("创 建 账 号");
 		_pDescriptionText->setText("选择注册方式或电子邮箱注册");
 		_pUsernameLineEdit->setPlaceholderText("用户名");
@@ -292,41 +328,82 @@ void FKFormPannel::_updateUI()
 		_pPasswordLineEdit->setPlaceholderText("输入密码");
 		_pPasswordLineEdit->setIsClearButtonEnabled(true);
 		_pConfirmButton->setText("SIGN UP");
-		_pConfirmButton->setEnabled(false); // 默认禁用，等待验证通过
+		_pConfirmButton->setEnabled(false);
 
-		//<loginRegisterLayout->addSpacing(100);
-		//<loginRegisterLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
-		//<loginRegisterLayout->addSpacing(35);
-		loginRegisterLayout->addSpacing(80);
-		loginRegisterLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(24);
-		loginRegisterLayout->addLayout(_pIconLabelLayout, 0);
-		loginRegisterLayout->addSpacing(24);
-		loginRegisterLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(15);
+		//<_pUniqueLayout->addSpacing(100);
+		//<_pUniqueLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
+		//<_pUniqueLayout->addSpacing(35);
+		_pUniqueLayout->addSpacing(80);
+		_pUniqueLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(24);
+		_pUniqueLayout->addLayout(_pIconLabelLayout, 0);
+		_pUniqueLayout->addSpacing(24);
+		_pUniqueLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(15);
 
-		loginRegisterLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(5);
-		loginRegisterLayout->addWidget(_pEmailLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(5);
-		loginRegisterLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(5);
-		loginRegisterLayout->addWidget(_pConfirmPasswordLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(5);
-		loginRegisterLayout->addWidget(_pVerifyCodeLineEdit, 0, Qt::AlignCenter);
-		loginRegisterLayout->addSpacing(40);
-		loginRegisterLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
-		loginRegisterLayout->addStretch();
+		_pUniqueLayout->addWidget(_pUsernameLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(5);
+		_pUniqueLayout->addWidget(_pEmailLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(5);
+		_pUniqueLayout->addWidget(_pPasswordLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(5);
+		_pUniqueLayout->addWidget(_pConfirmPasswordLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(5);
+		_pUniqueLayout->addWidget(_pVerifyCodeLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->addSpacing(40);
+		_pUniqueLayout->addWidget(_pConfirmButton, 0, Qt::AlignCenter);
+		_pUniqueLayout->addStretch();
 
 		_pEmailLineEdit->show();
 		_pConfirmPasswordLineEdit->show();
 		_pVerifyCodeLineEdit->show();
-		
-		_pResetPasswordText->hide();
+
+		_pSwitchSigninOrResetText->hide();
 		//<_pDescriptionText->hide();
 		//<_pQQIconLabel->hide();
 		//<_pWechatIconLabel->hide();
 		//<_pBiliBiliIconLabel->hide();
+		break;
+	}
+	case Launcher::FormType::Authentication: {// 由Login/Reset可以切换到Auth
+		_pTitleText->setText("验 证 身 份");
+		_pDescriptionText->setText("选择验证方式或输入邮箱验证");
+		_pSwitchSigninOrResetText->setText("返回登录");
+		_pConfirmButton->setText("VERIFY");
+		_pConfirmButton->setEnabled(false);
+
+		_pUniqueLayout->insertWidget(7, _pEmailLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->insertWidget(9, _pVerifyCodeLineEdit, 0, Qt::AlignCenter);
+
+		_pResetPasswordWidget->setLayout(_pUniqueLayout);
+
+		_pEmailLineEdit->show();
+		_pVerifyCodeLineEdit->show();
+
+		_pUsernameLineEdit->hide();
+		_pPasswordLineEdit->hide();
+		_pConfirmPasswordLineEdit->hide();
+		break;
+	}
+	case Launcher::FormType::ResetPassword: {// 只能由Auth切换到Reset
+		_pTitleText->setText("重 置 密 码");
+		_pDescriptionText->setText("请输入新的密码并确认");
+		_pPasswordLineEdit->setPlaceholderText("输入密码");
+		_pPasswordLineEdit->setIsClearButtonEnabled(true);
+		_pConfirmButton->setText("RESET");
+		_pConfirmButton->setEnabled(false); 
+
+		_pUniqueLayout->insertWidget(7, _pPasswordLineEdit, 0, Qt::AlignCenter);
+		_pUniqueLayout->insertWidget(9, _pConfirmPasswordLineEdit, 0, Qt::AlignCenter);
+
+		_pPasswordLineEdit->show();
+		_pConfirmPasswordLineEdit->show();
+
+		_pEmailLineEdit->hide();
+		_pVerifyCodeLineEdit->hide();
+		break;
+	}
+	default: throw std::invalid_argument("Invalid form type");
 	}
 }
 
@@ -338,7 +415,7 @@ void FKFormPannel::_drawEdgeShadow(QPainter& painter, const QRect& rect, const Q
 	gradient.setColorAt(1, Qt::transparent);\
 	painter.fillRect(QRect{ rect.top##Left(), contentRect.bottom##Right() }, gradient)
 
-	if (_pIsLoginState) {
+	if (_pFormType == Launcher::FormType::Login || _pFormType == Launcher::FormType::Authentication) {
 		QRect contentRect = rect.adjusted(shadowWidth, 0, 0, 0);
 		DrawEdgeShadow(Left, Right);
 	}
@@ -419,7 +496,6 @@ void FKFormPannel::_handleServerResponse(const QString& response, Http::RequestI
 	}
 }
 
-// 验证方法实现
 bool FKFormPannel::_validateUsername(const QString& username)
 {
 	if (username.isEmpty()) {
@@ -447,7 +523,6 @@ bool FKFormPannel::_validatePassword(const QString& password)
 		return false;
 	}
 	
-	// 密码规则验证（8-20位，不能包含空格）
 	if (password.length() < 8 || password.length() > 20 || password.contains(' ')) {
 		return false;
 	}
@@ -466,36 +541,45 @@ bool FKFormPannel::_validateConfirmPassword(const QString& password, const QStri
 
 bool FKFormPannel::_validateVerifyCode(const QString& verifyCode)
 {
-	// 简单验证验证码非空且为6位数字
 	if (verifyCode.isEmpty() || verifyCode.length() != 6) {
 		return false;
 	}
 	
-	// 可以添加更复杂的验证逻辑
 	return true;
 }
 
-void FKFormPannel::_updateButtonState()
+void FKFormPannel::_updateConfirmButtonState()
 {
-	if (_pIsLoginState) {
-		// 登录状态：用户名和密码都有效时启用按钮
-		bool isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllLoginValid) == Launcher::InputValidationFlag::AllLoginValid;
-		_pConfirmButton->setEnabled(isValid);
-	} else {
-		// 注册状态：所有字段都有效时启用按钮
-		bool isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllRegisterValid) == Launcher::InputValidationFlag::AllRegisterValid;
-		_pConfirmButton->setEnabled(isValid);
-		
-		// 邮箱有效时启用验证码按钮
-		bool isEmailValid = (_pValidationFlags & Launcher::InputValidationFlag::EmailValid) == Launcher::InputValidationFlag::EmailValid;
-		_pVerifyCodeLineEdit->setButtonEnabled(isEmailValid);
+	bool isValid = false;
+	// 所有字段都有效时启用按钮
+	switch (_pFormType)
+	{
+	case Launcher::FormType::Login: {
+		isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllLoginValid) == Launcher::InputValidationFlag::AllLoginValid;
+		break;
 	}
+	case Launcher::FormType::Register: {
+		isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllRegisterValid) == Launcher::InputValidationFlag::AllRegisterValid;
+		break;
+	}
+	case Launcher::FormType::Authentication: {
+		isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllAuthenticationValid) == Launcher::InputValidationFlag::AllAuthenticationValid;
+		break;
+	}
+	case Launcher::FormType::ResetPassword: {
+		isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllResetPasswordValid) == Launcher::InputValidationFlag::AllResetPasswordValid;
+		break;
+	}
+	default: throw std::invalid_argument("Invalid form type");
+	}
+	_pConfirmButton->setEnabled(isValid);
 }
 
-// 文本变化槽实现
 void FKFormPannel::_onUsernameTextChanged(const QString& text)
 {
-	bool isValid = _pIsLoginState ? _validateUsernameOrEmail(text) : _validateUsername(text);
+	bool isValid = (_pFormType == Launcher::FormType::Login) 
+		? _validateUsernameOrEmail(text) 
+		: _validateUsername(text);
 	
 	if (isValid) {
 		_pValidationFlags |= Launcher::InputValidationFlag::UsernameValid;
@@ -504,7 +588,7 @@ void FKFormPannel::_onUsernameTextChanged(const QString& text)
 		_pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::UsernameValid };
 	}
 	
-	_updateButtonState();
+	_updateConfirmButtonState();
 }
 
 void FKFormPannel::_onEmailTextChanged(const QString& text)
@@ -514,11 +598,12 @@ void FKFormPannel::_onEmailTextChanged(const QString& text)
 	if (isValid) {
 		_pValidationFlags |= Launcher::InputValidationFlag::EmailValid;
 		_pEmailLineEdit->setStyleSheet(_pNormalStyleSheet);
+		_pVerifyCodeLineEdit->setButtonEnabled(true);
 	} else {
 		_pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::EmailValid };
 	}
 	
-	_updateButtonState();
+	_updateConfirmButtonState();
 }
 
 void FKFormPannel::_onPasswordTextChanged(const QString& text)
@@ -537,7 +622,7 @@ void FKFormPannel::_onPasswordTextChanged(const QString& text)
 		_onConfirmPasswordTextChanged(_pConfirmPasswordLineEdit->text());
 	}
 	
-	_updateButtonState();
+	_updateConfirmButtonState();
 }
 
 void FKFormPannel::_onConfirmPasswordTextChanged(const QString& text)
@@ -551,7 +636,7 @@ void FKFormPannel::_onConfirmPasswordTextChanged(const QString& text)
 		_pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::ConfirmPasswordValid };
 	}
 	
-	_updateButtonState();
+	_updateConfirmButtonState();
 }
 
 void FKFormPannel::_onVerifyCodeTextChanged(const QString& text)
@@ -565,16 +650,16 @@ void FKFormPannel::_onVerifyCodeTextChanged(const QString& text)
 		_pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::VerifyCodeValid };
 	}
 	
-	_updateButtonState();
+	_updateConfirmButtonState();
 }
 
-// 编辑完成槽实现
 void FKFormPannel::_onUsernameEditingFinished()
 {
 	if (!(_pValidationFlags & Launcher::InputValidationFlag::UsernameValid)) {
 		_pUsernameLineEdit->setStyleSheet(_pErrorStyleSheet);
 		if (!_pUsernameLineEdit->text().isEmpty()) {
-			FKLauncherShell::ShowMessage("ERROR", "用户名只能包含字母、数字和下划线！", NXMessageBarType::Error, _pIsLoginState ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
+			// 登录/注册
+			FKLauncherShell::ShowMessage("ERROR", "用户名只能包含字母、数字和下划线！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
 		}
 	}
 }
@@ -584,7 +669,8 @@ void FKFormPannel::_onEmailEditingFinished()
 	if (!(_pValidationFlags & Launcher::InputValidationFlag::EmailValid)) {
 		_pEmailLineEdit->setStyleSheet(_pErrorStyleSheet);
 		if (!_pEmailLineEdit->text().isEmpty()) {
-			FKLauncherShell::ShowMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, NXMessageBarType::TopRight);
+			// 验证/注册
+			FKLauncherShell::ShowMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Authentication ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
 		}
 	}
 }
@@ -594,7 +680,8 @@ void FKFormPannel::_onPasswordEditingFinished()
 	if (!(_pValidationFlags & Launcher::InputValidationFlag::PasswordValid)) {
 		_pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
 		if (!_pPasswordLineEdit->text().isEmpty()) {
-			FKLauncherShell::ShowMessage("ERROR", "密码长度需在8-20位之间且不能包含空格！", NXMessageBarType::Error, _pIsLoginState ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
+			// 登录/（注册/重置密码）
+			FKLauncherShell::ShowMessage("ERROR", "密码长度需在8-20位之间且不能包含空格！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
 		}
 	}
 }
@@ -604,6 +691,7 @@ void FKFormPannel::_onConfirmPasswordEditingFinished()
 	if (!(_pValidationFlags & Launcher::InputValidationFlag::ConfirmPasswordValid)) {
 		_pConfirmPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
 		if (!_pConfirmPasswordLineEdit->text().isEmpty()) {
+			// 注册/重置密码
 			FKLauncherShell::ShowMessage("ERROR", "两次输入的密码不一致！", NXMessageBarType::Error, NXMessageBarType::TopRight);
 		}
 	}
@@ -614,7 +702,8 @@ void FKFormPannel::_onVerifyCodeEditingFinished()
 	if (!(_pValidationFlags & Launcher::InputValidationFlag::VerifyCodeValid)) {
 		_pVerifyCodeLineEdit->setStyleSheet(_pErrorStyleSheet);
 		if (!_pVerifyCodeLineEdit->text().isEmpty()) {
-			FKLauncherShell::ShowMessage("ERROR", "验证码格式错误！", NXMessageBarType::Error, NXMessageBarType::TopRight);
+			// 验证/注册
+			FKLauncherShell::ShowMessage("ERROR", "验证码格式错误！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Authentication ? NXMessageBarType::TopLeft : NXMessageBarType::TopRight);
 		}
 	}
 }
@@ -640,7 +729,6 @@ void FKFormPannel::_updateVerifyCodeTimer()
 	_pRemainingSeconds--;
 
 	if (_pRemainingSeconds > 0) {
-		// 更新按钮文本为 "58s" 格式
 		_pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
 	}
 	else {
@@ -663,7 +751,7 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
 
 	// 定时器设置，防止用户多次点击
 	_pRemainingSeconds = 60;
-	_pVerifyCodeLineEdit->setButtonEnabled(false); // 禁用按钮
+	_pVerifyCodeLineEdit->setButtonEnabled(false);
 	_pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
 	_pVerifyCodeTimer->start();
 
@@ -675,7 +763,7 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
 	// 创建数据对象
 	QJsonObject dataObj;
 	dataObj["email"] = email;
-	requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+	requestObj["data"] = dataObj;
 	qDebug() << "request is " << requestObj;
 
 	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varify_code",
@@ -688,18 +776,15 @@ void FKFormPannel::_onComfirmButtonClicked()
 {
 	// 由于我们已经实现了实时验证，按钮只有在所有字段都有效时才能点击
 	// 这里只需要处理提交逻辑，不需要重复验证
-	
-	if (_pIsLoginState) {
-		// 获取用户名/邮箱和密码
+	switch (_pFormType) {
+	case Launcher::FormType::Login: {
 		QString usernameOrEmail = _pUsernameLineEdit->text().trimmed();
 		QString password = _pPasswordLineEdit->text();
 
-		// 创建 JSON 请求对象
 		QJsonObject requestObj;
 		requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
 		requestObj["message"] = "Client request for login";
 
-		// 创建数据对象
 		QJsonObject dataObj;
 
 		// 判断输入是邮箱还是用户名
@@ -722,71 +807,58 @@ void FKFormPannel::_onComfirmButtonClicked()
 
 		requestObj["data"] = dataObj;
 
-		// 发送登录请求
 		FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/login_user",
 			requestObj,
 			Http::RequestId::ID_LOGIN_USER,
 			Http::RequestSeviceType::LOGIN_USER);
+		break;
 	}
-	else {
-		// 获取所有字段值
+	case Launcher::FormType::Register: {
 		QString username = _pUsernameLineEdit->text().trimmed();
 		QString email = _pEmailLineEdit->text().trimmed();
 		QString password = _pPasswordLineEdit->text();
 		QString varifyCode = _pVerifyCodeLineEdit->text().trimmed();
 
-		// 创建 JSON 请求对象
 		QJsonObject requestObj;
 		requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
 		requestObj["message"] = "Client request for register user";
 
-		// 创建数据对象
 		QJsonObject dataObj;
 		dataObj["username"] = username;
 		dataObj["email"] = email;
 		dataObj["password"] = password;
 		dataObj["verify_code"] = varifyCode;
-		requestObj["data"] = dataObj;  // 将数据对象添加到请求中
+		requestObj["data"] = dataObj;
 
 		FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/register_user",
 			requestObj,
 			Http::RequestId::ID_REGISTER_USER,
 			Http::RequestSeviceType::REGISTER_USER);
+		break;
+	}
+	case Launcher::FormType::Authentication: {
+		//TODO
+		// Authentication succeeded身份验证成功才允许跳转到ResetPassword界面进行密码重置
+		break;
+	}
+	case Launcher::FormType::ResetPassword: {
+		//TODO
+		
+		break;
+	}
+	default: throw std::invalid_argument("Invalid form type");
 	}
 }
 
-void FKFormPannel::_onResetPasswordTextClicked()
+void FKFormPannel::_onSwitchSigninOrResetTextClicked()
 {
-	if (!TestBool) {
-		_pCentralStackedWidget->doWindowStackSwitch(NXWindowType::Popup, 1, false);
-		// 不需要设置nullptr，因为_pResetPasswordWidget->setLayout(_pTestLayout);会自动转移权限
-		// _pLoginRegisterWidget->setLayout(nullptr);
-		// 注意从后向前take，下标从0开始
-		_pTestLayout->takeAt(9); // _pPasswordLineEdit
-		_pTestLayout->takeAt(7); // _pUsernameLineEdit
-		//qDebug() << "test layout count is " << _pTestLayout->count();
-		_pTestLayout->insertWidget(7, _pEmailLineEdit, 0, Qt::AlignCenter);
-		_pTestLayout->insertWidget(9, _pVerifyCodeLineEdit, 0, Qt::AlignCenter);
-		//qDebug() << "test layout count is " << _pTestLayout->count();
-		//for (int i = 0; i < _pTestLayout->count(); i++) {
-		//	if (QWidget* widget = _pTestLayout->itemAt(i)->widget()) {
-		//		if (NXLineEdit* lineEdit = qobject_cast<NXLineEdit*>(widget)) {
-		//			qDebug() << "test layout item " << i;
-		//		}
-		//	}
-		//}
-		_pUsernameLineEdit->hide();
-		_pPasswordLineEdit->hide();
-		_pEmailLineEdit->show();
-		_pVerifyCodeLineEdit->show();
-		_pResetPasswordWidget->setLayout(_pTestLayout);
-		TestBool = true;
-		QTimer::singleShot(5000, this, [this]() {
-			Q_EMIT _pResetPasswordText->clicked();
-			});
+	_pIsSwitchStackedWidget = true;
+	if (_pCentralStackedWidget->currentIndex() == 0) {
+		_updateSwitchedUI();
+		_pCentralStackedWidget->doWindowStackSwitch(NXWindowType::Scale, 1, false);
 	}
 	else {
-		_pCentralStackedWidget->doWindowStackSwitch(NXWindowType::Popup, 0, false);
-		TestBool = false;
+		_updateSwitchedUI();
+		_pCentralStackedWidget->doWindowStackSwitch(NXWindowType::Scale, 0, true);
 	}
 }

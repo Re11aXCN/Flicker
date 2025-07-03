@@ -12,8 +12,8 @@ FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
 	, _pWaveRadius{ 0 }
 	, _pWaveOpacity{ 0 } // 初始值改为0（动画从255->0）
 {
-	setFixedSize(170, 52);
-	setBorderRadius(26);
+	setFixedSize(180, 56);
+	setBorderRadius(28);
 	setLightDefaultColor(NXThemeColor(NXThemeType::Light, PrimaryNormal));
 	setLightHoverColor(NXThemeColor(NXThemeType::Light, PrimaryHover));
 	setLightPressColor(NXThemeColor(NXThemeType::Light, PrimaryPress));

@@ -41,8 +41,6 @@ void FKLauncherShell::_initUi()
 	setCustomBackgroundColor(Constant::LIGHT_MAIN_BG_COLOR, Constant::DARK_MAIN_BG_COLOR);
 	setWindowButtonFlags(NXAppBarType::MinimizeButtonHint | NXAppBarType::CloseButtonHint);
 
-	// 移除布局，使用绝对定位以便实现动画
-	setLayout(nullptr);
 	_pMessageButton = new NXMessageButton(this);
 	_pMessageButton->setFixedSize(1, 1);
 	_pMessageButton->setVisible(false);
@@ -109,7 +107,7 @@ void FKLauncherShell::_onTogglePannelButtonClicked()
 	}
 	
 	// 切换FormPannel的状态
-	_pFormPannel->toggleState();
+	_pFormPannel->toggleFormType();
 	
 	// 启动动画
 	_pAnimationGroup->start();

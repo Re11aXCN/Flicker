@@ -83,10 +83,19 @@ namespace Launcher {
 		ConfirmPasswordValid = 0x08,
 		VerifyCodeValid = 0x10,
 		AllLoginValid = UsernameValid | PasswordValid,
-		AllRegisterValid = UsernameValid | EmailValid | PasswordValid | ConfirmPasswordValid | VerifyCodeValid
+		AllRegisterValid = UsernameValid | EmailValid | PasswordValid | ConfirmPasswordValid | VerifyCodeValid,
+		AllAuthenticationValid = EmailValid | VerifyCodeValid,
+		AllResetPasswordValid = PasswordValid | ConfirmPasswordValid,
 	};
 	Q_DECLARE_FLAGS(InputValidationFlags, InputValidationFlag)
 	Q_DECLARE_OPERATORS_FOR_FLAGS(InputValidationFlags)
+
+	enum class FormType {
+		Login,
+		Register,
+		Authentication,
+		ResetPassword,
+	};
 };
 
 #endif

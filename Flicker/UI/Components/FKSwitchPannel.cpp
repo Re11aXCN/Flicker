@@ -13,18 +13,62 @@
 
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 	: QWidget(parent)
-	, _pMoveOpacity{ 1.0 }
+	, _pLoginOpacity{ 1.0 }
+	, _pRegisterOpacity{ 0.0 }
 {
 
 	_initUI();
 	_initAnimations();
 
-	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, [this]() {
-		toggleState();
+	QObject::connect(_pLoginSwitchBtn, &FKPushButton::clicked, this, [this]() {
+		_pLoginOpacityAnimation->setDuration(1000);
+		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+		_pLoginOpacityAnimation->setStartValue(1.0);
+		_pLoginOpacityAnimation->setEndValue(0.0);
+		_pLoginOpacityAnimation->setKeyValueAt(0.1, 1.0);
+		_pLoginOpacityAnimation->setKeyValueAt(0.9, 0.0);
+
+		_pRegisterOpacityAnimation->setDuration(700);
+		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+		_pRegisterOpacityAnimation->setStartValue(0.3);
+		_pRegisterOpacityAnimation->setEndValue(1.0);
+		_pLoginSwitchBtn->setEnabled(false);
+		_pRegisterSwitchBtn->setEnabled(true);
+		_pRegisterSwitchBtn->raise();
+		toggleFormType();
+		Q_EMIT switchClicked();
+		});
+	QObject::connect(_pRegisterSwitchBtn, &FKPushButton::clicked, this, [this]() {
+		_pRegisterOpacityAnimation->setDuration(1000);
+		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+		_pRegisterOpacityAnimation->setStartValue(1.0);
+		_pRegisterOpacityAnimation->setEndValue(0.0);
+		_pRegisterOpacityAnimation->setKeyValueAt(0.1, 1.0);
+		_pRegisterOpacityAnimation->setKeyValueAt(0.9, 0.0);
+
+		_pLoginOpacityAnimation->setDuration(700);
+		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+		_pLoginOpacityAnimation->setStartValue(0.3);
+		_pLoginOpacityAnimation->setEndValue(1.0);
+		_pLoginSwitchBtn->setEnabled(true);
+		_pRegisterSwitchBtn->setEnabled(false);
+		_pLoginSwitchBtn->raise();
+		toggleFormType();
 		Q_EMIT switchClicked();
 		});
 	QObject::connect(_pAnimationGroup, &QParallelAnimationGroup::finished, this, [this]() {
 		_updateUI();
+		});
+	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, [this](const QVariant& value) {
+		//qreal opacity = value.toReal();
+		_pLoginTitleEffect->setOpacity(_pLoginOpacity);
+		_pLoginDescriptionEffect->setOpacity(_pLoginOpacity);
+		_pLoginSwitchBtnEffect->setOpacity(_pLoginOpacity);
+		});
+	QObject::connect(_pRegisterOpacityAnimation, &QPropertyAnimation::valueChanged, this, [this](const QVariant& value) {
+		_pRegisterTitleEffect->setOpacity(_pRegisterOpacity);
+		_pRegisterDescriptionEffect->setOpacity(_pRegisterOpacity);
+		_pRegisterSwitchBtnEffect->setOpacity(_pRegisterOpacity);
 		});
 }
 
@@ -37,20 +81,15 @@ void FKSwitchPannel::setBottomCirclePos(const QPoint& pos) { _pBottomCirclePos =
 
 void FKSwitchPannel::setTopCirclePos(const QPoint& pos) { _pTopCirclePos = pos; update(); }
 
-void FKSwitchPannel::setMoveOpacity(qreal opacity) { _pMoveOpacity = opacity; update(); }
+void FKSwitchPannel::setLoginOpacity(qreal opacity) { _pLoginOpacity = opacity; update(); }
 
-void FKSwitchPannel::toggleState()
+void FKSwitchPannel::setRegisterOpacity(qreal opacity) { _pRegisterOpacity = opacity; update(); }
+
+void FKSwitchPannel::toggleFormType()
 {
-	// 停止正在进行的动画
 	_pAnimationGroup->stop();
 
-	// 设置动画起始值和结束值
-	_pOpacityAnimation->setStartValue(_pMoveOpacity);
-	_pOpacityAnimation->setEndValue(_pMoveOpacity);
-	_pOpacityAnimation->setKeyValueAt(0.5, 0.0); // 中间点完全透明
-
 	if (_isLoginState) {
-		// 从登录状态切换到注册状态
 		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
 		_pBottomCircleAnimation->setEndValue(rect().bottomRight());
 
@@ -58,7 +97,6 @@ void FKSwitchPannel::toggleState()
 		_pTopCircleAnimation->setEndValue(rect().topLeft());
 	}
 	else {
-		// 从注册状态切换到登录状态
 		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
 		_pBottomCircleAnimation->setEndValue(rect().bottomLeft());
 
@@ -66,10 +104,8 @@ void FKSwitchPannel::toggleState()
 		_pTopCircleAnimation->setEndValue(rect().topRight());
 	}
 
-	// 切换状态标志
 	_isLoginState = !_isLoginState;
 
-	// 启动动画
 	_pAnimationGroup->start();
 }
 
@@ -85,20 +121,17 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	// 背景色设置，为了遮挡FormPanel
 	painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
 
-	// 绘制底部圆形（使用动画属性控制位置）
 	QRect bottomCircleRect(_pBottomCirclePos - QPoint(250, 170), _pBottomCirclePos + QPoint(250, 330));
 
-	// 创建径向渐变实现内阴影效果
 	QRadialGradient bottomGradient(bottomCircleRect.center(), bottomCircleRect.width() / 2);
-	bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR); // 圆形背景色
-	bottomGradient.setColorAt(0.85, Constant::LIGHT_MAIN_BG_COLOR); // 圆形背景色
-	bottomGradient.setColorAt(0.9, Qt::white); // 内阴影亮部
-	bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR); // 内阴影暗部
+	bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
+	bottomGradient.setColorAt(0.85, Constant::LIGHT_MAIN_BG_COLOR);
+	bottomGradient.setColorAt(0.9, Qt::white);
+	bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
 	painter.setBrush(bottomGradient);
 	painter.setPen(Qt::NoPen);
 	painter.drawEllipse(bottomCircleRect);
 
-	// 绘制顶部圆形（使用动画属性控制位置）
 	QRect topCircleRect(_pTopCirclePos - QPoint(150, 180), _pTopCirclePos + QPoint(150, 120));
 
 	QRadialGradient topGradient(topCircleRect.center(), topCircleRect.width() / 2);
@@ -134,93 +167,147 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 
 void FKSwitchPannel::_initUI()
 {
-	_pTitleText = new NXText(FKUtils::concat(
+	QFont SitkaHeadingFont("Sitka Heading");
+	QFont SimSunFont("SimSun");
+	_pLoginTitleEffect = new QGraphicsOpacityEffect(this);
+	_pLoginDescriptionEffect = new QGraphicsOpacityEffect(this);
+	_pLoginSwitchBtnEffect = new QGraphicsOpacityEffect(this);
+	_pRegisterTitleEffect = new QGraphicsOpacityEffect(this);
+	_pRegisterDescriptionEffect = new QGraphicsOpacityEffect(this);
+	_pRegisterSwitchBtnEffect = new QGraphicsOpacityEffect(this);
+
+	_pLoginTitleEffect->setOpacity(1.0);
+	_pLoginDescriptionEffect->setOpacity(1.0);
+	_pLoginSwitchBtnEffect->setOpacity(1.0);
+
+	_pRegisterTitleEffect->setOpacity(0.0);
+	_pRegisterDescriptionEffect->setOpacity(0.0);
+	_pRegisterSwitchBtnEffect->setOpacity(0.0);
+
+	_pLoginTitleText = new NXText(FKUtils::concat(
 		"<font color='",
 		FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
 		"'>Hello Friend！</font>"
 	), this);
-	_pDescriptionText = new NXText(FKUtils::concat(
+	_pLoginDescriptionText = new NXText(FKUtils::concat(
 		"<font color='",
 		FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
 		"'>去注册一个账号，成为尊贵的粉丝会员，让我们踏入奇妙的旅途！</font>"
 	), this);
-	_pSwitchBtn = new FKPushButton("SIGN UP", this);
+	_pLoginSwitchBtn = new FKPushButton("SIGN UP", this);
 
-	_pTitleText->setTextStyle(NXTextType::CustomStyle, 28, QFont::Weight::Bold);
-	_pDescriptionText->setFixedWidth(280);
-	_pDescriptionText->setAlignment(Qt::AlignCenter);
-	_pDescriptionText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Normal);
+	_pLoginTitleText->setFont(SitkaHeadingFont);
+	_pLoginTitleText->setFixedWidth(280);
+	_pLoginTitleText->setAlignment(Qt::AlignCenter);
+	_pLoginTitleText->setTextStyle(NXTextType::CustomStyle, 32, QFont::Weight::Black);
+	_pLoginTitleText->setGraphicsEffect(_pLoginTitleEffect);
 
-	QVBoxLayout* mainLayout = new QVBoxLayout(this);
-	mainLayout->setContentsMargins(50, 55, 50, 85);
-	mainLayout->setSpacing(0);
-	mainLayout->addStretch();
-	mainLayout->addWidget(_pTitleText, 0, Qt::AlignCenter);
-	mainLayout->addSpacing(40);
-	mainLayout->addWidget(_pDescriptionText, 0, Qt::AlignCenter);
-	mainLayout->addSpacing(50);
-	mainLayout->addWidget(_pSwitchBtn, 0, Qt::AlignCenter);
-	mainLayout->addStretch();
+	_pLoginDescriptionText->setFont(SimSunFont);
+	_pLoginDescriptionText->setFixedWidth(300);
+	_pLoginDescriptionText->setAlignment(Qt::AlignCenter);
+	_pLoginDescriptionText->setTextStyle(NXTextType::CustomStyle, 15, QFont::Weight::Medium);
+	_pLoginDescriptionText->setGraphicsEffect(_pLoginDescriptionEffect);
+
+	_pLoginSwitchBtn->setGraphicsEffect(_pLoginSwitchBtnEffect);
+
+	_pRegisterTitleText = new NXText(FKUtils::concat(
+		"<font color='",
+		FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
+		"'>Welcome Back！</font>"
+	), this);
+	_pRegisterDescriptionText = new NXText(FKUtils::concat(
+		"<font color='",
+		FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+		"'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
+	), this);
+	_pRegisterSwitchBtn = new FKPushButton("SIGN IN", this);
+
+	_pRegisterTitleText->setFont(SitkaHeadingFont);
+	_pRegisterTitleText->setFixedWidth(280);
+	_pRegisterTitleText->setAlignment(Qt::AlignCenter);
+	_pRegisterTitleText->setTextStyle(NXTextType::CustomStyle, 28, QFont::Weight::ExtraBold);
+	_pRegisterTitleText->setGraphicsEffect(_pRegisterTitleEffect);
+
+	_pRegisterDescriptionText->setFont(SimSunFont);
+	_pRegisterDescriptionText->setFixedWidth(300);
+	_pRegisterDescriptionText->setAlignment(Qt::AlignCenter);
+	_pRegisterDescriptionText->setTextStyle(NXTextType::CustomStyle, 15, QFont::Weight::Medium);
+	_pRegisterDescriptionText->setGraphicsEffect(_pRegisterDescriptionEffect);
+
+	_pRegisterSwitchBtn->setGraphicsEffect(_pRegisterSwitchBtnEffect);
+	_pRegisterSwitchBtn->setEnabled(false);
+
+	_pLoginSwitchBtn->raise();
+	/*QVBoxLayout* loginLayout = new QVBoxLayout();
+	loginLayout->setContentsMargins(50, 55, 50, 85);
+	loginLayout->setSpacing(0);
+	loginLayout->addStretch();
+	loginLayout->addWidget(_pLoginTitleText, 0, Qt::AlignCenter);
+	loginLayout->addSpacing(40);
+	loginLayout->addWidget(_pLoginDescriptionText, 0, Qt::AlignCenter);
+	loginLayout->addSpacing(50);
+	loginLayout->addWidget(_pLoginSwitchBtn, 0, Qt::AlignCenter);
+	loginLayout->addStretch();
+
+	QVBoxLayout* registerLayout = new QVBoxLayout();
+	registerLayout->setContentsMargins(50, 55, 50, 85);
+	registerLayout->setSpacing(0);
+	registerLayout->addStretch();
+	registerLayout->addWidget(_pRegisterTitleText, 0, Qt::AlignCenter);
+	registerLayout->addSpacing(40);
+	registerLayout->addWidget(_pRegisterDescriptionText, 0, Qt::AlignCenter);
+	registerLayout->addSpacing(50);
+	registerLayout->addWidget(_pRegisterSwitchBtn, 0, Qt::AlignCenter);
+	registerLayout->addStretch();*/
+	constexpr int XOffset = (Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT) / 2;
+	constexpr int YOffset = Constant::WIDGET_HEIGHT / 2;
+	const QSize loginTitleSize = _pLoginTitleText->size();
+	const QSize loginDescriptionSize = _pLoginDescriptionText->size();
+	const QSize loginSwitchBtnSize = _pLoginSwitchBtn->size();
+
+	const int half = _pLoginDescriptionText->height() / 2;
+	_pLoginTitleText->move(XOffset - loginTitleSize.width() / 2, YOffset - loginTitleSize.height() / 2 - half - 70);
+	_pLoginDescriptionText->move(XOffset - loginDescriptionSize.width() / 2, YOffset - half);
+	_pLoginSwitchBtn->move(XOffset - loginSwitchBtnSize.width() / 2, YOffset + loginSwitchBtnSize.height() / 2 + half + 40);
+
+	_pRegisterTitleText->move(_pLoginTitleText->pos());
+	_pRegisterDescriptionText->move(_pLoginDescriptionText->pos());
+	_pRegisterSwitchBtn->move(_pLoginSwitchBtn->pos());
 }
 
 void FKSwitchPannel::_initAnimations()
 {
-	// 创建动画组
 	_pAnimationGroup = new QParallelAnimationGroup(this);
 
-	// 创建底部圆形动画
 	_pBottomCircleAnimation = new QPropertyAnimation(this, "pBottomCirclePos");
-	_pBottomCircleAnimation->setDuration(1250); // 1.25秒
+	_pBottomCircleAnimation->setDuration(1250);
 	_pBottomCircleAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
-	// 创建顶部圆形动画
 	_pTopCircleAnimation = new QPropertyAnimation(this, "pTopCirclePos");
-	_pTopCircleAnimation->setDuration(1250); // 1.25秒
+	_pTopCircleAnimation->setDuration(1250);
 	_pTopCircleAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
-	// 创建不透明度动画
-	_pOpacityAnimation = new QPropertyAnimation(this, "pMoveOpacity");
-	_pOpacityAnimation->setDuration(600); // 0.6秒
-	_pOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
-	_pOpacityAnimation->setStartValue(1.0);
-	_pOpacityAnimation->setEndValue(0.0);
-	_pOpacityAnimation->setKeyValueAt(0.5, 0.0); // 中间点完全透明
+	_pLoginOpacityAnimation = new QPropertyAnimation(this, "pLoginOpacity");
+	_pLoginOpacityAnimation->setDuration(1000);
+	_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+	_pLoginOpacityAnimation->setStartValue(1.0);
+	_pLoginOpacityAnimation->setEndValue(0.0);
+	_pLoginOpacityAnimation->setKeyValueAt(0.1, 1.0);
+	_pLoginOpacityAnimation->setKeyValueAt(0.9, 0.0);
 
-	// 添加到动画组
+	_pRegisterOpacityAnimation = new QPropertyAnimation(this, "pRegisterOpacity");
+	_pRegisterOpacityAnimation->setDuration(700);
+	_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+	_pRegisterOpacityAnimation->setStartValue(0.3);
+	_pRegisterOpacityAnimation->setEndValue(1.0);
+
 	_pAnimationGroup->addAnimation(_pBottomCircleAnimation);
 	_pAnimationGroup->addAnimation(_pTopCircleAnimation);
-	_pAnimationGroup->addAnimation(_pOpacityAnimation);
+	_pAnimationGroup->addAnimation(_pLoginOpacityAnimation);
+	_pAnimationGroup->addAnimation(_pRegisterOpacityAnimation);
 }
 
 void FKSwitchPannel::_updateUI()
 {
-	// 根据当前状态更新文本
-	if (_isLoginState) {
-		// 当前是登录状态，显示注册相关文本
-		_pTitleText->setText(FKUtils::concat(
-			"<font color='",
-			FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
-			"'>Hello Friend！</font>"
-		));
-		_pDescriptionText->setText(FKUtils::concat(
-			"<font color='",
-			FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
-			"'>去注册一个账号，成为尊贵的粉丝会员，让我们踏入奇妙的旅途！</font>"
-		));
-		_pSwitchBtn->setText("SIGN UP");
-	}
-	else {
-		// 当前是注册状态，显示登录相关文本
-		_pTitleText->setText(FKUtils::concat(
-			"<font color='",
-			FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
-			"'>Welcome Back！</font>"
-		));
-		_pDescriptionText->setText(FKUtils::concat(
-			"<font color='",
-			FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
-			"'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
-		));
-		_pSwitchBtn->setText("SIGN IN");
-	}
+	
 }
