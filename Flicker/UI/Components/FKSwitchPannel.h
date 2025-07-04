@@ -1,4 +1,4 @@
-﻿#ifndef FK_SWITCH_PANNEL_H_
+#ifndef FK_SWITCH_PANNEL_H_
 #define FK_SWITCH_PANNEL_H_
 
 #include <QWidget>

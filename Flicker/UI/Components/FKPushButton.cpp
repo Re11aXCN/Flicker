@@ -9,9 +9,8 @@
 
 FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
 	: NXPushButton(parent)
-	, _pWaveRadius{ 0 }
-	, _pWaveOpacity{ 0 } // 初始值改为0（动画从255->0）
 {
+	setCursor(Qt::PointingHandCursor);
 	setFixedSize(180, 56);
 	setBorderRadius(28);
 	setLightDefaultColor(NXThemeColor(NXThemeType::Light, PrimaryNormal));
@@ -23,17 +22,18 @@ FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
 	setDarkHoverColor(NXThemeColor(NXThemeType::Dark, PrimaryHover));
 	setDarkPressColor(NXThemeColor(NXThemeType::Dark, PrimaryPress));
 	setDarkTextColor(Constant::LIGHT_TEXT_COLOR);
-	_pWaveRadiusAnimation = new QPropertyAnimation(this, "pWaveRadius");
-	_pWaveRadiusAnimation->setDuration(400);
-	_pWaveRadiusAnimation->setStartValue(0); // 从0开始
-	_pWaveRadiusAnimation->setEndValue(width());
-	_pWaveRadiusAnimation->setEasingCurve(QEasingCurve::Linear);
 
-	_pWaveOpacityAnimation = new QPropertyAnimation(this, "pWaveOpacity");
-	_pWaveOpacityAnimation->setDuration(400);
-	_pWaveOpacityAnimation->setStartValue(255); // 完全可见
-	_pWaveOpacityAnimation->setEndValue(0);     // 渐变到透明
-	_pWaveOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
+	_pPressRadius = 0;
+	_pHoverOpacity = 0;
+	_pHoverGradient = new QRadialGradient();
+	_pHoverGradient->setRadius(170);
+	_pHoverGradient->setColorAt(0, QColor(0xFF, 0xFF, 0xFF, 40));
+	_pHoverGradient->setColorAt(1, QColor(0xFF, 0xFF, 0xFF, 0));
+
+	_pPressGradient = new QRadialGradient();
+	_pPressGradient->setRadius(170);
+	_pPressGradient->setColorAt(0, QColor(0xFF, 0xFF, 0xFF, 0));
+	_pPressGradient->setColorAt(1, QColor(0xFF, 0xFF, 0xFF, 100));
 }
 
 FKPushButton::FKPushButton(const QString& text, QWidget* parent /*= nullptr*/)
@@ -47,47 +47,127 @@ FKPushButton::~FKPushButton()
 
 }
 
-void FKPushButton::setWaveRadius(int radius) { _pWaveRadius = radius; update(); }
-void FKPushButton::setWaveOpacity(int opacity) { _pWaveOpacity = opacity; update(); }
+bool FKPushButton::event(QEvent* event) {
+	switch (event->type())
+	{
+	case QEvent::MouseButtonPress:
+	{
+		break;
+	}
+	case QEvent::MouseButtonRelease:
+	{
+		QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(event);
+		QPropertyAnimation* opacityAnimation = new QPropertyAnimation(this, "pPressOpacity");
+		QObject::connect(opacityAnimation, &QPropertyAnimation::valueChanged, this, [=](const QVariant& value) {
+			update();
+			});
+		QObject::connect(opacityAnimation, &QPropertyAnimation::finished, this, [=]() {
+			_pIsPressAnimationFinished = true;
+			});
+		opacityAnimation->setDuration(1250);
+		opacityAnimation->setEasingCurve(QEasingCurve::InQuad);
+		opacityAnimation->setStartValue(1);
+		opacityAnimation->setEndValue(0);
+		opacityAnimation->start(QAbstractAnimation::DeleteWhenStopped);
+
+		QPropertyAnimation* pressAnimation = new QPropertyAnimation(this, "pPressRadius");
+		QObject::connect(pressAnimation, &QPropertyAnimation::valueChanged, this, [=](const QVariant& value) {
+			_pPressGradient->setRadius(value.toReal());
+			});
+		pressAnimation->setDuration(1250);
+		pressAnimation->setEasingCurve(QEasingCurve::InQuad);
+		pressAnimation->setStartValue(30);
+		pressAnimation->setEndValue(_getLongestDistance(mouseEvent->pos()) * 1.8);
+		pressAnimation->start(QAbstractAnimation::DeleteWhenStopped);
+		_pIsPressAnimationFinished = false;
+		_pPressGradient->setFocalPoint(mouseEvent->pos());
+		_pPressGradient->setCenter(mouseEvent->pos());
+		//点击后隐藏Hover效果
+		_startHoverOpacityAnimation(false);
+		break;
+	}
+	case QEvent::MouseMove:
+	{
+		QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(event);
+		if (_pHoverOpacity < 1 && _pIsPressAnimationFinished)
+		{
+			_startHoverOpacityAnimation(true);
+		}
+		if (_pIsPressAnimationFinished)
+		{
+			_pHoverGradient->setCenter(mouseEvent->pos());
+			_pHoverGradient->setFocalPoint(mouseEvent->pos());
+		}
+		update();
+		break;
+	}
+	case QEvent::Enter:
+	{
+		_startHoverOpacityAnimation(true);
+		break;
+	}
+	case QEvent::Leave:
+	{
+		_startHoverOpacityAnimation(false);
+		break;
+	}
+	default:
+	{
+		break;
+	}
+	}
+	return QWidget::event(event);
+}
 
 void FKPushButton::paintEvent(QPaintEvent* event)
 {
 	NXPushButton::paintEvent(event);
-
-	if (_pWaveRadius > 0 && _pWaveOpacity > 0) {
-		int height = this->height();
-		qreal radius = height / 4.0;
-		QPainter painter(this);
-		painter.setRenderHint(QPainter::Antialiasing);
-		painter.setViewport(0, 0, width(), height);
-		painter.setWindow(0, 0, width(), height);
-
-		// 创建圆角矩形裁剪路径
-		QPainterPath path;
-		path.addRoundedRect(rect(), radius, radius);
-		painter.setClipPath(path);
-
-		// 设置波纹样式
-		painter.setPen(Qt::NoPen);
-		painter.setBrush(QColor(255, 255, 255, _pWaveOpacity)); // 使用动态透明度
-		painter.drawEllipse(_pMousePressPos, _pWaveRadius, _pWaveRadius); // 使用动态半径
+	QPainter painter(this);
+	painter.save();
+	painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
+	painter.setPen(Qt::NoPen);
+	//效果阴影绘制
+	if (_pIsPressAnimationFinished)
+	{
+		//覆盖阴影绘制
+		painter.setOpacity(_pHoverOpacity);
+		painter.setBrush(*_pHoverGradient);
+		painter.drawEllipse(_pHoverGradient->center(), _pHoverGradient->radius(), _pHoverGradient->radius());
 	}
-}
-
-void FKPushButton::mousePressEvent(QMouseEvent* event)
-{
-	if (event->button() == Qt::LeftButton) {
-		_pMousePressPos = event->pos();
-		_pWaveRadius = 0;       // 重置半径
-		_pWaveOpacity = 255;    // 重置透明度
-		_pWaveRadiusAnimation->start();
-		_pWaveOpacityAnimation->start();
+	else
+	{
+		//点击阴影绘制
+		painter.setOpacity(_pPressOpacity);
+		painter.setBrush(*_pPressGradient);
+		painter.drawEllipse(_pPressGradient->center(), _pPressRadius, _pPressRadius / 1.1);
 	}
-	NXPushButton::mousePressEvent(event);
+	painter.restore();
 }
 
-void FKPushButton::mouseReleaseEvent(QMouseEvent* event)
+qreal FKPushButton::_getLongestDistance(QPoint point)
 {
-	NXPushButton::mouseReleaseEvent(event);
+	qreal topLeftDis = _distance(point, QPoint(0, 0));
+	qreal topRightDis = _distance(point, QPoint(width(), 0));
+	qreal bottomLeftDis = _distance(point, QPoint(0, height()));
+	qreal bottomRightDis = _distance(point, QPoint(width(), height()));
+	QList<qreal> disList{ topLeftDis, topRightDis, bottomLeftDis, bottomRightDis };
+	std::sort(disList.begin(), disList.end());
+	return disList[3];
 }
 
+qreal FKPushButton::_distance(QPoint point1, QPoint point2)
+{
+	return std::sqrt((point1.x() - point2.x()) * (point1.x() - point2.x()) + (point1.y() - point2.y()) * (point1.y() - point2.y()));
+}
+
+void FKPushButton::_startHoverOpacityAnimation(bool isVisible)
+{
+	QPropertyAnimation* opacityAnimation = new QPropertyAnimation(this, "pHoverOpacity");
+	QObject::connect(opacityAnimation, &QPropertyAnimation::valueChanged, this, [=](const QVariant& value) {
+		update();
+		});
+	opacityAnimation->setDuration(250);
+	opacityAnimation->setStartValue(_pHoverOpacity);
+	opacityAnimation->setEndValue(isVisible ? 1 : 0);
+	opacityAnimation->start(QAbstractAnimation::DeleteWhenStopped);
+}

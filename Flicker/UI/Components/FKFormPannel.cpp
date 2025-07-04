@@ -172,7 +172,7 @@ void FKFormPannel::_initUI()
 	_pSwitchSigninOrResetText->setIsAllowClick(true);
 	_pSwitchSigninOrResetText->setAlignment(Qt::AlignCenter);
 	_pSwitchSigninOrResetText->setStyleSheet(FKUtils::concat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
-	_pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetBorder::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
+	_pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetType::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
 	_pSwitchSigninOrResetText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Light);
 	_pConfirmButton->setEnabled(false);
 

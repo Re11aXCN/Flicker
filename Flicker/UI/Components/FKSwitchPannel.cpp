@@ -8,11 +8,13 @@
 #include <QParallelAnimationGroup>
 #include <QSequentialAnimationGroup>
 #include <QEasingCurve>
+#include <NXTheme.h>
+
 #include "FKConstant.h"
 #include "FKUtils.h"
 
 #include "Components/FKPushButton.h"
-
+#include "Components/circleWidget.h"
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 	: QWidget(parent)
 	, _pLoginOpacity{ 1.0 }
@@ -21,6 +23,9 @@ FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 
 	_initUI();
 	_initAnimations();
+	CircleWidget* pFormPanel = new CircleWidget(this);
+	pFormPanel->setFixedSize(200, 200);
+	pFormPanel->move(this->rect().center());
 
 	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
 	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
@@ -57,11 +62,9 @@ void FKSwitchPannel::toggleFormType()
 		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
 		_pLoginOpacityAnimation->setStartValue(1.0);
 		_pLoginOpacityAnimation->setEndValue(0.0);
-		//_pLoginOpacityAnimation->setKeyValueAt(0.2, 1.0);
 		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
 		_pRegisterOpacityAnimation->setStartValue(0.3);
 		_pRegisterOpacityAnimation->setEndValue(1.0);
-		//_pRegisterOpacityAnimation->setKeyValueAt(0.44, 0.3);
 	}
 	else {
 		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
@@ -73,11 +76,9 @@ void FKSwitchPannel::toggleFormType()
 		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
 		_pRegisterOpacityAnimation->setStartValue(1.0);
 		_pRegisterOpacityAnimation->setEndValue(0.0);
-		//_pRegisterOpacityAnimation->setKeyValueAt(0.2, 1.0);
 		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::Linear);
 		_pLoginOpacityAnimation->setStartValue(0.3);
 		_pLoginOpacityAnimation->setEndValue(1.0);
-		//_pLoginOpacityAnimation->setKeyValueAt(0.44, 0.3);
 	}
 	_isLoginState = !_isLoginState;
 	_pAnimationGroup->start();
@@ -98,12 +99,12 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	// 背景色设置，为了遮挡FormPanel
 	painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
 
-	QRect bottomCircleRect(_pBottomCirclePos - QPoint(250, 170), _pBottomCirclePos + QPoint(250, 330));
+	QRect bottomCircleRect(_pBottomCirclePos - QPoint(242, 138), _pBottomCirclePos + QPoint(258, 362));
 
 	QRadialGradient bottomGradient(bottomCircleRect.center(), bottomCircleRect.width() / 2);
 	bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
-	bottomGradient.setColorAt(0.85, Constant::LIGHT_MAIN_BG_COLOR);
-	bottomGradient.setColorAt(0.9, Qt::white);
+	bottomGradient.setColorAt(0.95, Constant::LIGHT_MAIN_BG_COLOR);
+	//bottomGradient.setColorAt(0.9, Qt::white);
 	bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
 	painter.setBrush(bottomGradient);
 	painter.setPen(Qt::NoPen);
@@ -118,6 +119,15 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	topGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
 	painter.setBrush(topGradient);
 	painter.drawEllipse(topCircleRect);
+
+	//QRect contentRect{ rect().bottomLeft() - QPoint{ 0, 140 } , QSize{230, 140}};
+	//QLinearGradient gradienta(contentRect.topLeft(), contentRect.bottomLeft());
+	//gradienta.setColorAt(0, QColor{ 209, 217, 230, 255 });
+	//gradienta.setColorAt(1, Qt::transparent);
+	//painter.fillRect(contentRect, gradienta);
+	//painter.setBrush(Constant::LIGHT_MAIN_BG_COLOR);
+	//painter.drawEllipse(rect().bottomLeft(), 230, 125);
+
 	// 1. 定义同心圆
 	const int centerX = width / 2;
 	const int centerY = height / 2;
@@ -240,15 +250,10 @@ void FKSwitchPannel::_initAnimations()
 
 	_pRegisterOpacityAnimation = new QPropertyAnimation(this, "pRegisterOpacity");
 	_pRegisterOpacityAnimation->setDuration(1250);
-	// 仅适用于QSequentialAnimationGroup
-	//QPauseAnimation* loginDelayAnimation = new QPauseAnimation(250, this);
-	//QPauseAnimation* registerDelayAnimation = new QPauseAnimation(550, this);
 
 	_pAnimationGroup->addAnimation(_pBottomCircleAnimation);
 	_pAnimationGroup->addAnimation(_pTopCircleAnimation);
-	//_pAnimationGroup->addAnimation(loginDelayAnimation);
 	_pAnimationGroup->addAnimation(_pLoginOpacityAnimation);
-	//_pAnimationGroup->addAnimation(registerDelayAnimation);
 	_pAnimationGroup->addAnimation(_pRegisterOpacityAnimation);
 }
 

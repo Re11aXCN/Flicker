@@ -286,3 +286,29 @@ requestObj["data"] = dataObj;  // 将数据对象添加到请求中
 正确能够响应逻辑
 
 ![image-20250622230704404](assets/image-20250622230704404.png)
+
+### QPropertyAnimation
+
+QParallelAnimationGroup并行执行
+
+QSequentialAnimationGroup顺序执行
+
+QPauseAnimation只能用于QSequentialAnimationGroup进行暂停，如果QParallelAnimationGroup需要进行间隔建议使用关键帧		setKeyValueAt(0.44, 0.3);
+
+比如 A动画1.25s，B动画需要再A动画执行0.55s后才开始，并且需要并行执行，那么B需要设置动画为1.25s，然后B->setKeyValueAt(0.44, 0.3)// 0.44对于1.25s的比例是0.55s，0.3是setStartValue的初始值
+
+### QPainter::CompositionMode
+
+测试颜色为 红(1.0, 0.0, 0.0, 0.7) 和 黑(0.0, 0.0, 0.0, 0.7)，
+
+CompositionMode_SourceIn 源图颜色有透明度
+
+![image-20250704043107596](assets/image-20250704043107596.png)
+
+CompositionMode_Source 源图颜色无透明度
+
+![image-20250704043125535](assets/image-20250704043125535.png)
+
+CompositionMode_SourceAtop + CompositionMode_Clear 目标图像和源图像进行应用透明度混合
+
+![image-20250704043148594](assets/image-20250704043148594.png)
