@@ -8,6 +8,8 @@
 #include "FKConstant.h"
 #include "Components/FKFormPannel.h"
 #include "Components/FKSwitchPannel.h"
+#include "Components/FKShadowWidget.h"
+
 FKLauncherShell::FKLauncherShell(QWidget* parent /*= nullptr*/)
 	: NXWidget(parent)
 {
@@ -40,22 +42,34 @@ void FKLauncherShell::_initUi()
 	setWindowIcon(QIcon(":/Resource/ico/Weixin_IDI_ICON1.ico"));
 	setCustomBackgroundColor(Constant::LIGHT_MAIN_BG_COLOR, Constant::DARK_MAIN_BG_COLOR);
 	setWindowButtonFlags(NXAppBarType::MinimizeButtonHint | NXAppBarType::CloseButtonHint);
-
 	_pMessageButton = new NXMessageButton(this);
+	_pFormPannel = new FKFormPannel(this);
+	_pSwitchPannel = new FKSwitchPannel(this);
+	_pShadowWidget = new FKShadowWidget(this);
+
 	_pMessageButton->setFixedSize(1, 1);
 	_pMessageButton->setVisible(false);
 
-	_pFormPannel = new FKFormPannel(this);
 	_pFormPannel->setFixedSize(Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
 
-	_pSwitchPannel = new FKSwitchPannel(this);
 	_pSwitchPannel->setFixedSize(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
 	_pSwitchPannel->setTopCirclePos(_pSwitchPannel->rect().topRight());
 	_pSwitchPannel->setBottomCirclePos(_pSwitchPannel->rect().bottomLeft());
 
-	// 设置初始位置
-	_pSwitchPannel->move(0, 0);
+	_pShadowWidget->setFixedSize(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
+	_pShadowWidget->setAttribute(Qt::WA_TranslucentBackground, true);
+	_pShadowWidget->setBlur(30.0);
+	_pShadowWidget->setLightColor(Constant::SWITCH_BOX_SHADOW_COLOR);
+	_pShadowWidget->setDarkColor(Constant::SWITCH_BOX_SHADOW_COLOR);
+	_pShadowWidget->setLightOffset({ -5,-5 });
+	_pShadowWidget->setDarkOffset({ 5,5 });
+	_pShadowWidget->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
+	_pShadowWidget->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
+	_pShadowWidget->lower();
+
 	_pFormPannel->move(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, 0);
+	_pSwitchPannel->move(0, 0);
+	_pShadowWidget->move(0, 0);
 
 	// 防止 Pannel 遮挡 最小化 和 关闭按钮的点击事件
 	NXAppBar* appBar = this->appBar();
@@ -66,49 +80,50 @@ void FKLauncherShell::_initUi()
 
 void FKLauncherShell::_initAnimation()
 {
-	// 初始化动画
 	_pAnimationGroup = new QParallelAnimationGroup(this);
 
-	// 创建SwitchPannel位置动画
 	_pSwitchPannelAnimation = new QPropertyAnimation(_pSwitchPannel, "pos");
-	_pSwitchPannelAnimation->setDuration(1250); // 1.25秒
+	_pSwitchPannelAnimation->setDuration(1250); 
 	_pSwitchPannelAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
-	// 创建FormPannel位置动画
+	_pShadowWidgetAnimation = new QPropertyAnimation(_pShadowWidget, "pos");
+	_pShadowWidgetAnimation->setDuration(1250); 
+	_pShadowWidgetAnimation->setEasingCurve(QEasingCurve::OutCubic);
+
 	_pFormPannelAnimation = new QPropertyAnimation(_pFormPannel, "pos");
-	_pFormPannelAnimation->setDuration(1250); // 1.25秒
+	_pFormPannelAnimation->setDuration(1250); 
 	_pFormPannelAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
-	// 添加到动画组
 	_pAnimationGroup->addAnimation(_pSwitchPannelAnimation);
+	_pAnimationGroup->addAnimation(_pShadowWidgetAnimation);
 	_pAnimationGroup->addAnimation(_pFormPannelAnimation);
+
 }
 
 void FKLauncherShell::_onTogglePannelButtonClicked()
 {
-	// 停止正在进行的动画
 	_pAnimationGroup->stop();
 	
 	QPoint switchPos = _pSwitchPannel->pos();
+	QPoint shadowPos = _pShadowWidget->pos();
 	QPoint formPos = _pFormPannel->pos();
 
 	// 设置动画起始值和结束值
 	_pSwitchPannelAnimation->setStartValue(switchPos);
+	_pShadowWidgetAnimation->setStartValue(shadowPos);
 	_pFormPannelAnimation->setStartValue(formPos);
 	
 	if (switchPos.x() == 0) {
-		// 当前SwitchPannel在左侧，移动到右侧
 		_pSwitchPannelAnimation->setEndValue(QPoint(Constant::WIDGET_HEIGHT, 0));
+		_pShadowWidgetAnimation->setEndValue(QPoint(Constant::WIDGET_HEIGHT, 0));
+
 		_pFormPannelAnimation->setEndValue(QPoint(0, 0));
 	} else {
-		// 当前SwitchPannel在右侧，移动到左侧
 		_pSwitchPannelAnimation->setEndValue(QPoint(0, 0));
+		_pShadowWidgetAnimation->setEndValue(QPoint(0, 0));
 		_pFormPannelAnimation->setEndValue(QPoint(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, 0));
 	}
 	
-	// 切换FormPannel的状态
 	_pFormPannel->toggleFormType();
-	
-	// 启动动画
 	_pAnimationGroup->start();
 }

@@ -7,7 +7,7 @@ class QPropertyAnimation;
 class QParallelAnimationGroup;
 class FKFormPannel;
 class FKSwitchPannel;
-
+class FKShadowWidget;
 class FKLauncherShell : public NXWidget
 {
 	Q_OBJECT
@@ -26,11 +26,12 @@ private:
 	// 面板
 	FKFormPannel* _pFormPannel{ nullptr };
 	FKSwitchPannel* _pSwitchPannel{ nullptr };
-	
+	FKShadowWidget* _pShadowWidget{ nullptr };
 	// 动画
 	QParallelAnimationGroup* _pAnimationGroup{ nullptr };
 	QPropertyAnimation* _pSwitchPannelAnimation{ nullptr };
 	QPropertyAnimation* _pFormPannelAnimation{ nullptr };
+	QPropertyAnimation* _pShadowWidgetAnimation{ nullptr };
 
 	inline static NXMessageButton* _pMessageButton;
 };

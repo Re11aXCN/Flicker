@@ -1,4 +1,4 @@
-#ifndef FK_SWITCH_PANNEL_H_
+﻿#ifndef FK_SWITCH_PANNEL_H_
 #define FK_SWITCH_PANNEL_H_
 
 #include <QWidget>
@@ -30,7 +30,7 @@ Q_SIGNALS:
 
 protected:
 	void paintEvent(QPaintEvent* event) override;
-
+	void resizeEvent(QResizeEvent *event)  override;
 private:
 	void _initUI();
 	void _initAnimations();
@@ -55,8 +55,7 @@ private:
 	QPropertyAnimation* _pLoginOpacityAnimation{ nullptr };
 	QPropertyAnimation* _pRegisterOpacityAnimation{ nullptr };
 
-	// 状态标志
-	bool _isLoginState{ true }; // true表示登录状态，false表示注册状态
+	bool _pIsLoginState{ true };
 };
 
 #endif //!FK_SWITCH_PANNEL_H_

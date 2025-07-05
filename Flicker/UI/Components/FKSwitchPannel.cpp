@@ -8,24 +8,44 @@
 #include <QParallelAnimationGroup>
 #include <QSequentialAnimationGroup>
 #include <QEasingCurve>
+#include <QStyleOption>
 #include <NXTheme.h>
 
 #include "FKConstant.h"
 #include "FKUtils.h"
 
 #include "Components/FKPushButton.h"
-#include "Components/circleWidget.h"
+#include "Components/NXBoxShadowEffect.h"
+#include "Components/FKShadowWidget.h"
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 	: QWidget(parent)
 	, _pLoginOpacity{ 1.0 }
 	, _pRegisterOpacity{ 0.0 }
 {
-
 	_initUI();
 	_initAnimations();
-	CircleWidget* pFormPanel = new CircleWidget(this);
-	pFormPanel->setFixedSize(200, 200);
-	pFormPanel->move(this->rect().center());
+	/*NXBoxShadowEffect* shadow = new NXBoxShadowEffect(this);
+	shadow->setBlur(30.0);
+	shadow->setLightColor(QColor(0, 0x1E, 0x9A, 102));
+	shadow->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+	shadow->setLightOffset({ -5,-5 });
+	shadow->setDarkOffset({ 5,5 });
+	shadow->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
+	shadow->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
+	setGraphicsEffect(shadow);*/
+	//FKShadowWidget* pFormPanel = new FKShadowWidget(this);
+	//pFormPanel->setFixedSize(300, 500);
+	//pFormPanel->setBlur(30.0);
+	////pFormPanel->setSpread(10.0);
+	//pFormPanel->setLightColor(QColor(0, 0x1E, 0x9A, 102));
+	//pFormPanel->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+	//pFormPanel->setLightOffset({ -5,-5 });
+	//pFormPanel->setDarkOffset({ 5,5 });
+	//pFormPanel->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
+	//pFormPanel->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
+	////pFormPanel->move(240,-178);
+	//pFormPanel->lower();
+	//pFormPanel->move(0, 0);
 
 	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
 	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
@@ -52,7 +72,7 @@ void FKSwitchPannel::toggleFormType()
 {
 	_pAnimationGroup->stop();
 
-	if (_isLoginState) {
+	if (_pIsLoginState) {
 		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
 		_pBottomCircleAnimation->setEndValue(rect().bottomRight());
 
@@ -80,9 +100,9 @@ void FKSwitchPannel::toggleFormType()
 		_pLoginOpacityAnimation->setStartValue(0.3);
 		_pLoginOpacityAnimation->setEndValue(1.0);
 	}
-	_isLoginState = !_isLoginState;
+	_pIsLoginState = !_pIsLoginState;
 	_pAnimationGroup->start();
-	_pSwitchBtn->setText(_isLoginState ? "REGISTER" : "LOGIN");
+	_pSwitchBtn->setText(_pIsLoginState ? "REGISTER" : "LOGIN");
 
 	Q_EMIT switchClicked();
 }
@@ -95,7 +115,7 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	const int width = this->width();
 	const int height = this->height();
 
-	QRect opacityRect{ rect().topLeft() + QPoint{ 0, 30 }, rect().bottomRight()  };
+	QRect opacityRect{ rect().topLeft(), rect().bottomRight()  };
 	// 背景色设置，为了遮挡FormPanel
 	painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
 
@@ -120,14 +140,6 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	painter.setBrush(topGradient);
 	painter.drawEllipse(topCircleRect);
 
-	//QRect contentRect{ rect().bottomLeft() - QPoint{ 0, 140 } , QSize{230, 140}};
-	//QLinearGradient gradienta(contentRect.topLeft(), contentRect.bottomLeft());
-	//gradienta.setColorAt(0, QColor{ 209, 217, 230, 255 });
-	//gradienta.setColorAt(1, Qt::transparent);
-	//painter.fillRect(contentRect, gradienta);
-	//painter.setBrush(Constant::LIGHT_MAIN_BG_COLOR);
-	//painter.drawEllipse(rect().bottomLeft(), 230, 125);
-
 	// 1. 定义同心圆
 	const int centerX = width / 2;
 	const int centerY = height / 2;
@@ -150,6 +162,11 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	// 4. 绘制圆环
 	painter.fillPath(ringPath, gradient);
 	QWidget::paintEvent(event);
+}
+
+void FKSwitchPannel::resizeEvent(QResizeEvent* event)
+{
+	QWidget::resizeEvent(event);
 }
 
 void FKSwitchPannel::_initUI()

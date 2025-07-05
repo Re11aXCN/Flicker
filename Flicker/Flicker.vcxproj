@@ -150,8 +150,8 @@
     <QtRcc Include="Resource\Flicker.qrc" />
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="UI\Components\NXBoxShadow.h" />
-    <ClInclude Include="UI\Components\CircleWidget.h" />
+    <QtMoc Include="UI\Components\NXBoxShadowEffect.h" />
+    <QtMoc Include="UI\Components\FKShadowWidget.h" />
     <QtMoc Include="UI\Components\FKIconLabel.h" />
     <QtMoc Include="UI\Components\FKPushButton.h" />
     <QtMoc Include="UI\Components\FKSwitchPannel.h" />
@@ -188,8 +188,8 @@
     </ClCompile>
     <ClCompile Include="Source\FKHttpManager.cpp" />
     <ClCompile Include="UI\Components\FKFormPannel.cpp" />
-    <ClCompile Include="UI\Components\NXBoxShadow.cpp" />
-    <ClCompile Include="UI\Components\CircleWidget.cpp" />
+    <ClCompile Include="UI\Components\NXBoxShadowEffect.cpp" />
+    <ClCompile Include="UI\Components\FKShadowWidget.cpp" />
     <ClCompile Include="UI\FKLauncherShell.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

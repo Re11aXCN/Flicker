@@ -55,10 +55,10 @@
     <ClCompile Include="UI\Components\FKIconLabel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Components\CircleWidget.cpp">
+    <ClCompile Include="UI\Components\FKShadowWidget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Components\NXBoxShadow.cpp">
+    <ClCompile Include="UI\Components\NXBoxShadowEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -79,9 +79,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Global\FKDef.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\Components\CircleWidget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -117,7 +114,10 @@
     <QtMoc Include="UI\Components\FKIconLabel.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="UI\Components\NXBoxShadow.h">
+    <QtMoc Include="UI\Components\NXBoxShadowEffect.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="UI\Components\FKShadowWidget.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>
