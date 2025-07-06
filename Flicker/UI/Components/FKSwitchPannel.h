@@ -13,10 +13,8 @@ class FKPushButton;
 class FKSwitchPannel : public QWidget
 {
 	Q_OBJECT
-		Q_PROPERTY_CREATE_COMPLEX_H(QPoint, BottomCirclePos)
-		Q_PROPERTY_CREATE_COMPLEX_H(QPoint, TopCirclePos)
-		Q_PROPERTY_CREATE_BASIC_H(qreal, LoginOpacity)
-		Q_PROPERTY_CREATE_BASIC_H(qreal, RegisterOpacity)
+	Q_PROPERTY_CREATE_BASIC_H(qreal, LoginOpacity)
+	Q_PROPERTY_CREATE_BASIC_H(qreal, RegisterOpacity)
 
 public:
 	explicit FKSwitchPannel(QWidget *parent = nullptr);
@@ -24,7 +22,7 @@ public:
 
 	// 切换状态
 	Q_SLOT void toggleFormType();
-
+	Q_SLOT void clickSwitchBtn();
 Q_SIGNALS:
 	void switchClicked(); // 当切换按钮被点击时发出信号
 
@@ -52,8 +50,6 @@ private:
 	FKPushButton* _pSwitchBtn{ nullptr };
 
 	QParallelAnimationGroup* _pAnimationGroup{ nullptr };
-	QPropertyAnimation* _pBottomCircleAnimation{ nullptr };
-	QPropertyAnimation* _pTopCircleAnimation{ nullptr };
 	QPropertyAnimation* _pLoginOpacityAnimation{ nullptr };
 	QPropertyAnimation* _pRegisterOpacityAnimation{ nullptr };
 

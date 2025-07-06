@@ -24,15 +24,6 @@ FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 {
 	_initUI();
 	_initAnimations();
-	//NXBoxShadowEffect* shadow = new NXBoxShadowEffect(this);
-	//shadow->setBlur(30.0);
-	//shadow->setLightColor(QColor(0, 0x1E, 0x9A, 102));
-	//shadow->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	//shadow->setLightOffset({ -5,-5 });
-	//shadow->setDarkOffset({ 5,5 });
-	//shadow->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
-	//shadow->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
-	//setGraphicsEffect(shadow);
 
 	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
 	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
@@ -47,10 +38,6 @@ FKSwitchPannel::~FKSwitchPannel()
 	delete _pAnimationGroup;
 }
 
-void FKSwitchPannel::setBottomCirclePos(const QPoint& pos) { _pBottomCirclePos = pos; update(); }
-
-void FKSwitchPannel::setTopCirclePos(const QPoint& pos) { _pTopCirclePos = pos; update(); }
-
 void FKSwitchPannel::setLoginOpacity(qreal opacity) { _pLoginOpacity = opacity; update(); }
 
 void FKSwitchPannel::setRegisterOpacity(qreal opacity) { _pRegisterOpacity = opacity; update(); }
@@ -60,12 +47,6 @@ void FKSwitchPannel::toggleFormType()
 	_pAnimationGroup->stop();
 
 	if (_pIsLoginState) {
-		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
-		_pBottomCircleAnimation->setEndValue(rect().bottomRight());
-
-		_pTopCircleAnimation->setStartValue(_pTopCirclePos);
-		_pTopCircleAnimation->setEndValue(rect().topLeft());
-
 		_pLoginOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
 		_pLoginOpacityAnimation->setStartValue(1.0);
 		_pLoginOpacityAnimation->setEndValue(0.0);
@@ -74,12 +55,6 @@ void FKSwitchPannel::toggleFormType()
 		_pRegisterOpacityAnimation->setEndValue(1.0);
 	}
 	else {
-		_pBottomCircleAnimation->setStartValue(_pBottomCirclePos);
-		_pBottomCircleAnimation->setEndValue(rect().bottomLeft());
-
-		_pTopCircleAnimation->setStartValue(_pTopCirclePos);
-		_pTopCircleAnimation->setEndValue(rect().topRight());
-
 		_pRegisterOpacityAnimation->setEasingCurve(QEasingCurve::InOutQuad);
 		_pRegisterOpacityAnimation->setStartValue(1.0);
 		_pRegisterOpacityAnimation->setEndValue(0.0);
@@ -94,6 +69,11 @@ void FKSwitchPannel::toggleFormType()
 	Q_EMIT switchClicked();
 }
 
+void FKSwitchPannel::clickSwitchBtn()
+{
+	_pSwitchBtn->click();
+}
+
 void FKSwitchPannel::paintEvent(QPaintEvent* event)
 {
 	Q_UNUSED(event);
@@ -101,31 +81,6 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 	const int width = this->width();
 	const int height = this->height();
-
-	//QRect opacityRect{ rect().topLeft(), rect().bottomRight()  };
-	//// 背景色设置，为了遮挡FormPanel
-	//painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
-
-	//QRect bottomCircleRect(_pBottomCirclePos - QPoint(242, 138), _pBottomCirclePos + QPoint(258, 362));
-
-	//QRadialGradient bottomGradient(bottomCircleRect.center(), bottomCircleRect.width() / 2);
-	//bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
-	//bottomGradient.setColorAt(0.95, Constant::LIGHT_MAIN_BG_COLOR);
-	////bottomGradient.setColorAt(0.9, Qt::white);
-	//bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	//painter.setBrush(bottomGradient);
-	//painter.setPen(Qt::NoPen);
-	//painter.drawEllipse(bottomCircleRect);
-
-	/*QRect topCircleRect(_pTopCirclePos - QPoint(150, 180), _pTopCirclePos + QPoint(150, 120));
-
-	QRadialGradient topGradient(topCircleRect.center(), topCircleRect.width() / 2);
-	topGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
-	topGradient.setColorAt(0.85, Constant::LIGHT_MAIN_BG_COLOR);
-	topGradient.setColorAt(0.9, Qt::white);
-	topGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	painter.setBrush(topGradient);
-	painter.drawEllipse(topCircleRect);*/
 
 	// 1. 定义同心圆
 	const int centerX = width / 2;
@@ -242,22 +197,12 @@ void FKSwitchPannel::_initAnimations()
 {
 	_pAnimationGroup = new QParallelAnimationGroup(this);
 
-	_pBottomCircleAnimation = new QPropertyAnimation(this, "pBottomCirclePos");
-	_pBottomCircleAnimation->setDuration(1250);
-	_pBottomCircleAnimation->setEasingCurve(QEasingCurve::OutCubic);
-
-	_pTopCircleAnimation = new QPropertyAnimation(this, "pTopCirclePos");
-	_pTopCircleAnimation->setDuration(1250);
-	_pTopCircleAnimation->setEasingCurve(QEasingCurve::OutCubic);
-
 	_pLoginOpacityAnimation = new QPropertyAnimation(this, "pLoginOpacity");
 	_pLoginOpacityAnimation->setDuration(1250);
 
 	_pRegisterOpacityAnimation = new QPropertyAnimation(this, "pRegisterOpacity");
 	_pRegisterOpacityAnimation->setDuration(1250);
 
-	_pAnimationGroup->addAnimation(_pBottomCircleAnimation);
-	_pAnimationGroup->addAnimation(_pTopCircleAnimation);
 	_pAnimationGroup->addAnimation(_pLoginOpacityAnimation);
 	_pAnimationGroup->addAnimation(_pRegisterOpacityAnimation);
 }
@@ -272,7 +217,6 @@ void FKSwitchPannel::_updateChildGeometry()
 	// 更新所有子控件位置（保持居中）
 	const int half = _pLoginDescriptionText->height() / 2;
 
-	// 登录标题和描述
 	_pLoginTitleText->move(
 		squareCenterX - _pLoginTitleText->width() / 2,
 		squareCenterY - _pLoginTitleText->height() / 2 - half - 70
@@ -282,7 +226,6 @@ void FKSwitchPannel::_updateChildGeometry()
 		squareCenterY - half
 	);
 
-	// 注册标题和描述
 	_pRegisterTitleText->move(
 		squareCenterX - _pRegisterTitleText->width() / 2,
 		squareCenterY - _pRegisterTitleText->height() / 2 - half - 70
@@ -292,7 +235,6 @@ void FKSwitchPannel::_updateChildGeometry()
 		squareCenterY - half
 	);
 
-	// 切换按钮
 	_pSwitchBtn->move(
 		squareCenterX - _pSwitchBtn->width() / 2,
 		squareCenterY + _pSwitchBtn->height() / 2 + half + 40

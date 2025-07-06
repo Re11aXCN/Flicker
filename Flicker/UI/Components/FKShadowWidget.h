@@ -18,12 +18,12 @@ public:
 	explicit FKShadowWidget(QWidget* parent = nullptr);
 	~FKShadowWidget() override = default;
 
-	void setCustomDraw(std::function<void(QPainter*)> customDraw);
+	void setCustomDraw(std::function<void(QPainter*, QWidget*)> customDraw);
 protected:
 	void paintEvent(QPaintEvent* event) override;
 private:
 	NXBoxShadowEffect* _pShadowEffect;
-	std::function<void(QPainter*)> _pCustomDraw;
+	std::function<void(QPainter*, QWidget*)> _pCustomDraw;
 };
 
 #endif // !FK_SHADOWWIDGET_H_

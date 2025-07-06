@@ -15,7 +15,7 @@ FKShadowWidget::FKShadowWidget(QWidget* parent /*= nullptr*/)
 	setGraphicsEffect(_pShadowEffect);
 }
 
-void FKShadowWidget::setCustomDraw(std::function<void(QPainter*)> customDraw)
+void FKShadowWidget::setCustomDraw(std::function<void(QPainter*, QWidget*)> customDraw)
 {
 	_pCustomDraw = customDraw;
 }
@@ -97,7 +97,7 @@ void FKShadowWidget::paintEvent(QPaintEvent* event)
 	QPainter painter(this);
 	if (_pShadowEffect->getProjectionType() == NXWidgetType::BoxShadow::ProjectionType::Outset) {
 		if (_pCustomDraw) {
-			_pCustomDraw(&painter);
+			_pCustomDraw(&painter, this->parentWidget());
 		}
 		else {
 			painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);

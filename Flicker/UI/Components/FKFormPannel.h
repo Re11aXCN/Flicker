@@ -41,6 +41,7 @@ public:
 	explicit FKFormPannel(QWidget* parent = nullptr);
 	~FKFormPannel() override;
 	void toggleFormType();
+	Q_SLOT void clickSwitchSigninOrResetText();
 protected:
 	void paintEvent(QPaintEvent* event) override;
 

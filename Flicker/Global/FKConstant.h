@@ -10,8 +10,9 @@ namespace Constant {
 	constexpr int SWITCH_BOX_SHADOW_WIDTH = 10;
 	constexpr QColor LIGHT_MAIN_BG_COLOR{ 235, 239, 243, 255 };
 	constexpr QColor DARK_MAIN_BG_COLOR{ 235, 239, 243, 255 };
-	constexpr QColor SWITCH_BOX_SHADOW_COLOR{ 209, 217, 230, 255 };
-	constexpr QColor SWITCH_CIRCLE_DARK_SHADOW_COLOR{ 184, 190, 199, 255 };
+	constexpr QColor SWITCH_BOX_SHADOW_COLOR{ 209, 217, 230, 140 };
+	constexpr QColor SWITCH_CIRCLE_DARK_SHADOW_COLOR{ 184, 190, 199, 36 };
+	constexpr QColor SWITCH_CIRCLE_LIGHT_SHADOW_COLOR{ 0, 54, 180, 36 };
 	constexpr QColor DESCRIPTION_TEXT_COLOR{ 160, 165, 168, 255 };
 	constexpr QColor LAUNCHER_PUSHBTN_TEXT_COLOR{ 249, 249, 249, 255 };
 	constexpr QColor LIGHT_TEXT_COLOR{ 249, 249, 249, 255 };

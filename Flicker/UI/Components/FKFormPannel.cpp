@@ -102,12 +102,17 @@ void FKFormPannel::toggleFormType()
 	});
 }
 
+void FKFormPannel::clickSwitchSigninOrResetText()
+{
+	Q_EMIT _pSwitchSigninOrResetText->clicked();
+}
+
 void FKFormPannel::paintEvent(QPaintEvent* event)
 {
 	Q_UNUSED(event);
 	QPainter painter(this);
 	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-	//_drawEdgeShadow(painter, rect(), Constant::SWITCH_BOX_SHADOW_COLOR, Constant::SWITCH_BOX_SHADOW_WIDTH);
+	_drawEdgeShadow(painter, rect(), Constant::SWITCH_BOX_SHADOW_COLOR, Constant::SWITCH_BOX_SHADOW_WIDTH);
 
 	QWidget::paintEvent(event);
 }
