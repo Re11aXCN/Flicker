@@ -175,17 +175,12 @@
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="UI\Components\FKIconLabel.cpp" />
     <ClCompile Include="UI\Components\FKLineEdit.cpp" />
     <ClCompile Include="UI\Components\FKPushButton.cpp" />
     <ClCompile Include="UI\Components\FKSwitchPannel.cpp" />
     <ClCompile Include="Global\FKUtils.cpp" />
-    <ClCompile Include="main.cpp">
-      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">input</DynamicSource>
-      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).moc</QtMocFileName>
-      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Release|x64'">input</DynamicSource>
-      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).moc</QtMocFileName>
-    </ClCompile>
     <ClCompile Include="Source\FKHttpManager.cpp" />
     <ClCompile Include="UI\Components\FKFormPannel.cpp" />
     <ClCompile Include="UI\Components\NXBoxShadowEffect.cpp" />

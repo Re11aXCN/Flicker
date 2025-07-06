@@ -24,28 +24,27 @@ FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 {
 	_initUI();
 	_initAnimations();
-	/*NXBoxShadowEffect* shadow = new NXBoxShadowEffect(this);
-	shadow->setBlur(30.0);
-	shadow->setLightColor(QColor(0, 0x1E, 0x9A, 102));
-	shadow->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	shadow->setLightOffset({ -5,-5 });
-	shadow->setDarkOffset({ 5,5 });
-	shadow->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
-	shadow->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
-	setGraphicsEffect(shadow);*/
-	//FKShadowWidget* pFormPanel = new FKShadowWidget(this);
-	//pFormPanel->setFixedSize(300, 500);
-	//pFormPanel->setBlur(30.0);
-	////pFormPanel->setSpread(10.0);
-	//pFormPanel->setLightColor(QColor(0, 0x1E, 0x9A, 102));
-	//pFormPanel->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	//pFormPanel->setLightOffset({ -5,-5 });
-	//pFormPanel->setDarkOffset({ 5,5 });
-	//pFormPanel->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
-	//pFormPanel->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
-	////pFormPanel->move(240,-178);
-	//pFormPanel->lower();
-	//pFormPanel->move(0, 0);
+	//NXBoxShadowEffect* shadow = new NXBoxShadowEffect(this);
+	//shadow->setBlur(30.0);
+	//shadow->setLightColor(QColor(0, 0x1E, 0x9A, 102));
+	//shadow->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+	//shadow->setLightOffset({ -5,-5 });
+	//shadow->setDarkOffset({ 5,5 });
+	//shadow->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
+	//shadow->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
+	//setGraphicsEffect(shadow);
+	FKShadowWidget* pFormPanel = new FKShadowWidget(this);
+	pFormPanel->setFixedSize(200, 300);
+	pFormPanel->setBlur(30.0);
+	pFormPanel->setLightColor(QColor(0, 0x1E, 0x9A, 102));
+	pFormPanel->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+	pFormPanel->setLightOffset({ -5,-5 });
+	pFormPanel->setDarkOffset({ 5,5 });
+	pFormPanel->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
+	pFormPanel->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate315);
+	//pFormPanel->move(240,-178);
+	pFormPanel->move(50, 50);
+	pFormPanel->lower();
 
 	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
 	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
@@ -167,6 +166,7 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 void FKSwitchPannel::resizeEvent(QResizeEvent* event)
 {
 	QWidget::resizeEvent(event);
+	_updateChildGeometry();
 }
 
 void FKSwitchPannel::_initUI()
@@ -272,6 +272,43 @@ void FKSwitchPannel::_initAnimations()
 	_pAnimationGroup->addAnimation(_pTopCircleAnimation);
 	_pAnimationGroup->addAnimation(_pLoginOpacityAnimation);
 	_pAnimationGroup->addAnimation(_pRegisterOpacityAnimation);
+}
+
+void FKSwitchPannel::_updateChildGeometry()
+{
+	const int squareSize = height();
+	const int squareLeft = (width() - squareSize) / 2;
+	const int squareCenterX = squareLeft + squareSize / 2;
+	const int squareCenterY = squareSize / 2;
+
+	// 更新所有子控件位置（保持居中）
+	const int half = _pLoginDescriptionText->height() / 2;
+
+	// 登录标题和描述
+	_pLoginTitleText->move(
+		squareCenterX - _pLoginTitleText->width() / 2,
+		squareCenterY - _pLoginTitleText->height() / 2 - half - 70
+	);
+	_pLoginDescriptionText->move(
+		squareCenterX - _pLoginDescriptionText->width() / 2,
+		squareCenterY - half
+	);
+
+	// 注册标题和描述
+	_pRegisterTitleText->move(
+		squareCenterX - _pRegisterTitleText->width() / 2,
+		squareCenterY - _pRegisterTitleText->height() / 2 - half - 70
+	);
+	_pRegisterDescriptionText->move(
+		squareCenterX - _pRegisterDescriptionText->width() / 2,
+		squareCenterY - half
+	);
+
+	// 切换按钮
+	_pSwitchBtn->move(
+		squareCenterX - _pSwitchBtn->width() / 2,
+		squareCenterY + _pSwitchBtn->height() / 2 + half + 40
+	);
 }
 
 void FKSwitchPannel::_updateLoginOpacity(const QVariant& value)

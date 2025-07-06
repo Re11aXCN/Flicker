@@ -45,10 +45,6 @@ private:
 	void _drawInsetShadow(QPainter* painter, const QPixmap& pixmap, const QPoint& pos);
 	void _drawOutsetShadow(QPainter* painter, const QPixmap& pixmap, const QPoint& pos);
 
-	QImage _createBaseShadowImage(const QPixmap& pixmap, const QColor& color);
-
-	QImage _applyBlur(const QImage& source, bool alphaOnly);
-	QImage _applyColor(const QImage& image, const QColor& color);
 	NXThemeType::ThemeMode _themeMode{ NXThemeType::ThemeMode::Light };
 };
 

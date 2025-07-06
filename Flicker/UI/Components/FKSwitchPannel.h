@@ -34,6 +34,8 @@ protected:
 private:
 	void _initUI();
 	void _initAnimations();
+	void _updateChildGeometry();
+
 	Q_SLOT void _updateLoginOpacity(const QVariant& value);
 	Q_SLOT void _updateRegisterOpacity(const QVariant& value);
 	NXText* _pLoginTitleText{ nullptr };

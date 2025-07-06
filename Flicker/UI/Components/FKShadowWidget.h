@@ -15,18 +15,11 @@ class FKShadowWidget : public QWidget {
 	Q_PRIVATE_CREATE_COMPLEX_H(QPointF, LightOffset)
 	Q_PRIVATE_CREATE_COMPLEX_H(QPointF, DarkOffset)
 public:
-	enum Shape{
-		Rect,
-		Ellipse
-	};
 	explicit FKShadowWidget(QWidget* parent = nullptr);
 	~FKShadowWidget() override = default;
-	void setShape(FKShadowWidget::Shape shape);
-	FKShadowWidget::Shape getShape() const;
 protected:
 	void paintEvent(QPaintEvent* event) override;
 private:
-	FKShadowWidget::Shape _pShape;
 	NXBoxShadowEffect* _pShadowEffect;
 };
 
