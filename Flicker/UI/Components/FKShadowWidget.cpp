@@ -15,6 +15,11 @@ FKShadowWidget::FKShadowWidget(QWidget* parent /*= nullptr*/)
 	setGraphicsEffect(_pShadowEffect);
 }
 
+void FKShadowWidget::setCustomDraw(std::function<void(QPainter*)> customDraw)
+{
+	_pCustomDraw = customDraw;
+}
+
 void FKShadowWidget::setDarkOffset(const QPointF& size) {
 	_pShadowEffect->setDarkOffset(size);
 	update();
@@ -90,28 +95,16 @@ QColor FKShadowWidget::getDarkColor() const {
 void FKShadowWidget::paintEvent(QPaintEvent* event)
 {
 	QPainter painter(this);
-	painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(Constant::LIGHT_MAIN_BG_COLOR);
 	if (_pShadowEffect->getProjectionType() == NXWidgetType::BoxShadow::ProjectionType::Outset) {
-		////painter.drawEllipse(rect());
-
-		//QPainterPath rectPath;
-		//rectPath.addRect(rect());
-
-		//// 创建半圆路径（直径100，半径50，开口向上）
-		//QPainterPath circlePath;
-		//// 半圆定位：圆心在(50,120)，覆盖区域(0,70,100,100)
-		//circlePath.moveTo(1, 151);          // 起点：左下角
-		//circlePath.arcTo(QRectF(QPoint{ 1, 1 }, QSize{ 300, 300 }), 180, -180); // 从180°逆时针绘制到0°
-		//circlePath.closeSubpath();          // 闭合路径形成半圆区域
-
-		//// 从矩形中减去半圆形成凹槽
-		//QPainterPath finalPath = rectPath.subtracted(circlePath);
-
-		//// 绘制最终路径
-		//painter.drawPath(finalPath);
-		painter.drawRect(rect());
+		if (_pCustomDraw) {
+			_pCustomDraw(&painter);
+		}
+		else {
+			painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+			painter.setPen(Qt::NoPen);
+			painter.setBrush(Constant::LIGHT_MAIN_BG_COLOR);
+			painter.drawRect(rect());
+		}
 	}
 	QWidget::paintEvent(event);
 }

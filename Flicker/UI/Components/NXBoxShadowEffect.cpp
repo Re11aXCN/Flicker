@@ -462,7 +462,11 @@ void NXBoxShadowEffectPrivate::_drawInsetShadow(QPainter* painter, const QPixmap
 
 void NXBoxShadowEffectPrivate::_drawOutsetShadow(QPainter* painter, const QPixmap& pixmap, const QPoint& pos)
 {
+	/*
 	const qreal radian = _pSpread * M_SQRT1_2;
+	const qreal basePadding = _pBlur * 0.3 + radian;
+	const qreal paddingX = basePadding + pos.x();
+	const qreal paddingY = basePadding + pos.y();
 
 	QImage pixmapImage = pixmap.toImage();
 	QPointF lightOffset, darkOffset;
@@ -474,26 +478,26 @@ void NXBoxShadowEffectPrivate::_drawOutsetShadow(QPainter* painter, const QPixma
 	case NXWidgetType::BoxShadow::Rotate45:
 		lightOffset = _pLightOffset;
 		darkOffset = _pDarkOffset;
-		lightClearRect.adjust(-3 * _pLightOffset.x() + pos.x() + radian, -2 * _pLightOffset.y() + pos.y() + radian, 0, 0);
-		darkClearRect.adjust(0, 0, -3 * _pDarkOffset.x() - pos.x() - radian, -1.5 * _pDarkOffset.y() - pos.y() - radian);
+		lightClearRect.adjust(-_pLightOffset.x() + paddingX, -_pLightOffset.y() + paddingY, 0, 0);
+		darkClearRect.adjust(0, 0, -_pDarkOffset.x() - paddingX, -_pDarkOffset.y() - paddingY);
 		break;
 	case NXWidgetType::BoxShadow::Rotate135:
 		lightOffset = { -_pLightOffset.y(), _pLightOffset.x() };
 		darkOffset = { -_pDarkOffset.y(), _pDarkOffset.x() };
-		lightClearRect.adjust(0, -3 * _pLightOffset.x() + pos.x() + radian, 2 * _pLightOffset.y() - pos.y() - radian, 0);
-		darkClearRect.adjust(1.5 * _pDarkOffset.y() + pos.y() + radian, 0, 0, 3 * -_pDarkOffset.x() - pos.x() - radian);
+		lightClearRect.adjust(0, -_pLightOffset.x() + paddingX, _pLightOffset.y() - paddingY, 0);
+		darkClearRect.adjust(_pDarkOffset.y() + paddingY, 0, 0, -_pDarkOffset.x() - paddingX);
 		break;
 	case NXWidgetType::BoxShadow::Rotate225:
 		lightOffset = { -_pLightOffset.x(), -_pLightOffset.y() };
 		darkOffset = { -_pDarkOffset.x(), -_pDarkOffset.y() };
-		lightClearRect.adjust(0, 0, 3 * _pLightOffset.x() - pos.x() - radian, 2 * _pLightOffset.y() - pos.y() - radian);
-		darkClearRect.adjust(3 * _pDarkOffset.x() + pos.x() + radian, 1.5 * _pDarkOffset.y() + pos.y() + radian, 0, 0);
+		lightClearRect.adjust(0, 0, _pLightOffset.x() - paddingX, _pLightOffset.y() - paddingY);
+		darkClearRect.adjust(_pDarkOffset.x() + paddingX, _pDarkOffset.y() + paddingY, 0, 0);
 		break;
 	case NXWidgetType::BoxShadow::Rotate315:
 		lightOffset = { _pLightOffset.y(), -_pLightOffset.x() };
 		darkOffset = { _pDarkOffset.y(), -_pDarkOffset.x() };
-		lightClearRect.adjust(-2 * _pLightOffset.y() + pos.y() + radian, 0, 0, 3 * _pLightOffset.x() - pos.x() - radian);
-		darkClearRect.adjust(0, 3 * _pDarkOffset.x() + pos.x() + radian, -1.5 * _pDarkOffset.y() - pos.y() - radian, 0);
+		lightClearRect.adjust(-_pLightOffset.y() + paddingY, 0, 0, _pLightOffset.x() - paddingX);
+		darkClearRect.adjust(0, _pDarkOffset.x() + paddingX, -_pDarkOffset.y() - paddingY, 0);
 		break;
 	default:
 		break;
@@ -516,13 +520,61 @@ void NXBoxShadowEffectPrivate::_drawOutsetShadow(QPainter* painter, const QPixma
 		painter.end();
 		return source;
 		};
-	qDebug() << blurImage.rect() << " " << lightClearRect;
+
 	QImage lightShadow = applyColorFunc(blurImage, _pLightColor, lightClearRect);
 	QImage darkShadow = applyColorFunc(std::move(blurImage), _pDarkColor, darkClearRect);
 	painter->drawImage(pos + lightOffset, lightShadow);
 	painter->drawImage(pos + darkOffset, darkShadow);
 
-	//painter->drawPixmap(pos, pixmap);
+	painter->drawPixmap(pos, pixmap);
+	*/
+
+	QImage pixmapImage = pixmap.toImage();
+	QPointF lightOffset, darkOffset;
+	switch (_pRotateMode)
+	{
+	case NXWidgetType::BoxShadow::Rotate45:
+		lightOffset = _pLightOffset;
+		darkOffset = _pDarkOffset;
+		break;
+	case NXWidgetType::BoxShadow::Rotate135:
+		lightOffset = { -_pLightOffset.y(), _pLightOffset.x() };
+		darkOffset = { -_pDarkOffset.y(), _pDarkOffset.x() };
+		break;
+	case NXWidgetType::BoxShadow::Rotate225:
+		lightOffset = { -_pLightOffset.x(), -_pLightOffset.y() };
+		darkOffset = { -_pDarkOffset.x(), -_pDarkOffset.y() };
+		break;
+	case NXWidgetType::BoxShadow::Rotate315:
+		lightOffset = { _pLightOffset.y(), -_pLightOffset.x() };
+		darkOffset = { _pDarkOffset.y(), -_pDarkOffset.x() };
+		break;
+	default:
+		break;
+	}
+
+	QImage blurImage(pixmapImage.size(), QImage::Format_ARGB32_Premultiplied);
+	blurImage.setDevicePixelRatio(pixmap.devicePixelRatio());
+	blurImage.fill(0);
+
+	QPainter blurPainter(&blurImage);
+	qt_blurImage(&blurPainter, pixmapImage, _pBlur, true, true);
+	blurPainter.end();
+
+	auto applyColorFunc = [](QImage source, const QColor& color) -> QImage {
+		QPainter painter(&source);
+		painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+		painter.fillRect(source.rect(), color);
+		painter.end();
+		return source;
+		};
+
+	QImage lightShadow = applyColorFunc(blurImage, _pLightColor);
+	QImage darkShadow = applyColorFunc(std::move(blurImage), _pDarkColor);
+	painter->drawImage(pos + lightOffset, lightShadow);
+	painter->drawImage(pos + darkOffset, darkShadow);
+
+	painter->drawPixmap(pos, pixmap);
 }
 
 NXBoxShadowEffect::NXBoxShadowEffect(QObject* parent /*= nullptr*/)
@@ -652,7 +704,7 @@ QRectF NXBoxShadowEffect::boundingRectFor(const QRectF& rect) const
 	}
 	
 	// 对于外阴影，需要扩展边界以容纳阴影
-	qreal boundary = d->_pBlur + d->_pSpread;
+	qreal boundary = d->_pBlur + d->_pSpread * M_SQRT1_2;
 	
 	// 无论是矩形还是圆形阴影，都需要在所有方向上扩展边界
 	return rect.united(rect.translated(0, 0).adjusted(-boundary, -boundary, boundary, boundary));

@@ -11,7 +11,7 @@ class FKShadowWidget;
 class FKLauncherShell : public NXWidget
 {
 	Q_OBJECT
-
+		Q_PROPERTY_CREATE_BASIC_H(qreal, TopCircleX)
 public:
 	explicit FKLauncherShell(QWidget* parent = nullptr);
 	virtual ~FKLauncherShell();
@@ -32,6 +32,10 @@ private:
 	QPropertyAnimation* _pSwitchPannelAnimation{ nullptr };
 	QPropertyAnimation* _pFormPannelAnimation{ nullptr };
 	QPropertyAnimation* _pShadowWidgetAnimation{ nullptr };
+	QPropertyAnimation* _pShadowWidgetWidthAnimation{ nullptr };
+	QPropertyAnimation* _pSwitchPannelWidthAnimation{ nullptr };
+	QPropertyAnimation* _pSwitchTopCircleXAnimation{ nullptr };
+	QPropertyAnimation* _pSwitchBottomCircleXAnimation{ nullptr };
 
 	inline static NXMessageButton* _pMessageButton;
 };

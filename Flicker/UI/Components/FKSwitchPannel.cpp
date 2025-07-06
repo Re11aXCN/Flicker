@@ -33,18 +33,6 @@ FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
 	//shadow->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
 	//shadow->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate45);
 	//setGraphicsEffect(shadow);
-	FKShadowWidget* pFormPanel = new FKShadowWidget(this);
-	pFormPanel->setFixedSize(200, 300);
-	pFormPanel->setBlur(30.0);
-	pFormPanel->setLightColor(QColor(0, 0x1E, 0x9A, 102));
-	pFormPanel->setDarkColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	pFormPanel->setLightOffset({ -5,-5 });
-	pFormPanel->setDarkOffset({ 5,5 });
-	pFormPanel->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
-	pFormPanel->setRotateMode(NXWidgetType::BoxShadow::RotateMode::Rotate315);
-	//pFormPanel->move(240,-178);
-	pFormPanel->move(50, 50);
-	pFormPanel->lower();
 
 	QObject::connect(_pSwitchBtn, &FKPushButton::clicked, this, &FKSwitchPannel::toggleFormType);
 	QObject::connect(_pLoginOpacityAnimation, &QPropertyAnimation::valueChanged, this, &FKSwitchPannel::_updateLoginOpacity);
@@ -114,22 +102,22 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	const int width = this->width();
 	const int height = this->height();
 
-	QRect opacityRect{ rect().topLeft(), rect().bottomRight()  };
-	// 背景色设置，为了遮挡FormPanel
-	painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
+	//QRect opacityRect{ rect().topLeft(), rect().bottomRight()  };
+	//// 背景色设置，为了遮挡FormPanel
+	//painter.fillRect(opacityRect, Constant::LIGHT_MAIN_BG_COLOR);
 
-	QRect bottomCircleRect(_pBottomCirclePos - QPoint(242, 138), _pBottomCirclePos + QPoint(258, 362));
+	//QRect bottomCircleRect(_pBottomCirclePos - QPoint(242, 138), _pBottomCirclePos + QPoint(258, 362));
 
-	QRadialGradient bottomGradient(bottomCircleRect.center(), bottomCircleRect.width() / 2);
-	bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
-	bottomGradient.setColorAt(0.95, Constant::LIGHT_MAIN_BG_COLOR);
-	//bottomGradient.setColorAt(0.9, Qt::white);
-	bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-	painter.setBrush(bottomGradient);
-	painter.setPen(Qt::NoPen);
-	painter.drawEllipse(bottomCircleRect);
+	//QRadialGradient bottomGradient(bottomCircleRect.center(), bottomCircleRect.width() / 2);
+	//bottomGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
+	//bottomGradient.setColorAt(0.95, Constant::LIGHT_MAIN_BG_COLOR);
+	////bottomGradient.setColorAt(0.9, Qt::white);
+	//bottomGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+	//painter.setBrush(bottomGradient);
+	//painter.setPen(Qt::NoPen);
+	//painter.drawEllipse(bottomCircleRect);
 
-	QRect topCircleRect(_pTopCirclePos - QPoint(150, 180), _pTopCirclePos + QPoint(150, 120));
+	/*QRect topCircleRect(_pTopCirclePos - QPoint(150, 180), _pTopCirclePos + QPoint(150, 120));
 
 	QRadialGradient topGradient(topCircleRect.center(), topCircleRect.width() / 2);
 	topGradient.setColorAt(0.0, Constant::LIGHT_MAIN_BG_COLOR);
@@ -137,7 +125,7 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 	topGradient.setColorAt(0.9, Qt::white);
 	topGradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
 	painter.setBrush(topGradient);
-	painter.drawEllipse(topCircleRect);
+	painter.drawEllipse(topCircleRect);*/
 
 	// 1. 定义同心圆
 	const int centerX = width / 2;
