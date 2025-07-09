@@ -41,9 +41,9 @@ public:
 	mysqlx::Session* getSession() { return _session.get(); }
 	void updateActiveTime() { _lastActiveTime = std::chrono::steady_clock::now(); }
 	std::chrono::steady_clock::time_point getLastActiveTime() const { return _lastActiveTime; }
-	bool isExpired(std::chrono::seconds timeout) const {
+	bool isExpired(std::chrono::milliseconds timeout) const {
 		auto now = std::chrono::steady_clock::now();
-		return std::chrono::duration_cast<std::chrono::seconds>(now - _lastActiveTime) > timeout;
+		return std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastActiveTime) > timeout;
 	}
 
 private:

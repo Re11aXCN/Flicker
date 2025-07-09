@@ -88,7 +88,7 @@ public:
 			_pConfig.PoolSize);
 	}
 
-    std::unique_ptr<StubType> getConnection(std::chrono::milliseconds timeout = std::chrono::milliseconds(5000)) {
+    std::unique_ptr<StubType> getConnection() {
         std::unique_lock<std::mutex> lock(_pMutex);
 
 		// 添加关闭状态检查
@@ -97,7 +97,7 @@ public:
 		}
 
 		// 等待可用连接或超时
-		bool hasConnection = _pCv.wait_for(lock, timeout, [this] {
+		bool hasConnection = _pCv.wait_for(lock, _pConfig.GrpclbCallTimeout, [this] {
 			return _pShutdown || !_pConnections.empty();
 			});
 
@@ -110,7 +110,7 @@ public:
         if (!hasConnection) {
             std::println("获取连接超时，创建新连接 (活跃连接数: {})", _pActiveConnections.load());
             // 检查是否超过最大连接数限制
-            if (_pActiveConnections.load() >= _pConfig.PoolSize * 3) {
+            if (_pActiveConnections.load() > _pConfig.PoolSize) {
                 throw std::runtime_error("已达到最大连接数限制，无法创建新连接");
             }
 
@@ -145,10 +145,10 @@ public:
     }
 
     template<typename Func>
-    auto executeWithConnection(Func operation, std::chrono::milliseconds timeout = std::chrono::milliseconds(5000)) {
+    auto executeWithConnection(Func operation) {
         std::unique_ptr<StubType> connection;
         try {
-            connection = getConnection(timeout);
+            connection = getConnection();
         }
         catch (const std::exception& e) {
             std::println("获取gRPC连接失败: {}", e.what());
@@ -194,12 +194,18 @@ private:
             grpc::ChannelArguments channelArgs;
 
 			// 设置通道参数
-			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 30000);  // 30秒发送keepalive ping
-			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10000);  // 10秒超时
-			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);  // 允许在没有调用时发送keepalive
-			channelArgs.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);  // 允许无限制的ping
-			channelArgs.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 10000);  // 最大重连间隔10秒
-
+			//< 发送keepalive ping
+			//< 超时
+			//< 允许在没有调用时发送keepalive
+			//< 允许无限制的ping
+			//< 最大重连间隔
+			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, static_cast<int>(_pConfig.KeepAliveTime.count()));                       
+			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, static_cast<int>(_pConfig.KeepAliveTimeout.count()));
+			channelArgs.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, _pConfig.KeepAlivePermitWithoutCalls);
+			channelArgs.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, _pConfig.Http2MaxPingWithoutData);
+			channelArgs.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, static_cast<int>(_pConfig.MaxReconnectBackoff.count()));
+			channelArgs.SetInt(GRPC_ARG_GRPCLB_CALL_TIMEOUT_MS, static_cast<int>(_pConfig.GrpclbCallTimeout.count()));
+            
             // 根据配置创建安全或非安全通道
             if (_pConfig.UseSSL) {
                 grpc::SslCredentialsOptions sslOpts;

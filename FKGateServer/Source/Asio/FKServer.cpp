@@ -63,7 +63,7 @@ void FKServer::start()
 		
 		// 短暂延迟后重试
 		boost::asio::steady_timer timer(_pIoContext);
-		timer.expires_after(std::chrono::seconds(1));
+		timer.expires_after(std::chrono::milliseconds(1));
 		timer.async_wait([self = shared_from_this()](const boost::system::error_code&) {
 			self->start();
 		});

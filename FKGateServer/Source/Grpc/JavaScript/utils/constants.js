@@ -28,7 +28,13 @@ const ERROR_CODE = {
     // 验证码已过期
     CODE_EXPIRED: 4,
     // 验证码不匹配
-    CODE_MISMATCH: 5
+    CODE_MISMATCH: 5,
+    // 加密错误
+    ENCRYPT_ERROR: 6,
+    // 密码认证失败
+    CIPHER_AUTH_FAILED: 7,
+    // 表单参数缺失
+    FORM_PARAMS_MISSING: 8,
 };
 
 module.exports = {

@@ -18,15 +18,16 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <chrono>
 #include <mysqlx/xdevapi.h>
-#include "MySQL/Entity/FKUserEntity.h"
 
-// 用户数据访问层
+class FKUserEntity;
+class FKMySQLConnectionPool;
 class FKUserMapper {
 public:
     // 构造函数
-    explicit FKUserMapper(mysqlx::Session* session) : _session(session) {}
-
+    explicit FKUserMapper(const std::string& tableName = "users");
+    ~FKUserMapper();
     // 创建用户表（如果不存在）
     bool createTableIfNotExists();
 
@@ -61,13 +62,13 @@ private:
                                                     const auto& paramValue);
 
     // 从结果集构建用户实体
-    FKUserEntity _buildUserFromRow(const mysqlx::Row& row);
-
-    // 数据库会话
-    mysqlx::Session* _session;
+    FKUserEntity _buildUserFromRow(const mysqlx::Row& row, const mysqlx::RowResult::Columns& columnsInfo);
 
     // 表名
-    const std::string _tableName = "users";
+    std::string _tableName;
+    
+    // 连接池
+    FKMySQLConnectionPool* _pConnectionPool;
 };
 
 #endif // !FK_USER_MAPPER_H_

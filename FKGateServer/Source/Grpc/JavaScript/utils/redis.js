@@ -3,7 +3,7 @@
  * 提供Redis连接和操作的封装
  */
 
-const { redisConfig } = require('../config/configLoader');
+const { redisConfig } = require('../config/config-loader');
 const Redis = require("ioredis");
 
 // 创建Redis客户端实例

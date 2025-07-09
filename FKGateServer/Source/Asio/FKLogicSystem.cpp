@@ -5,130 +5,17 @@
 #include <string>
 #include <vector>
 #include <json/json.h>
-#include "Grpc/FKPasswordGrpc.grpc.pb.h"
 
 #include "FKUtils.h"
 #include "Asio/FKHttpConnection.h"
-#include "Grpc/FKGrpcServiceManager.h"
+#include "Grpc/VerifyCode/FKVerifyCodeGrpcClient.h"
+#include "Grpc/Password/FKPasswordGrpcClient.h"
 #include "Redis/FKRedisConnectionPool.h"
-#include "MySQL/Mapper/FKUserMapper.h"
-#include "MySQL/FKMySQLConnectionPool.h"
-namespace gRPC {
-	// 创建gRPC通道和存根
-	static std::shared_ptr<FKPasswordGrpc::PasswordService::Stub> CreateStub() {
-		// 创建到密码服务的通道
-		auto channel = grpc::CreateChannel("127.0.0.1:50052", grpc::InsecureChannelCredentials());
+#include "MySQL/Entity/FKUserEntity.h"
+#include "MySQL/Service/FKUserService.h"
 
-		// 创建存根
-		return FKPasswordGrpc::PasswordService::NewStub(channel);
-	}
-	/**
-	* 使用bcrypt对密码进行哈希处理
-	* @param password 原始密码
-	* @return 返回一个元组，包含哈希后的密码和盐值
-	*/
-	static std::tuple<std::string, std::string> HashPassword(const std::string& password) {
-		try {
-			// 创建请求对象
-			FKPasswordGrpc::HashPasswordRequest request;
-			request.set_password(password);
-
-			// 创建响应对象
-			FKPasswordGrpc::HashPasswordResponse response;
-
-			// 创建gRPC上下文
-			grpc::ClientContext context;
-
-			// 设置超时时间（5秒）
-			std::chrono::system_clock::time_point deadline =
-				std::chrono::system_clock::now() + std::chrono::seconds(5);
-			context.set_deadline(deadline);
-
-			// 创建存根并调用服务
-			auto stub = CreateStub();
-			grpc::Status status = stub->HashPassword(&context, request, &response);
-
-			// 检查调用状态
-			if (status.ok()) {
-				// 调用成功，检查业务状态码
-				if (response.status_code() == 0) { // SUCCESS
-					std::println("密码加密成功");
-					return { response.hashed_password(), response.salt() };
-				}
-				else {
-					std::println("密码加密业务错误: {}", response.message());
-					return { "", "" };
-				}
-			}
-			else {
-				// gRPC调用失败
-				std::println("密码加密gRPC调用失败: {}, {}",
-					status.error_code(), status.error_message());
-				return { "", "" };
-			}
-		}
-		catch (const std::exception& e) {
-			std::println("密码加密异常: {}", e.what());
-			return { "", "" };
-		}
-	}
-
-	/**
-	 * 验证密码是否匹配
-	 * @param password 待验证的密码
-	 * @param hashedPassword 数据库中存储的哈希密码
-	 * @return 如果密码匹配返回true，否则返回false
-	 */
-	static bool verifyPassword(const std::string& password, const std::string& hashedPassword) {
-		try {
-			// 创建请求对象
-			FKPasswordGrpc::VerifyPasswordRequest request;
-			request.set_password(password);
-			request.set_hashed_password(hashedPassword);
-
-			// 创建响应对象
-			FKPasswordGrpc::VerifyPasswordResponse response;
-
-			// 创建gRPC上下文
-			grpc::ClientContext context;
-
-			// 设置超时时间（5秒）
-			std::chrono::system_clock::time_point deadline =
-				std::chrono::system_clock::now() + std::chrono::seconds(5);
-			context.set_deadline(deadline);
-
-			// 创建存根并调用服务
-			auto stub = CreateStub();
-			grpc::Status status = stub->VerifyPassword(&context, request, &response);
-
-			// 检查调用状态
-			if (status.ok()) {
-				// 调用成功，检查业务状态码
-				if (response.status_code() == 0) { // SUCCESS
-					std::println("密码验证完成，结果: {}", response.is_valid() ? "有效" : "无效");
-					return response.is_valid();
-				}
-				else {
-					std::println("密码验证业务错误: {}", response.message());
-					return false;
-				}
-			}
-			else {
-				// gRPC调用失败
-				std::println("密码验证gRPC调用失败: {}, {}",
-					status.error_code(), status.error_message());
-				return false;
-			}
-		}
-		catch (const std::exception& e) {
-			std::println("密码验证异常: {}", e.what());
-			return false;
-		}
-	}
-
-}
-
-using namespace FKVerifyGrpc;
+using namespace FKVerifyCodeGrpc;
+using namespace FKPasswordGrpc;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
 
 FKLogicSystem::FKLogicSystem()
@@ -149,7 +36,7 @@ FKLogicSystem::FKLogicSystem()
 		boost::beast::ostream(responseBody) << jsonOutput;
 		};
 
-	auto getVarifyCodeFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+	auto getVerifyCodeFunc = [](std::shared_ptr<FKHttpConnection> connection) {
 		// 读取请求体
 		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
 		std::println("Received Body: \n{}", body);
@@ -184,47 +71,37 @@ FKLogicSystem::FKLogicSystem()
 			return;
 		}
 
-		// 构建gRPC请求
-		VarifyCodeRequestBody grpcRequest;
-		if (requestRoot.isMember("request_type")) {
-			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
-		}
-		else [[unlikely]] {
-			// 默认值（根据业务需求设置）
-			grpcRequest.set_request_type(0);
-		}
-		grpcRequest.set_email(requestRoot["data"]["email"].asString());
-
 		try {
 			// 调用gRPC服务
-			auto manager = FKGrpcServiceManager::getInstance();
-			VarifyCodeResponseBody grpcResponse = manager->getServicePool<gRPC::ServiceType::VERIFY_CODE_SERVICE>()
-                .executeWithConnection([&grpcRequest](auto* stub) {
-                    grpc::ClientContext context;
-                    VarifyCodeResponseBody response;
-                    stub->GetVarifyCode(&context, grpcRequest, &response);
-                    return response;
-                });
+			FKVerifyCodeGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::VERIFY_CODE_SERVICE>());
 
-			// 构建JSON响应（按照新格式）
-			responseRoot["status_code"] = grpcResponse.status_code();
-			responseRoot["message"] = grpcResponse.message();
-
-			// 创建data对象
-			Json::Value dataObj;
-			dataObj["request_type"] = grpcResponse.request_type();
-			dataObj["email"] = grpcResponse.email();
-			dataObj["varify_code"] = grpcResponse.varify_code();
-			responseRoot["data"] = dataObj;
+			VerifyCodeRequestBody grpcRequest;
+			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
+			grpcRequest.set_email(requestRoot["data"]["email"].asString());
+			auto [grpcResponse, grpcStatus]= client.getVerifyCode(grpcRequest);
 
 			// 根据gRPC状态设置HTTP状态
-			if (grpcResponse.status_code() >= 400) {
+			if (grpcResponse.status_code() != 0) {
+				responseRoot["status_code"] = grpcResponse.status_code();
+				responseRoot["message"] = grpcResponse.message();
 				connection->getResponse().result(boost::beast::http::status::bad_request);
 			}
 			else {
-				connection->getResponse().result(boost::beast::http::status::ok);
+				if (grpcStatus.ok()) {
+					// 创建data对象
+					Json::Value dataObj;
+					dataObj["request_type"] = grpcResponse.request_type();
+					dataObj["email"] = grpcResponse.email();
+					dataObj["verify_code"] = grpcResponse.verify_code();
+					responseRoot["data"] = dataObj;
+					connection->getResponse().result(boost::beast::http::status::ok);
+				}
+				else {
+					responseRoot["status_code"] = grpcStatus.error_code();
+					responseRoot["message"] = grpcStatus.error_message();
+					connection->getResponse().result(boost::beast::http::status::request_timeout);
+				}
 			}
-
 		}
 		catch (const std::exception& e) {
 			// gRPC调用异常处理
@@ -264,11 +141,10 @@ FKLogicSystem::FKLogicSystem()
 		}
 
 		// 验证必需字段
-		if (!requestRoot.isMember("data") || 
-			!requestRoot["data"].isMember("uuid") || requestRoot["data"]["uuid"].empty() ||
+		if (!requestRoot.isMember("data") ||
 			!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() ||
 			!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-			!requestRoot["data"].isMember("password") || requestRoot["data"]["password"].empty() ||
+			!requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty() ||
 			!requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty()) {
 			
 			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
@@ -279,26 +155,14 @@ FKLogicSystem::FKLogicSystem()
 		}
 
 		// 获取请求数据
-		std::string uuid = requestRoot["data"]["uuid"].asString();
 		std::string username = requestRoot["data"]["username"].asString();
 		std::string email = requestRoot["data"]["email"].asString();
-		std::string password = requestRoot["data"]["password"].asString();
+		std::string hashed_password = requestRoot["data"]["hashed_password"].asString();
 		std::string verifyCode = requestRoot["data"]["verify_code"].asString();
-
-		// 创建data对象（用于响应）
-		Json::Value dataObj;
-		dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
-		dataObj["uuid"] = uuid;
-		dataObj["username"] = username;
-		dataObj["email"] = email;
-		// 不在响应中返回密码
-		dataObj["password"] = "*****";
-		dataObj["verify_code"] = verifyCode;
 
 		// 验证码前缀（与JavaScript端constants.js中定义一致）
 		const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
 
-		// 1. 通过FKRedisConnectionPool查询验证码
 		try {
 			bool verificationSuccess = false;
 
@@ -313,7 +177,6 @@ FKLogicSystem::FKLogicSystem()
 					std::println("验证码已过期或不存在: {}", email);
 					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::VERIFY_CODE_EXPIRED);
 					responseRoot["message"] = "The verification code has expired, please get it again";
-					responseRoot["data"] = dataObj;
 					connection->getResponse().result(boost::beast::http::status::bad_request);
 					return false;
 				}
@@ -321,11 +184,9 @@ FKLogicSystem::FKLogicSystem()
 				// 验证码存在，检查是否匹配
 				std::string storedCode = *optionalValue;
 				if (storedCode != verifyCode) {
-					// 验证码不匹配
 					std::println("验证码不匹配: {} vs {}", storedCode, verifyCode);
 					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::VERIFY_CODE_ERROR);
 					responseRoot["message"] = "The verification code is incorrect, please re-enter it";
-					responseRoot["data"] = dataObj;
 					connection->getResponse().result(boost::beast::http::status::bad_request);
 					return false;
 				}
@@ -343,82 +204,73 @@ FKLogicSystem::FKLogicSystem()
 				return false;
 			}
 
-			// 2. 检查用户是否已存在
-			auto existingUserByUsername = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
-				FKUserMapper userMapper(session);
-				return userMapper.findUserByUsername(username);
-			});
-			if (existingUserByUsername) {
-				std::println("用户名已存在: {}", username);
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
-				responseRoot["message"] = "Username already exists, please choose another one";
-				responseRoot["data"] = dataObj;
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-				boost::beast::ostream(connection->getResponse().body())
-					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-				return false;
-			}
-			
-			// 检查邮箱是否已存在
-			auto existingUserByEmail = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
-				FKUserMapper userMapper(session);
-				return userMapper.findUserByEmail(email);
-			});
-			if (existingUserByEmail) {
-				std::println("邮箱已存在: {}", email);
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
-				responseRoot["message"] = "Email already exists, please use another one or recover your password";
-				responseRoot["data"] = dataObj;
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-				boost::beast::ostream(connection->getResponse().body())
-					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-				return false;
-			}
+			// 如果验证码验证成功，调用gRPC服务加密SHA256密码
+			FKPasswordGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::PASSWORD_SERVICE>());
 
-			// 3. 使用BCrypt对密码进行哈希处理
-			auto [hashedPassword, salt] = gRPC::HashPassword(password);
+			EncryptPasswordRequestBody grpcRequest;
+			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
+			grpcRequest.set_hashed_password(requestRoot["data"]["hashed_password"].asString());
 			
-			// 4. 创建用户实体并保存到数据库
-			FKUserEntity newUser;
-			newUser.setUuid(uuid);
-			newUser.setUsername(username);
-			newUser.setEmail(email);
-			newUser.setPassword(hashedPassword);
-			newUser.setSalt(salt);
-			
-			// 使用事务保存用户
-			bool success = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
-				FKUserMapper userMapper(session);
-				return userMapper.insertUser(newUser);
-			});
-			if (success) {
-				// 注册成功
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
-				responseRoot["message"] = "Registration successful, please go to Login";
-				responseRoot["data"] = dataObj;
-				connection->getResponse().result(boost::beast::http::status::ok);
-			} else {
-				// 数据库操作失败
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::DATABASE_ERROR);
-				responseRoot["message"] = "Failed to register user due to database error";
-				responseRoot["data"] = dataObj;
-				connection->getResponse().result(boost::beast::http::status::internal_server_error);
+			auto [grpcResponse, grpcStatus] = client.encryptPassword(grpcRequest);
+			// 根据gRPC状态设置HTTP状态
+			if (grpcResponse.status_code() != 0) {
+				responseRoot["status_code"] = grpcResponse.status_code();
+				responseRoot["message"] = grpcResponse.message();
+				connection->getResponse().result(boost::beast::http::status::bad_request);
 			}
+			else {
+				if (grpcStatus.ok()) {
+					auto result = FKUserService::getInstance()->registerUser(username, email, grpcResponse.encrypted_password(), grpcResponse.salt());
 
+					switch (result) {
+					case DbOperator::UserRegisterResult::SUCCESS: {
+						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
+						responseRoot["message"] = "Registration successful, please go to Login";
+						Json::Value dataObj;
+						dataObj["request_type"] = grpcResponse.request_type();
+						dataObj["encrypted_password"] = "******";
+						dataObj["salt"] = "******";
+						responseRoot["data"] = dataObj;
+						connection->getResponse().result(boost::beast::http::status::ok);
+						break;
+					}
+					case DbOperator::UserRegisterResult::USERNAME_EXISTS:
+						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
+						responseRoot["message"] = "Username already exists, please choose another one";
+						connection->getResponse().result(boost::beast::http::status::bad_request);
+						break;
+					case DbOperator::UserRegisterResult::EMAIL_EXISTS:
+						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
+						responseRoot["message"] = "Email already exists, please use another one or recover your password";
+						connection->getResponse().result(boost::beast::http::status::bad_request);
+						break;
+					default:
+						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::DATABASE_ERROR);
+						responseRoot["message"] = "Failed to register user due to database error";
+						connection->getResponse().result(boost::beast::http::status::internal_server_error);
+						break;
+					}
+				}
+				else {
+					responseRoot["status_code"] = grpcStatus.error_code();
+					responseRoot["message"] = grpcStatus.error_message();
+					connection->getResponse().result(boost::beast::http::status::request_timeout);
+				}
+			}
 		} catch (const std::exception& e) {
-			// 处理异常
 			std::println("注册过程发生异常: {}", e.what());
 			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
 			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
-			responseRoot["data"] = dataObj;
 			connection->getResponse().result(boost::beast::http::status::internal_server_error);
 		}
 
-		// 发送响应
 		boost::beast::ostream(connection->getResponse().body())
 			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
 		return true;
 	};
+
+
+
 	auto loginUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
 		// 读取请求体
 		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
@@ -447,7 +299,7 @@ FKLogicSystem::FKLogicSystem()
 		if (!requestRoot.isMember("data") || 
 			((!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty()) && 
 			(!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty())) ||
-			!requestRoot["data"].isMember("password") || requestRoot["data"]["password"].empty()) {
+			!requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty()) {
 			
 			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
 			responseRoot["message"] = "Missing username/email or password";
@@ -459,38 +311,24 @@ FKLogicSystem::FKLogicSystem()
 		// 获取请求数据
 		std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
 		std::string email = requestRoot["data"].isMember("email") ? requestRoot["data"]["email"].asString() : "";
-		std::string password = requestRoot["data"]["password"].asString();
-		bool rememberPassword = requestRoot["data"].isMember("remember_password") ? requestRoot["data"]["remember_password"].asBool() : false;
-		bool autoLogin = requestRoot["data"].isMember("auto_login") ? requestRoot["data"]["auto_login"].asBool() : false;
-
-		// 创建data对象（用于响应）
-		Json::Value dataObj;
-		dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
-		dataObj["username"] = username;
-		dataObj["email"] = email;
-		// 不在响应中返回密码
-		dataObj["password"] = "*****";
-		dataObj["remember_password"] = rememberPassword;
-		dataObj["auto_login"] = autoLogin;
+		std::string hashed_password = requestRoot["data"]["hashed_password"].asString();
+		/*bool rememberPassword = requestRoot["data"].isMember("remember_password") ? requestRoot["data"]["remember_password"].asBool() : false;
+		bool autoLogin = requestRoot["data"].isMember("auto_login") ? requestRoot["data"]["auto_login"].asBool() : false;*/
 
 		try {
 			// 1. 查询用户
-			 std::optional<FKUserEntity> user = FKMySQLConnectionPool::getInstance()->executeWithConnection([&](mysqlx::Session* session) {
-				FKUserMapper userMapper(session);
-				if (!username.empty()) {
-					return userMapper.findUserByUsername(username);
-				} else if (!email.empty()) {
-					return userMapper.findUserByEmail(email);
-				}
-				return std::optional<FKUserEntity>();
-			});
+			std::optional<FKUserEntity> user;
+			if (!username.empty()) {
+				user = FKUserService::getInstance()->findUserByUsername(username);
+			} else if (!email.empty()) {
+				user = FKUserService::getInstance()->findUserByEmail(email);
+			}
 			
 			// 检查用户是否存在
 			if (!user.has_value()) {
 				std::println("用户不存在: {} / {}", username, email);
 				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NOT_FIND_USER);
-				responseRoot["message"] = "User does not exist";
-				responseRoot["data"] = dataObj;
+				responseRoot["message"] = "User does not exist {" + username + " / " + email + "}";
 				connection->getResponse().result(boost::beast::http::status::bad_request);
 				boost::beast::ostream(connection->getResponse().body())
 					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
@@ -498,40 +336,48 @@ FKLogicSystem::FKLogicSystem()
 			}
 			
 			// 2. 验证密码
-			std::string storedPassword = user->getPassword();
-			bool passwordValid = gRPC::verifyPassword(password, storedPassword);
-			
-			if (!passwordValid) {
+			FKPasswordGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::PASSWORD_SERVICE>());
+
+			AuthenticatePasswordRequestBody grpcRequest;
+			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
+			grpcRequest.set_hashed_password(hashed_password);
+			grpcRequest.set_encrypted_password(user->getPassword());
+
+			auto [grpcResponse, grpcStatus] = client.authenticatePassword(grpcRequest);
+
+			if (grpcResponse.status_code() != 0) {
 				std::println("密码错误: {}", user->getUsername());
 				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::PASSWORD_ERROR);
 				responseRoot["message"] = "Incorrect password";
-				responseRoot["data"] = dataObj;
 				connection->getResponse().result(boost::beast::http::status::bad_request);
-				boost::beast::ostream(connection->getResponse().body())
-					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-				return false;
 			}
-			
-			// 3. 登录成功，更新响应数据
-			dataObj["username"] = user->getUsername();
-			dataObj["email"] = user->getEmail();
-			dataObj["uuid"] = user->getUuid();
-			
-			// TODO: 生成会话令牌并存储在Redis中
-			// TODO: 如果选择了记住密码，生成长期令牌
-			
-			// 4. 设置成功响应
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
-			responseRoot["message"] = "Login successful";
-			responseRoot["data"] = dataObj;
-			connection->getResponse().result(boost::beast::http::status::ok);
+			else {
+				if (grpcStatus.ok()) {
+					// 3. 登录成功，更新响应数据
 
+
+				// TODO: 生成会话令牌并存储在Redis中
+				// TODO: 如果选择了记住密码，生成长期令牌
+
+				// 4. 设置成功响应
+					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
+					responseRoot["message"] = "Login successful";
+					Json::Value dataObj;
+					dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
+					responseRoot["data"] = dataObj;
+					connection->getResponse().result(boost::beast::http::status::ok);
+				}
+				else {
+					responseRoot["status_code"] = grpcStatus.error_code();
+					responseRoot["message"] = grpcStatus.error_message();
+					connection->getResponse().result(boost::beast::http::status::request_timeout);
+				}
+			}
 		} catch (const std::exception& e) {
 			// 处理异常
 			std::println("登录过程发生异常: {}", e.what());
 			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
 			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
-			responseRoot["data"] = dataObj;
 			connection->getResponse().result(boost::beast::http::status::internal_server_error);
 		}
 
@@ -546,7 +392,7 @@ FKLogicSystem::FKLogicSystem()
 		};
 
 	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);
-	this->registerCallback("/get_varify_code", Http::RequestType::POST, getVarifyCodeFunc);
+	this->registerCallback("/get_verify_code", Http::RequestType::POST, getVerifyCodeFunc);
 	this->registerCallback("/register_user", Http::RequestType::POST, registerUserFunc);
 	this->registerCallback("/login_user", Http::RequestType::POST, loginUserFunc);
 	this->registerCallback("/reset_password", Http::RequestType::POST, resetPasswordFunc);

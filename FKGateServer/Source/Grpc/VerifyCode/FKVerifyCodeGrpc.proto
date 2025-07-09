@@ -1,22 +1,22 @@
 ﻿syntax = "proto3";
 
-package FKVerifyGrpc;
+package FKVerifyCodeGrpc;
 
-service VarifyCodeService {
-	rpc GetVarifyCode (VarifyCodeRequestBody) returns (VarifyCodeResponseBody) {}
+service VerifyCodeService {
+	rpc GetVerifyCode (VerifyCodeRequestBody) returns (VerifyCodeResponseBody) {}
 }
 
-message VarifyCodeRequestBody {
+message VerifyCodeRequestBody {
 	int32 request_type = 1;
 	// data
 	string email = 2;
 }
 
-message VarifyCodeResponseBody {
+message VerifyCodeResponseBody {
 	int32 status_code = 1;  //不是赋值，而是指定唯一编号
 	string message = 2;
 	// data
 	int32 request_type = 3;
 	string email = 4;
-	string varify_code = 5;
+	string verify_code = 5;
 }

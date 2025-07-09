@@ -6,7 +6,7 @@
 FKHttpConnection::FKHttpConnection(boost::asio::io_context& ioc)
 	: _pSocket(ioc)
 	, _pBuffer{ 8192 }
-	, _pTimeout{ _pSocket.get_executor(), std::chrono::seconds(60) }
+	, _pTimeout{ _pSocket.get_executor(), std::chrono::milliseconds(60) }
 {
 
 }
@@ -76,7 +76,7 @@ void FKHttpConnection::start()
 void FKHttpConnection::_checkTimeout()
 {
 	// 重置超时计时器
-	_pTimeout.expires_after(std::chrono::seconds(60));
+	_pTimeout.expires_after(std::chrono::milliseconds(1000));
 	
 	// 异步等待超时
 	_pTimeout.async_wait(

@@ -1,15 +1,15 @@
-{
+﻿{
   "name": "flicker-grpc-services",
   "version": "1.0.0",
   "description": "Flicker应用的gRPC服务，包括邮箱验证码和密码加密服务",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "start:email": "node emailVerificationServer.js",
-    "start:password": "node passwordService.js",
-    "dev:email": "nodemon emailVerificationServer.js",
-    "dev:password": "nodemon passwordService.js",
-    "dev": "concurrently \"npm run dev:email\" \"npm run dev:password\""
+    "start:verification": "node verification-server.js",
+    "start:cipher": "node cipher-server.js",
+    "dev:verification": "nodemon verification-server.js",
+    "dev:cipher": "nodemon cipher-server.js",
+    "dev": "concurrently \"npm run dev:verification\" \"npm run dev:cipher\""
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",

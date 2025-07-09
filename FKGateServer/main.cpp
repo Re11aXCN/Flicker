@@ -27,13 +27,19 @@ private:
 	std::function<void()> action_;
 };
 
-
+#include <mysqlx/xdevapi.h>
 #define CONCAT_IMPL(a, b) a##b
 #define CONCAT(a, b) CONCAT_IMPL(a, b)
 #define _finally(code) \
     Finally CONCAT(_finally_, __LINE__)([&]() ##code);
 int main(int argc, char* argv[])
 {
+	//mysqlx::SessionSettings option("localhost", 33060, "root", "123456", "flicker");
+	//mysqlx::Session session(option);
+	//mysqlx::Schema sch = session.getSchema("flicker");
+	//mysqlx::SqlResult res = session.sql("SELECT 1").execute();
+	//std::cout << "Result: " << res.count();
+	//session.close();
 	try
 	{
 		// 获取服务器配置（单例构造函数中已自动加载配置）

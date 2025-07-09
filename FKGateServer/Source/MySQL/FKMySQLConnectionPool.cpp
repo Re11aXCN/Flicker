@@ -79,10 +79,13 @@ void FKMySQLConnectionPool::shutdown() {
 std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
     try {
         // 创建MySQL会话
-        mysqlx::SessionSettings settings(_pConfig.Host, _pConfig.Port, _pConfig.Username, _pConfig.Password);
-        settings.set(mysqlx::SessionOption::DB, _pConfig.Schema);
+        mysqlx::SessionSettings settings(_pConfig.Host, _pConfig.Port, _pConfig.Username, _pConfig.Password.c_str(), _pConfig.Schema);
         settings.set(mysqlx::SessionOption::CONNECT_TIMEOUT, static_cast<unsigned int>(_pConfig.ConnectionTimeout.count()));
-        
+		//// 尝试禁用SSL
+		//settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::DISABLED);
+
+		//// 尝试使用旧认证协议
+		//settings.set(mysqlx::SessionOption::AUTH, "MYSQL41");
         // 创建会话
         auto session = std::make_unique<mysqlx::Session>(settings);
         
@@ -109,7 +112,7 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::getConnection() {
     if (!_pConnectionPool.empty()) {
         auto conn = _pConnectionPool.front();
         auto lastActiveTime = conn->getLastActiveTime();
-        auto timeDiff = std::chrono::duration_cast<std::chrono::seconds>(now - lastActiveTime);
+        auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastActiveTime);
         
         // 如果时间差小于5秒，直接返回该连接
         if (timeDiff.count() < 5) {

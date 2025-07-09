@@ -30,6 +30,27 @@
 #endif
 namespace FKUtils {
 	namespace helper {
+//短整形高低字节交换
+#define Swap16(A) ((((std::uint16_t)(A) & 0xff00) >> 8) | (((std::uint16_t)(A) & 0x00ff) << 8))
+//长整形高低字节交换
+#define Swap32(A) ((((std::uint32_t)(A) & 0xff000000) >> 24) | \
+				   (((std::uint32_t)(A) & 0x00ff0000) >>  8) | \
+				   (((std::uint32_t)(A) & 0x0000ff00) <<  8) | \
+				   (((std::uint32_t)(A) & 0x000000ff) << 24))
+
+/******************************************************************************
+ENDIANNESS返回结果
+	l:小端模式
+	b:打断模式
+******************************************************************************/
+#define ENDIANNESS ((char)helper::endian_test.mylong)  
+
+		static union {
+			char c[4];
+			unsigned long mylong;
+		} endian_test = { { 'l', '?', '?', 'b' } };
+
+
 		// 辅助函数：将半字节(0-15)转换为16进制字符（大写）
 		constexpr unsigned char nibble_to_hex(unsigned char nibble) noexcept {
 			nibble &= 0x0F; // 确保只有低4位
@@ -282,6 +303,31 @@ namespace FKUtils {
 		std::stringstream ss;
 		ss << std::put_time(&gmt_tm, "%a, %d %b %Y %H:%M:%S GMT");
 		return ss.str();
+	}
+
+
+	//将主机的无符号短整形数转换成网络字节顺序
+	inline ::uint16_t htons(std::uint16_t hs)
+	{
+		return (ENDIANNESS == 'l') ? Swap16(hs) : hs;
+	}
+
+	//将主机的无符号长整形数转换成网络字节顺序
+	inline std::uint32_t htonl(std::uint32_t hl)
+	{
+		return (ENDIANNESS == 'l') ? Swap32(hl) : hl;
+	}
+
+	//将一个无符号短整形数从网络字节顺序转换为主机字节顺序
+	inline std::uint16_t ntohs(std::uint16_t ns)
+	{
+		return (ENDIANNESS == 'l') ? Swap16(ns) : ns;
+	}
+
+	//将一个无符号长整形数从网络字节顺序转换为主机字节顺序
+	inline std::uint32_t ntohl(std::uint32_t nl)
+	{
+		return (ENDIANNESS == 'l') ? Swap32(nl) : nl;
 	}
 };
 #ifdef QT_CORE_LIB

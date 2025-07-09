@@ -1,11 +1,13 @@
 ﻿{
-  "email": {
-    "user": "2634544095@qq.com",
-    "authcode": "jdodjyndaadmeadc",
+  "mail": {
     "smtp": {
       "host": "smtp.qq.com",
       "port": 465,
       "secure": true
+    },
+    "account": {
+      "user": "2634544095@qq.com",
+      "pass": "jdodjyndaadmeadc"
     }
   },
   "mysql": {
@@ -18,12 +20,12 @@
     "port": 6379,
     "password": "123456"
   },
-  "services": {
-    "emailVerification": {
+  "server": {
+    "verification": {
       "host": "127.0.0.1",
       "port": 50051
     },
-    "password": {
+    "cipher": {
       "host": "127.0.0.1",
       "port": 50052
     }

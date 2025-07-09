@@ -1,6 +1,6 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKUserManager.h
+ * @ Filename	 : FKUserService.h
  * @ Description : 
  * 
  * @ Version	 : V1.0
@@ -20,48 +20,32 @@
 #include <optional>
 #include "FKDef.h"
 #include "FKMacro.h"
-#include "Entity/FKUserEntity.h"
-#include "FKMySQLConnectionPool.h"
-
+#include "MySQL/Mapper/FKUserMapper.h"
+class FKUserEntity;
 // 用户管理类，使用单例模式
-class FKUserManager {
-    SINGLETON_CREATE_H(FKUserManager)
+class FKUserService {
+    SINGLETON_CREATE_H(FKUserService)
 
 public:
-
-    // 注册用户
     DbOperator::UserRegisterResult registerUser(const std::string& username, const std::string& email,
-                                   const std::string& password);
-
-    // 检查用户名是否存在
+                                   const std::string& password, const std::string& salt);
     bool isUsernameExists(const std::string& username);
-
-    // 检查邮箱是否存在
     bool isEmailExists(const std::string& email);
 
-    // 根据ID查询用户
     std::optional<FKUserEntity> findUserById(int id);
-
-    // 根据UUID查询用户
     std::optional<FKUserEntity> findUserByUuid(const std::string& uuid);
-
-    // 根据用户名查询用户
     std::optional<FKUserEntity> findUserByUsername(const std::string& username);
-
-    // 根据邮箱查询用户
     std::optional<FKUserEntity> findUserByEmail(const std::string& email);
-
-    // 获取所有用户
     std::vector<FKUserEntity> getAllUsers();
 
 private:
-    FKUserManager();
-    ~FKUserManager();
+    FKUserService();
+    ~FKUserService();
 	// 初始化，创建用户表
 	bool _initialize();
 
-    // MySQL连接池
-    FKMySQLConnectionPool* _pConnectionPool;
+    // 用户数据访问对象
+    FKUserMapper _pUserMapper;
 };
 
 #endif // !FK_USER_MANAGER_H_

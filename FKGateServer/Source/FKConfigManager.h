@@ -4,7 +4,7 @@
  * @ Description : 服务器配置单例类，集中管理服务器的各种配置参数
  *                 用于
  *                 FKAsioThreadPool 单例构造时配置初始化、
- *                 FKGrpcServiceManager 单例构造时 注册连接池服务初始化FKGrpcServiceConfig
+ *                 FKGrpcServicePoolManager 单例构造时 注册连接池服务初始化FKGrpcServiceConfig
  *                 Redis 预留
  *                 Mysql 预留
  * 
@@ -43,7 +43,7 @@ public:
 	const FKGrpcServiceConfig& getGrpcServiceConfig(gRPC::ServiceType type) const { return _pGrpcServiceConfigs.at(type); }
 	const FKRedisConfig& getRedisConfig() const { return _pRedisConfig; }
 	const FKMySQLConfig& getMySQLConnectionString() const { return _pMySQLConfig; }
-	const std::chrono::seconds& getRequestTimeout() const { return _pRequestTimeout; }
+	const std::chrono::milliseconds& getRequestTimeout() const { return _pRequestTimeout; }
 
 private:
     FKConfigManager();
@@ -65,7 +65,7 @@ private:
 	FKMySQLConfig _pMySQLConfig;
 
 	// 超时配置
-	std::chrono::seconds _pRequestTimeout{ 10 };
+	std::chrono::milliseconds _pRequestTimeout{ 10 };
 
     // 互斥锁，保证线程安全
     mutable std::mutex _pConfigMutex;

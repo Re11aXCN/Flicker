@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Flicker gRPC服务入口文件
  * 同时启动邮箱验证码服务和密码加密服务
  */
 
 const { fork } = require('child_process');
 const path = require('path');
-const { servicesConfig } = require('./config/configLoader');
+const { serviceConfig } = require('./config/config-loader');
 
 /**
  * 启动服务
@@ -40,21 +40,21 @@ function startService(scriptPath, serviceName) {
 }
 
 // 启动邮箱验证码服务
-const emailServicePath = path.join(__dirname, 'emailVerificationServer.js');
-const emailService = startService(emailServicePath, '邮箱验证码服务');
+const verificationServerPath = path.join(__dirname, 'verification-server.js');
+const verificationServer = startService(verificationServerPath, '邮箱验证码服务');
 
 // 启动密码加密服务
-const passwordServicePath = path.join(__dirname, 'passwordService.js');
-const passwordService = startService(passwordServicePath, '密码加密服务');
+const cipherServerPath = path.join(__dirname, 'cipher-server.js');
+const cipherServer = startService(cipherServerPath, '密码加密服务');
 
 // 处理主进程的退出信号
 process.on('SIGINT', () => {
     console.log('收到退出信号，正在关闭所有服务...');
-    emailService.kill();
-    passwordService.kill();
+    verificationServer.kill();
+    cipherServer.kill();
     process.exit(0);
 });
 
 console.log(`所有服务已启动：
-- 邮箱验证码服务: ${servicesConfig.emailVerification.host}:${servicesConfig.emailVerification.port}
-- 密码加密服务: ${servicesConfig.password.host}:${servicesConfig.password.port}`);
+- 邮箱验证码服务: ${serviceConfig.verification.host}:${serviceConfig.verification.port}
+- 密码加密服务: ${serviceConfig.cipher.host}:${serviceConfig.cipher.port}`);

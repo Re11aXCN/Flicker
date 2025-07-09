@@ -14,48 +14,43 @@
 *************************************************************************************/
 #ifndef FK_DEF_H_
 #define FK_DEF_H_
-
+#include <magic_enum/magic_enum.hpp>
 namespace Http {
 	enum class RequestType {
 		GET,
 		POST
 	};
 	enum class RequestId {
-		ID_GET_VARIFY_CODE = 1001,
+		ID_GET_VERIFY_CODE = 1001,
 		ID_REGISTER_USER = 1002,
 		ID_LOGIN_USER = 1003,
 		ID_RESET_PASSWORD = 1004
 	};
 	enum class RequestSeviceType {
-		GET_VARIFY_CODE,
+		GET_VERIFY_CODE,
 		REGISTER_USER,
 		LOGIN_USER,
 		RESET_PASSWORD,
 	};
 	enum class RequestStatusCode {
 		SUCCESS				= 0,
-		INVALID_JSON		= 4001,
-		NETWORK_ABNORMAL	= 4002,
-		GRPC_CALL_FAILED	= 4003,
-		MISSING_FIELDS 		= 4004,
-		VERIFY_CODE_EXPIRED	= 4005,
-		VERIFY_CODE_ERROR	= 4006,
-		USER_EXIST			= 4007,
-		NOT_FIND_USER		= 4008,
-		DATABASE_ERROR 		= 4009,
-		PASSWORD_ERROR		= 4010,
+		INVALID_JSON		= 101,
+		NETWORK_ABNORMAL	= 102,
+		GRPC_CALL_FAILED	= 103,
+		MISSING_FIELDS		= 104,
+		VERIFY_CODE_EXPIRED	= 105,
+		VERIFY_CODE_ERROR	= 106,
+		USER_EXIST			= 107,
+		NOT_FIND_USER		= 108,
+		DATABASE_ERROR		= 109,
+		PASSWORD_ERROR		= 110,
 	};
 }
 
 namespace gRPC {
 	enum class ServiceType {
 		VERIFY_CODE_SERVICE = 0,  // 验证码服务
-		BCRYPT_PASSWORD,
-		USER_AUTH_SERVICE,        // 用户认证服务
-		PROFILE_SERVICE,          // 用户资料服务
-		MESSAGE_SERVICE,          // 消息服务
-
-		SERVICE_TYPE_COUNT        // 服务类型计数，必须放在最后
+		PASSWORD_SERVICE,
 	};
 }
 
@@ -99,5 +94,19 @@ namespace Launcher {
 };
 
 #endif
+
+template <>
+struct magic_enum::customize::enum_range<Http::RequestStatusCode> {
+	static constexpr int min = 0;  // 最小枚举值
+	static constexpr int max = 256;  // 最大枚举值
+	// 注意：max - min 必须小于 UINT16_MAX
+};
+
+template <>
+struct magic_enum::customize::enum_range<Http::RequestId> {
+	static constexpr int min = 1000;  // 最小枚举值
+	static constexpr int max = 1100;  // 最大枚举值
+	// 注意：max - min 必须小于 UINT16_MAX
+};
 
 #endif // !FK_DEF_H_

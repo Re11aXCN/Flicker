@@ -26,14 +26,16 @@
     <ClInclude Include="Source\FKConfigManager.h" />
     <ClInclude Include="Source\FKStructConfig.h" />
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp" />
-    <ClInclude Include="Source\Grpc\FKGrpcServiceManager.h" />
-    <ClInclude Include="Source\Grpc\FKPasswordGrpc.grpc.pb.h" />
-    <ClInclude Include="Source\Grpc\FKPasswordGrpc.pb.h" />
-    <ClInclude Include="Source\Grpc\FKVerifyGrpc.grpc.pb.h" />
-    <ClInclude Include="Source\Grpc\FKVerifyGrpc.pb.h" />
+    <ClInclude Include="Source\Grpc\FKGrpcServicePoolManager.h" />
+    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpc.grpc.pb.h" />
+    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpc.pb.h" />
+    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpcClient.h" />
+    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.grpc.pb.h" />
+    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.pb.h" />
+    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpcClient.h" />
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
     <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h" />
-    <ClInclude Include="Source\MySQL\FKUserManager.h" />
+    <ClInclude Include="Source\MySQL\Service\FKUserService.h" />
     <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h" />
     <ClInclude Include="Source\Redis\FKRedisConnectionPool.h" />
   </ItemGroup>
@@ -44,14 +46,14 @@
     <ClCompile Include="Source\Asio\FKLogicSystem.cpp" />
     <ClCompile Include="Source\Asio\FKServer.cpp" />
     <ClCompile Include="Source\FKConfigManager.cpp" />
-    <ClCompile Include="Source\Grpc\FKGrpcServiceManager.cpp" />
-    <ClCompile Include="Source\Grpc\FKPasswordGrpc.grpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\FKPasswordGrpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\FKVerifyGrpc.grpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\FKVerifyGrpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\FKGrpcServicePoolManager.cpp" />
+    <ClCompile Include="Source\Grpc\Password\FKPasswordGrpc.grpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\Password\FKPasswordGrpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.grpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.pb.cc" />
     <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp" />
     <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp" />
-    <ClCompile Include="Source\MySQL\FKUserManager.cpp" />
+    <ClCompile Include="Source\MySQL\Service\FKUserService.cpp" />
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp" />
     <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp" />
   </ItemGroup>
@@ -154,64 +156,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>
-NexUs.lib;
-jsoncpp.lib;
-abseil_dll.lib;
-absl_decode_rust_punycode.lib;
-absl_demangle_rust.lib;
-absl_flags_commandlineflag.lib;
-absl_flags_commandlineflag_internal.lib;
-absl_flags_config.lib;
-absl_flags_internal.lib;
-absl_flags_marshalling.lib;
-absl_flags_parse.lib;
-absl_flags_private_handle_accessor.lib;
-absl_flags_program_name.lib;
-absl_flags_reflection.lib;
-absl_flags_usage.lib;
-absl_flags_usage_internal.lib;
-absl_log_flags.lib;
-absl_log_internal_structured_proto.lib;
-absl_poison.lib;
-absl_tracing_internal.lib;
-absl_utf8_for_code_point.lib;
-address_sorting.lib;
-cares.lib;
-gpr.lib;
-grpc++.lib;
-grpc++_alts.lib;
-grpc++_error_details.lib;
-grpc++_reflection.lib;
-grpc++_unsecure.lib;
-grpc.lib;
-grpcpp_channelz.lib;
-grpc_authorization_provider.lib;
-grpc_plugin_support.lib;
-grpc_unsecure.lib;
-libcrypto.lib;
-libprotobuf-lited.lib;
-libprotobufd.lib;
-libprotocd.lib;
-libssl.lib;
-re2.lib;
-upb_base_lib.lib;
-upb_json_lib.lib;
-upb_mem_lib.lib;
-upb_message_lib.lib;
-upb_mini_descriptor_lib.lib;
-upb_textformat_lib.lib;
-upb_wire_lib.lib;
-utf8_range.lib;
-utf8_validity.lib;
-zlibd.lib;
-redis++.lib;
-hiredisd.lib;
-mysqlcppconnx.lib;
-zstd.lib;
-lz4d.lib;
-		%(AdditionalDependencies)
-	  </AdditionalDependencies>
+      <AdditionalDependencies>jsoncpp.lib;abseil_dll.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lited.lib;libprotobufd.lib;libprotocd.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlibd.lib;redis++.lib;hiredisd.lib;mysqlcppconnx.lib;zstd.lib;lz4d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -230,64 +175,7 @@ lz4d.lib;
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>
-NexUs.lib;
-jsoncpp.lib;
-abseil_dll.lib;
-absl_decode_rust_punycode.lib;
-absl_demangle_rust.lib;
-absl_flags_commandlineflag.lib;
-absl_flags_commandlineflag_internal.lib;
-absl_flags_config.lib;
-absl_flags_internal.lib;
-absl_flags_marshalling.lib;
-absl_flags_parse.lib;
-absl_flags_private_handle_accessor.lib;
-absl_flags_program_name.lib;
-absl_flags_reflection.lib;
-absl_flags_usage.lib;
-absl_flags_usage_internal.lib;
-absl_log_flags.lib;
-absl_log_internal_structured_proto.lib;
-absl_poison.lib;
-absl_tracing_internal.lib;
-absl_utf8_for_code_point.lib;
-address_sorting.lib;
-cares.lib;
-gpr.lib;
-grpc++.lib;
-grpc++_alts.lib;
-grpc++_error_details.lib;
-grpc++_reflection.lib;
-grpc++_unsecure.lib;
-grpc.lib;
-grpcpp_channelz.lib;
-grpc_authorization_provider.lib;
-grpc_plugin_support.lib;
-grpc_unsecure.lib;
-libcrypto.lib;
-libprotobuf-lite.lib;
-libprotobuf.lib;
-libprotoc.lib;
-libssl.lib;
-re2.lib;
-upb_base_lib.lib;
-upb_json_lib.lib;
-upb_mem_lib.lib;
-upb_message_lib.lib;
-upb_mini_descriptor_lib.lib;
-upb_textformat_lib.lib;
-upb_wire_lib.lib;
-utf8_range.lib;
-utf8_validity.lib;
-zlib.lib;
-redis++.lib;
-hiredis.lib;
-mysqlcppconnx.lib;
-zstd.lib;
-lz4.lib;
-		%(AdditionalDependencies)
-		</AdditionalDependencies>
+      <AdditionalDependencies>jsoncpp.lib;abseil_dll.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib;redis++.lib;hiredis.lib;mysqlcppconnx.lib;zstd.lib;lz4.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

@@ -16,7 +16,7 @@
 #include "Components/FKLineEdit.h"
 #include "Components/FKIconLabel.h"
 #include "Source/FKHttpManager.h"
-
+#include "magic_enum/magic_enum.hpp"
 
 static QRegularExpression s_email_pattern_regex(R"(^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
 static QRegularExpression s_username_pattern_regex("^[a-zA-Z0-9_]+$");
@@ -26,6 +26,7 @@ FKFormPannel::FKFormPannel(QWidget* parent /*= nullptr*/)
 	, _pVerifyCodeTimer(new QTimer(this))
 {
 	_initUI();
+	_initRegistryCallback();
 
 	_pErrorStyleSheet = _pVerifyCodeLineEdit->styleSheet().removeLast() + "border: 1px solid red;}";
 	_pNormalStyleSheet = _pVerifyCodeLineEdit->styleSheet();
@@ -99,6 +100,11 @@ void FKFormPannel::toggleFormType()
 	QTimer::singleShot(200, this, [this]() { 
 		_updateSwitchedUI();
 		_updateConfirmButtonState(); 
+		_pUsernameLineEdit->setText("Re11a");
+		_pEmailLineEdit->setText("2634544095@qq.com");
+		_pPasswordLineEdit->setText("123456789");
+		_pConfirmPasswordLineEdit->setText("123456789");
+		_pVerifyCodeLineEdit->setText("123456");
 	});
 }
 
@@ -434,8 +440,8 @@ void FKFormPannel::_drawEdgeShadow(QPainter& painter, const QRect& rect, const Q
 
 void FKFormPannel::_initRegistryCallback()
 {
-	_pResponseCallbacks.insert(Http::RequestId::ID_GET_VARIFY_CODE, [this](const QJsonObject& jsonObj) {
-		qDebug() << "get varify code response is " << jsonObj;
+	_pResponseCallbacks.insert(Http::RequestId::ID_GET_VERIFY_CODE, [this](const QJsonObject& jsonObj) {
+		qDebug() << "get verify code response is " << jsonObj;
 		if (jsonObj["status_code"].toInt() != static_cast<int>(Http::RequestStatusCode::SUCCESS)) {
 			FKLauncherShell::ShowMessage("ERROR", jsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::TopRight);
 			return;
@@ -480,6 +486,10 @@ void FKFormPannel::_initRegistryCallback()
 
 void FKFormPannel::_handleServerResponse(const QString& response, Http::RequestId requestId, Http::RequestSeviceType serviceType, Http::RequestStatusCode statusCode)
 {
+	qDebug() << "CALL: " << __FUNCTION__ << "response: " << response
+		<< "requestId: " << magic_enum::enum_name(requestId)
+		<< "serviceType: " << magic_enum::enum_name(serviceType)
+		<< "statusCode: " << magic_enum::enum_name(statusCode);
 	if (statusCode != Http::RequestStatusCode::SUCCESS) {
 		FKLauncherShell::ShowMessage("ERROR", "NETWORK REQUEST ERROR!", NXMessageBarType::Error, NXMessageBarType::TopRight);
 		return;
@@ -491,13 +501,23 @@ void FKFormPannel::_handleServerResponse(const QString& response, Http::RequestI
 		return;
 	}
 
-	switch (serviceType) {
-	case Http::RequestSeviceType::GET_VARIFY_CODE:
-		_pResponseCallbacks[requestId](jsonDoc.object());
-	case Http::RequestSeviceType::REGISTER_USER:
-		_pResponseCallbacks[requestId](jsonDoc.object());
-	default:
-		break;
+	if (!_pResponseCallbacks.contains(requestId)) {
+		qWarning() << "未注册的回调函数:" << magic_enum::enum_name(requestId);
+		return;
+	}
+
+	auto callback = _pResponseCallbacks.value(requestId);
+
+	if (!callback) {
+		qWarning() << "回调函数无效:" << magic_enum::enum_name(requestId);
+		return;
+	}
+
+	try {
+		callback(jsonDoc.object());
+	}
+	catch (const std::exception& e) {
+		qCritical() << "回调执行异常:" << e.what();
 	}
 }
 
@@ -762,8 +782,8 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
 
 	// 创建 JSON 请求对象
 	QJsonObject requestObj;
-	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::GET_VARIFY_CODE);
-	requestObj["message"] = "Client request for varify code";
+	requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::GET_VERIFY_CODE);
+	requestObj["message"] = "Client request for verify code";
 
 	// 创建数据对象
 	QJsonObject dataObj;
@@ -771,10 +791,10 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
 	requestObj["data"] = dataObj;
 	qDebug() << "request is " << requestObj;
 
-	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_varify_code",
+	FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/get_verify_code",
 		requestObj,
-		Http::RequestId::ID_GET_VARIFY_CODE,
-		Http::RequestSeviceType::GET_VARIFY_CODE);
+		Http::RequestId::ID_GET_VERIFY_CODE,
+		Http::RequestSeviceType::GET_VERIFY_CODE);
 }
 
 void FKFormPannel::_onComfirmButtonClicked()
@@ -802,9 +822,7 @@ void FKFormPannel::_onComfirmButtonClicked()
 			dataObj["email"] = "";
 		}
 
-		// 对密码进行MD5哈希处理
-		QByteArray passwordHash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Md5).toHex();
-		dataObj["password"] = QString(passwordHash);
+		dataObj["hashed_password"] = QString(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex());
 
 		// 记住密码和自动登录选项
 		//dataObj["remember_password"] = _pLoginRememberPasswordCheckBox->isChecked();
@@ -822,7 +840,7 @@ void FKFormPannel::_onComfirmButtonClicked()
 		QString username = _pUsernameLineEdit->text().trimmed();
 		QString email = _pEmailLineEdit->text().trimmed();
 		QString password = _pPasswordLineEdit->text();
-		QString varifyCode = _pVerifyCodeLineEdit->text().trimmed();
+		QString verifyCode = _pVerifyCodeLineEdit->text().trimmed();
 
 		QJsonObject requestObj;
 		requestObj["request_type"] = static_cast<int>(Http::RequestSeviceType::REGISTER_USER);
@@ -831,8 +849,8 @@ void FKFormPannel::_onComfirmButtonClicked()
 		QJsonObject dataObj;
 		dataObj["username"] = username;
 		dataObj["email"] = email;
-		dataObj["password"] = password;
-		dataObj["verify_code"] = varifyCode;
+		dataObj["hashed_password"] = QString(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex());
+		dataObj["verify_code"] = verifyCode;
 		requestObj["data"] = dataObj;
 
 		FKHttpManager::getInstance()->postHttpRequest("http://localhost:8080/register_user",

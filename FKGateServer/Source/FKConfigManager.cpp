@@ -65,7 +65,7 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
         
         // 读取请求超时配置
         if (root.isMember("request_timeout")) {
-            _pRequestTimeout = std::chrono::seconds(root["request_timeout"].asUInt());
+            _pRequestTimeout = std::chrono::milliseconds(root["request_timeout"].asUInt());
         }
         
         // 读取gRPC服务配置
@@ -87,8 +87,13 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
                 if (serviceConfig.isMember("port")) config.Port = serviceConfig["port"].asInt();
                 if (serviceConfig.isMember("pool_size")) config.PoolSize = serviceConfig["pool_size"].asUInt();
                 if (serviceConfig.isMember("use_ssl")) config.UseSSL = serviceConfig["use_ssl"].asBool();
-                if (serviceConfig.isMember("timeout")) config.Timeout = std::chrono::seconds(serviceConfig["timeout"].asUInt());
-                
+                if (serviceConfig.isMember("keep_alive_time_ms")) config.KeepAliveTime = std::chrono::milliseconds{ serviceConfig["keep_alive_time_ms"].asUInt() };
+                if (serviceConfig.isMember("keep_alive_timeout_ms")) config.KeepAliveTimeout = std::chrono::milliseconds{ serviceConfig["keep_alive_timeout_ms"].asUInt() };
+                if (serviceConfig.isMember("max_reconnect_backoff_ms")) config.MaxReconnectBackoff = std::chrono::milliseconds{ serviceConfig["max_reconnect_backoff_ms"].asUInt() };
+                if (serviceConfig.isMember("grpclb_call_timeout_ms")) config.GrpclbCallTimeout = std::chrono::milliseconds{ serviceConfig["grpclb_call_timeout_ms"].asUInt() };
+                if (serviceConfig.isMember("keep_alive_permit_without_calls")) config.KeepAlivePermitWithoutCalls = serviceConfig["keep_alive_permit_without_calls"].asBool();
+                if (serviceConfig.isMember("http2_max_ping_without_data")) config.Http2MaxPingWithoutData = serviceConfig["http2_max_ping_without_data"].asBool();
+
                 _pGrpcServiceConfigs[serviceType] = std::move(config);
             }
         }
@@ -100,8 +105,8 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
 			if (redis.isMember("port")) _pRedisConfig.Port = redis["port"].asInt();
 			if (redis.isMember("password")) _pRedisConfig.Password = redis["password"].asString();
             if (redis.isMember("pool_size")) _pRedisConfig.PoolSize = redis["pool_size"].asInt();
-            if (redis.isMember("connection_timeout")) _pRedisConfig.ConnectionTimeout = std::chrono::milliseconds{ redis["connection_timeout"].asInt() };
-			if (redis.isMember("socket_timeout")) _pRedisConfig.SocketTimeout = std::chrono::milliseconds{ redis["socket_timeout"].asInt() };
+            if (redis.isMember("connection_timeout_ms")) _pRedisConfig.ConnectionTimeout = std::chrono::milliseconds{ redis["connection_timeout_ms"].asInt() };
+			if (redis.isMember("socket_timeout_ms")) _pRedisConfig.SocketTimeout = std::chrono::milliseconds{ redis["socket_timeout_ms"].asInt() };
 			if (redis.isMember("db_index")) _pRedisConfig.DBIndex = redis["db_index"].asInt();
         }
         
@@ -110,11 +115,13 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
 			const Json::Value& mysql = root["mysql"];
 			if (mysql.isMember("host")) _pMySQLConfig.Host = mysql["host"].asString();
 			if (mysql.isMember("port")) _pMySQLConfig.Port = mysql["port"].asInt();
+            if (mysql.isMember("username")) _pMySQLConfig.Username = mysql["username"].asString();
 			if (mysql.isMember("password")) _pMySQLConfig.Password = mysql["password"].asString();
-			if (mysql.isMember("pool_size")) _pMySQLConfig.PoolSize = mysql["pool_size"].asInt();
-			if (mysql.isMember("connection_timeout")) _pMySQLConfig.ConnectionTimeout = std::chrono::seconds{ mysql["connection_timeout"].asInt() };
-			if (mysql.isMember("idle_timeout")) _pMySQLConfig.IdleTimeout = std::chrono::seconds{ mysql["idle_timeout"].asInt() };
-            if (mysql.isMember("monitor_interval")) _pMySQLConfig.MonitorInterval = std::chrono::seconds{ mysql["monitor_interval"].asInt() };
+			if (mysql.isMember("schema")) _pMySQLConfig.Schema = mysql["schema"].asString();
+            if (mysql.isMember("pool_size")) _pMySQLConfig.PoolSize = mysql["pool_size"].asInt();
+			if (mysql.isMember("connection_timeout_ms")) _pMySQLConfig.ConnectionTimeout = std::chrono::milliseconds{ mysql["connection_timeout_ms"].asInt() };
+			if (mysql.isMember("idle_timeout_ms")) _pMySQLConfig.IdleTimeout = std::chrono::milliseconds{ mysql["idle_timeout_ms"].asInt() };
+            if (mysql.isMember("monitor_interval_ms")) _pMySQLConfig.MonitorInterval = std::chrono::milliseconds{ mysql["monitor_interval_ms"].asInt() };
         }
 
         std::println("成功加载配置文件: {}", filePath);
@@ -159,7 +166,14 @@ bool FKConfigManager::saveToFile(const std::string& filePath) const
             serviceConfig["port"] = static_cast<Json::UInt>(config.Port);
             serviceConfig["pool_size"] = static_cast<Json::UInt>(config.PoolSize);
             serviceConfig["use_ssl"] = config.UseSSL;
-            serviceConfig["timeout"] = static_cast<Json::UInt>(config.Timeout.count());
+			serviceConfig["keep_alive_time_ms"] = static_cast<Json::UInt>(config.KeepAliveTime.count());
+			serviceConfig["keep_alive_timeout_ms"] = static_cast<Json::UInt>(config.KeepAliveTimeout.count());
+			serviceConfig["max_reconnect_backoff_ms"] = static_cast<Json::UInt>(config.MaxReconnectBackoff.count());
+			serviceConfig["grpclb_call_timeout_ms"] = static_cast<Json::UInt>(config.GrpclbCallTimeout.count());
+            
+            serviceConfig["keep_alive_permit_without_calls"] = config.KeepAlivePermitWithoutCalls;
+			serviceConfig["http2_max_ping_without_data"] = config.Http2MaxPingWithoutData;
+            
             grpcServices[std::string(serviceName)] = serviceConfig;
         }
         root["grpc_services"] = grpcServices;

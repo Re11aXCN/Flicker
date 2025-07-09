@@ -1,6 +1,6 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKGrpcServiceManager.h
+ * @ Filename	 : FKGrpcServicePoolManager.h
  * @ Description : gRPC服务管理器，管理不同的gRPC业务连接池
  * 
  * @ Version	 : V1.0
@@ -12,8 +12,8 @@
  * Modifications: 
  * ======================================
 *************************************************************************************/
-#ifndef FK_GRPC_SERVICE_MANAGER_H_
-#define FK_GRPC_SERVICE_MANAGER_H_
+#ifndef FK_GRPC_SERVICE_POOL_MANAGER_H_
+#define FK_GRPC_SERVICE_POOL_MANAGER_H_
 
 #include <string>
 #include <memory>
@@ -28,18 +28,24 @@
 #include "Source/FKStructConfig.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
-#include "FKVerifyGrpc.grpc.pb.h"
+#include "./VerifyCode/FKVerifyCodeGrpc.grpc.pb.h"
+#include "./Password/FKPasswordGrpc.grpc.pb.h"
+
 // 服务特性模板
 template <gRPC::ServiceType T> struct ServiceTraits;
 
 // 特化模板
 template<> struct ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE> {
-	using Type = FKVerifyGrpc::VarifyCodeService;
+	using Type = FKVerifyCodeGrpc::VerifyCodeService;
+};
+
+template<> struct ServiceTraits<gRPC::ServiceType::PASSWORD_SERVICE> {
+	using Type = FKPasswordGrpc::PasswordService;
 };
 #pragma endregion SERVICE_TRAITS_TEMPLATE
 
-class FKGrpcServiceManager {
-    SINGLETON_CREATE_SHARED_H(FKGrpcServiceManager)
+class FKGrpcServicePoolManager {
+    SINGLETON_CREATE_SHARED_H(FKGrpcServicePoolManager)
 public:
     // 获取所有服务的状态信息
     std::string getAllServicesStatus() const;
@@ -63,10 +69,10 @@ public:
     }
     
 private:
-    FKGrpcServiceManager();
-    ~FKGrpcServiceManager();
+    FKGrpcServicePoolManager();
+    ~FKGrpcServicePoolManager();
 	// 初始化特定类型的gRPC服务连接池
-	void _initializeService(gRPC::ServiceType serviceType, const FKGrpcServiceConfig& config);
+	void _initializeService(gRPC::ServiceType serviceType);
 
 	struct ServicePoolWrapper {
 		void* poolPtr{ nullptr };
@@ -78,4 +84,4 @@ private:
 };
 
 
-#endif // !FK_GRPC_SERVICE_MANAGER_H_
+#endif // !FK_GRPC_SERVICE_POOL_MANAGER_H_
