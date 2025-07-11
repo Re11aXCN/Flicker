@@ -39,6 +39,17 @@ void FKLauncherShell::ShowMessage(const QString& title, const QString& text, NXM
 	Q_EMIT _pMessageButton->showMessage();
 }
 
+void FKLauncherShell::paintEvent(QPaintEvent* event)
+{
+	Q_UNUSED(event);
+
+	NXWidget::paintEvent(event);
+
+	QPainter painter(this);
+	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+	_drawEdgeShadow(painter, _pSwitchPannel->rect(), Constant::SWITCH_BOX_SHADOW_COLOR, Constant::SWITCH_BOX_SHADOW_WIDTH);
+}
+
 void FKLauncherShell::_initUi()
 {
 	setAppBarHeight(30);
@@ -183,4 +194,40 @@ void FKLauncherShell::_onTogglePannelButtonClicked()
 	
 	_pFormPannel->toggleFormType();
 	_pAnimationGroup->start();
+}
+
+
+void FKLauncherShell::_drawEdgeShadow(QPainter& painter, const QRect& rect, const QColor& color, int shadowWidth) const noexcept
+{
+	QPoint shadowRectTopLeft, shadowRectBottomRight;
+	QLinearGradient gradient;
+	if (_pSwitchPannel->pos().x() < 160) {
+		shadowRectTopLeft = _pSwitchPannel->pos() + QPoint{ rect.width(), 0 };
+		shadowRectBottomRight = _pSwitchPannel->pos() + QPoint{ rect.width() + shadowWidth, rect.height() };
+		gradient = { shadowRectTopLeft, shadowRectTopLeft + QPoint{ shadowWidth, 0 } };
+		
+	}
+	else {
+		shadowRectTopLeft = _pSwitchPannel->pos() - QPoint{ shadowWidth, 0 };
+		shadowRectBottomRight = _pSwitchPannel->pos() + QPoint{ 0, rect.height() };
+		gradient = { _pSwitchPannel->pos(), shadowRectTopLeft };
+	}
+	gradient.setColorAt(0, color);
+	gradient.setColorAt(1, Qt::transparent);
+	painter.fillRect(QRect{ shadowRectTopLeft, shadowRectBottomRight }, gradient);
+//#define DrawEdgeShadow(Left, Right)\
+//	QLinearGradient gradient(rect.top##Left(), contentRect.top##Left());\
+//	gradient.setColorAt(0, color);\
+//	gradient.setColorAt(1, Qt::transparent);\
+//	painter.fillRect(QRect{ rect.top##Left(), contentRect.bottom##Right() }, gradient)
+//
+//	if (_pFormType == Launcher::FormType::Login || _pFormType == Launcher::FormType::Authentication) {
+//		QRect contentRect = rect.adjusted(shadowWidth, 0, 0, 0);
+//		DrawEdgeShadow(Left, Right);
+//	}
+//	else {
+//		QRect contentRect = rect.adjusted(0, 0, -shadowWidth, 0);
+//		DrawEdgeShadow(Right, Left);
+//	}
+//#undef DrawEdgeShadow
 }

@@ -1,8 +1,6 @@
 ﻿#include "FKUserService.h"
 #include <print>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+
 #include "MySQL/Entity/FKUserEntity.h"
 
 SINGLETON_CREATE_CPP(FKUserService)

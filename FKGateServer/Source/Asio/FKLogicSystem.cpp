@@ -117,6 +117,9 @@ FKLogicSystem::FKLogicSystem()
 		};
 
 	auto registerUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+
+		FKUserMapper mapper;
+		mapper.findAllUsers();
 		// 读取请求体
 		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
 		std::println("Received Body: \n{}", body);

@@ -46,7 +46,7 @@ struct FKRedisConfig {
 // MySQL连接信息结构体
 struct FKMySQLConfig {
 	std::string Host{ "localhost" };
-	uint16_t Port{ 33060 };
+	uint16_t Port{ 3306 }; // C 3306  C++/xdevapi 33060
 	uint16_t PoolSize{ 200 };
 	std::string Username{ "root" };
 	std::string Password{ "123456" };

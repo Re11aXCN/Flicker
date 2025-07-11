@@ -311,3 +311,122 @@ CompositionMode_Source 源图颜色无透明度
 CompositionMode_SourceAtop + CompositionMode_Clear 目标图像和源图像进行应用透明度混合
 
 ![image-20250704043148594](assets/image-20250704043148594.png)
+
+### MYSQL问题
+
+#### MySQL Connector/C++ 9.3.0
+
+**因为使用的是mysqlx，所以端口号是33060**
+
+
+
+暂且不支持数据库存储的时间类型转换为C++的chrono，
+
+需要手动解析`raw bytes`
+
+表
+
+```c++
+std::string createTableSQL = R"(
+                CREATE TABLE IF NOT EXISTS )"
+    + _tableName + R"( (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    uuid VARCHAR(36) NOT NULL UNIQUE,
+                    username VARCHAR(50) NOT NULL UNIQUE,
+                    email VARCHAR(100) NOT NULL UNIQUE,
+                    password VARCHAR(255) NOT NULL, 
+                    salt VARCHAR(29) NOT NULL,      
+                    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    update_time TIMESTAMP(3) NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(3),
+                    INDEX idx_email (email),
+                    INDEX idx_username (username)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            )";
+```
+
+
+
+```c++
+mysqlx::bytes create_time = row[columnMap["create_time"]].get<mysqlx::bytes>(); // bytes -> pair<const unsigned char*, size_t len>
+// 不能直接将create_time转为std::chrono
+// 原因：内存视图为 XX XX XX XX XX XX XX | XX XX XX
+//			     HH HH MM DD hh mm ss   ms ms ms
+// 默认是七字节，如果有毫秒就是十字节，实际应该从右向左读取，
+timestamp 起始为1970年，理论值07b2，实际内存视图大端 b20f， 小端 0fb2
+获取年份转换公式 /* (大端第二个字节十进制 - 8) * 256 + 大端第一个字节十进制 */ 更高效率你可以采取与运算 / 或者直接拼接 07 得到07b2
+    
+但是ms的存储数据非常混乱，推导不出来0.001、0.002与最后三个字节的关系
+```
+
+**注意内存视图看到的是大端，实际数据是小端**
+
+#### [MySQL Connector/C 9.3.0](https://www.mysqlzh.com/api/50.html)
+
+根据MySQL C API的描述和函数行为，以下是不同SQL语句执行后是否需要调用结果获取与释放函数的总结：
+
+1. [**需要获取结果并释放的语句**：](https://blog.csdn.net/rickypc/article/details/4834381)
+   
+   - **SELECT查询**：任何返回结果集的语句（如`SELECT`、`SHOW`、`DESCRIBE`、`EXPLAIN`等）
+   - **示例**：
+     ```cpp
+     mysql_query(mysql, "SELECT * FROM table");
+     MYSQL_RES *result = mysql_store_result(mysql); // 必须获取结果
+     // 处理结果...
+     mysql_free_result(result); // 必须释放
+     
+     /*不释放就会报错 	CR_COMMANDS_OUT_OF_SYNC*/
+     ```
+   
+2. **不需要获取结果/释放的语句**：
+   - **SET命令**（如`SET SESSION`）
+   - **数据操作语句（DML）**：
+     - `INSERT`、`UPDATE`、`DELETE`
+     - 执行后使用`mysql_affected_rows()`获取影响行数，而非结果集函数
+   - **数据定义语句（DDL）**：
+     - `CREATE TABLE`、`ALTER TABLE`、`DROP TABLE`
+     - `TRUNCATE`、`RENAME TABLE`等
+   - **事务控制语句**：
+     - `START TRANSACTION`、`COMMIT`、`ROLLBACK`
+
+关键判断逻辑：
+
+1. **结果集检查**：
+   - 通过`mysql_field_count()`判断：
+     ```cpp
+     if (mysql_field_count(mysql) > 0) {
+         // 需要获取结果集
+         MYSQL_RES *result = mysql_store_result(mysql);
+         // ...处理结果
+         mysql_free_result(result);
+     }
+     ```
+   - 返回**非0值**表示有结果集（如SELECT），**0**表示无结果集（如INSERT/CREATE）。
+
+2. **错误处理**：
+   - 若`mysql_query()`返回非0（失败），**无需**结果集操作，直接处理错误。
+
+示例场景：
+
+```cpp
+// 1. SELECT (需要结果集处理)
+mysql_query(mysql, "SELECT * FROM users");
+MYSQL_RES *res = mysql_store_result(mysql);
+// ...遍历结果
+mysql_free_result(res);
+
+// 2. INSERT (无需结果集)
+mysql_query(mysql, "INSERT INTO users VALUES (1, 'John')");
+// 检查影响行数
+printf("Affected rows: %lld", mysql_affected_rows(mysql));
+
+// 3. CREATE TABLE (无需结果集)
+mysql_query(mysql, "CREATE TABLE test (id INT)");
+// 只需检查返回值确认成功
+```
+
+特殊说明：
+
+- **二进制数据**：若查询包含`\0`（如BLOB数据），必须用`mysql_real_query()`替代`mysql_query()`。
+- **多语句查询**：启用多语句时（分号分隔），需循环调用`mysql_next_result()`处理所有结果，对每个结果集按需释放。
+
+**总结**：只有返回结果集的语句（主要是SELECT类查询）需要调用`mysql_store_result()`/`mysql_use_result()`和`mysql_free_result()`；建表、INSERT/UPDATE/DELETE等操作只需检查`mysql_query()`返回值及`mysql_affected_rows()`即可。

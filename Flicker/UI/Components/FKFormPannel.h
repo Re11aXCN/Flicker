@@ -52,9 +52,6 @@ private:
 	void _updateSwitchedUI(); // 更新UI显示
 	void _updateConfirmButtonState(); // 更新按钮状态
 
-	void _drawEdgeShadow(QPainter& painter, const QRect& rect,
-		const QColor& color, int shadowWidth) const noexcept;
-
 	// 验证方法
 	bool _validateUsername(const QString& username);
 	bool _validateEmail(const QString& email);

@@ -115,11 +115,6 @@ void FKFormPannel::clickSwitchSigninOrResetText()
 
 void FKFormPannel::paintEvent(QPaintEvent* event)
 {
-	Q_UNUSED(event);
-	QPainter painter(this);
-	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-	_drawEdgeShadow(painter, rect(), Constant::SWITCH_BOX_SHADOW_COLOR, Constant::SWITCH_BOX_SHADOW_WIDTH);
-
 	QWidget::paintEvent(event);
 }
 
@@ -417,26 +412,6 @@ void FKFormPannel::_updateSwitchedUI()
 	default: throw std::invalid_argument("Invalid form type");
 	}
 }
-
-void FKFormPannel::_drawEdgeShadow(QPainter& painter, const QRect& rect, const QColor& color, int shadowWidth) const noexcept
-{
-#define DrawEdgeShadow(Left, Right)\
-	QLinearGradient gradient(rect.top##Left(), contentRect.top##Left());\
-	gradient.setColorAt(0, color);\
-	gradient.setColorAt(1, Qt::transparent);\
-	painter.fillRect(QRect{ rect.top##Left(), contentRect.bottom##Right() }, gradient)
-
-	if (_pFormType == Launcher::FormType::Login || _pFormType == Launcher::FormType::Authentication) {
-		QRect contentRect = rect.adjusted(shadowWidth, 0, 0, 0);
-		DrawEdgeShadow(Left, Right);
-	}
-	else {
-		QRect contentRect = rect.adjusted(0, 0, -shadowWidth, 0);
-		DrawEdgeShadow(Right, Left);
-	}
-#undef DrawEdgeShadow
-}
-
 
 void FKFormPannel::_initRegistryCallback()
 {

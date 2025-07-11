@@ -1,60 +1,71 @@
 ﻿#include "FKMySQLConnectionPool.h"
+#include <print>
 #include <sstream>
 #include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
 
 FKMySQLConnectionPool::FKMySQLConnectionPool() {
-	_initialize(FKConfigManager::getInstance()->getMySQLConnectionString());
-	std::println("FKMySQLConnectionPool 已创建");
+    std::println("MySQL连接池已创建");
+    
+    try {
+        // 从配置管理器获取MySQL配置
+        auto& config = FKConfigManager::getInstance()->getMySQLConnectionString();
+        _initialize(config);
+    } catch (const std::exception& e) {
+        std::println("初始化MySQL连接池失败: {}", e.what());
+    }
 }
 
 FKMySQLConnectionPool::~FKMySQLConnectionPool() {
-	shutdown();
-	std::println("FKMySQLConnectionPool 已销毁");
+    shutdown();
+    std::println("MySQL连接池已销毁");
 }
 
 void FKMySQLConnectionPool::_initialize(const FKMySQLConfig& config) {
     std::lock_guard<std::mutex> lock(_pMutex);
     
     if (_pIsInitialized) {
-        std::println("MySQL连接池已初始化，请先关闭再重新初始化");
+        std::println("MySQL连接池已经初始化");
         return;
     }
     
-    try {
-        _pConfig = config;
-        
-        // 预创建连接
-        for (size_t i = 0; i < _pConfig.PoolSize; ++i) {
+    _pConfig = config;
+    
+    // 初始化MySQL库
+    if (mysql_library_init(0, nullptr, nullptr)) {
+        std::println("MySQL库初始化失败");
+        return;
+    }
+    
+    // 创建初始连接
+    for (size_t i = 0; i < _pConfig.PoolSize; ++i) {
+        try {
             auto conn = _createConnection();
             if (conn) {
                 _pConnectionPool.push(std::move(conn));
             }
+        } catch (const std::exception& e) {
+            std::println("创建MySQL连接失败: {}", e.what());
         }
-        
-        _pIsInitialized = true;
-        _pIsShutdown = false;
-        
-        // 启动监控线程
-        _pMonitorThread = std::thread(&FKMySQLConnectionPool::_monitorThreadFunc, this);
-        
-        std::println("MySQL连接池初始化成功，连接数: {}", _pConnectionPool.size());
-    } catch (const std::exception& e) {
-        std::println("MySQL连接池初始化失败: {}", e.what());
-        shutdown();
-        throw;
     }
+    
+    std::println("MySQL连接池初始化完成，创建了 {} 个连接", _pConnectionPool.size());
+    
+    // 标记为已初始化
+    _pIsInitialized = true;
+    _pIsShutdown = false;
+    
+    // 启动监控线程
+    _pMonitorThread = std::thread(&FKMySQLConnectionPool::_monitorThreadFunc, this);
 }
 
 void FKMySQLConnectionPool::shutdown() {
     {
         std::lock_guard<std::mutex> lock(_pMutex);
-        
         if (_pIsShutdown) {
             return;
         }
-        
         _pIsShutdown = true;
         _pIsInitialized = false;
     }
@@ -73,27 +84,63 @@ void FKMySQLConnectionPool::shutdown() {
         _pConnectionPool.pop();
     }
     
+    // 关闭MySQL库
+    mysql_library_end();
+    
     std::println("MySQL连接池已关闭");
 }
 
 std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
     try {
-        // 创建MySQL会话
-        mysqlx::SessionSettings settings(_pConfig.Host, _pConfig.Port, _pConfig.Username, _pConfig.Password.c_str(), _pConfig.Schema);
-        settings.set(mysqlx::SessionOption::CONNECT_TIMEOUT, static_cast<unsigned int>(_pConfig.ConnectionTimeout.count()));
-		//// 尝试禁用SSL
-		//settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::DISABLED);
-
-		//// 尝试使用旧认证协议
-		//settings.set(mysqlx::SessionOption::AUTH, "MYSQL41");
-        // 创建会话
-        auto session = std::make_unique<mysqlx::Session>(settings);
+        // 初始化MySQL连接
+        MYSQL* mysql = mysql_init(nullptr);
+        if (!mysql) {
+            throw std::runtime_error("MySQL初始化失败");
+        }
         
-        // 测试连接
-        session->sql("SELECT 1").execute();
+        // 设置连接选项
+        unsigned int timeout = static_cast<unsigned int>(_pConfig.ConnectionTimeout.count());
+        mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+        
+
+        // MySQL 8.0.34+版本已弃用MYSQL_OPT_RECONNECT
+        // 使用会话变量设置自动重连
+        // 注意：连接后需要执行SET SESSION wait_timeout和SET SESSION interactive_timeout
+        // 来延长连接超时时间，防止连接断开
+		// 设置自动重连
+		//char reconnect = 1;
+		//mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
+
+        // 设置字符集
+        mysql_options(mysql, MYSQL_SET_CHARSET_NAME, "utf8mb4");
+        
+        // 建立连接
+        if (!mysql_real_connect(
+                mysql, 
+                _pConfig.Host.c_str(),
+                _pConfig.Username.c_str(),
+                _pConfig.Password.c_str(),
+                _pConfig.Schema.c_str(),
+                _pConfig.Port,
+                nullptr,  // unix_socket
+                0  // client_flag
+            )) {
+            std::string error = mysql_error(mysql);
+            mysql_close(mysql);
+            throw std::runtime_error("MySQL连接失败: " + error);
+        }
+        
+        // 设置会话变量来延长连接超时时间，替代已弃用的MYSQL_OPT_RECONNECT
+        if (mysql_query(mysql, "SET SESSION wait_timeout=28800") != 0) {
+            std::println("设置wait_timeout失败: {}", mysql_error(mysql));
+        }
+        
+        if (mysql_query(mysql, "SET SESSION interactive_timeout=28800") != 0) {
+            std::println("设置interactive_timeout失败: {}", mysql_error(mysql));
+        }
         
         // 创建连接包装对象
-        return std::make_shared<FKMySQLConnection>(std::move(session));
+        return std::make_shared<FKMySQLConnection>(mysql);
     } catch (const std::exception& e) {
         std::println("创建MySQL连接失败: {}", e.what());
         throw;
@@ -133,8 +180,12 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::getConnection() {
     
     try {
         // 检查连接是否有效
-        conn->getSession()->sql("SELECT 1").execute();
-        return conn;
+        if (conn->isValid()) {
+            return conn;
+        } else {
+            std::println("连接已失效，创建新连接");
+            return _createConnection();
+        }
     } catch (const std::exception& e) {
         std::println("连接已失效，创建新连接: {}", e.what());
         return _createConnection();
@@ -187,9 +238,21 @@ void FKMySQLConnectionPool::_monitorThreadFunc() {
                 if (conn->isExpired(_pConfig.IdleTimeout)) {
                     // 连接已超时，不放回池中
                     std::println("关闭超时MySQL连接");
+                    // conn的析构函数会自动关闭连接
                 } else {
-                    // 连接未超时，放回临时队列
-                    tempQueue.push(std::move(conn));
+                    // 检查连接是否有效
+                    try {
+                        if (conn->isValid()) {
+                            // 连接有效且未超时，放回临时队列
+                            tempQueue.push(std::move(conn));
+                        } else {
+                            std::println("关闭无效MySQL连接");
+                            // conn的析构函数会自动关闭连接
+                        }
+                    } catch (const std::exception& e) {
+                        std::println("检查连接有效性异常: {}", e.what());
+                        // 连接异常，不放回池中
+                    }
                 }
             }
             
@@ -197,7 +260,7 @@ void FKMySQLConnectionPool::_monitorThreadFunc() {
             _pConnectionPool = std::move(tempQueue);
             
             if (initialSize != _pConnectionPool.size()) {
-                std::println("MySQL连接池监控: 关闭了 {} 个超时连接，当前连接数: {}", 
+                std::println("MySQL连接池监控: 关闭了 {} 个超时或无效连接，当前连接数: {}", 
                     initialSize - _pConnectionPool.size(), _pConnectionPool.size());
             }
         }
@@ -216,12 +279,13 @@ std::string FKMySQLConnectionPool::getStatus() const {
     oss << "已关闭: " << (_pIsShutdown ? "是" : "否") << "\n";
     oss << "主机: " << _pConfig.Host << "\n";
     oss << "端口: " << _pConfig.Port << "\n";
+    oss << "用户名: " << _pConfig.Username << "\n";
     oss << "数据库: " << _pConfig.Schema << "\n";
     oss << "连接池大小: " << _pConfig.PoolSize << "\n";
     oss << "可用连接数: " << _pConnectionPool.size() << "\n";
-    oss << "连接超时: " << _pConfig.ConnectionTimeout.count() << "秒\n";
-    oss << "空闲超时: " << _pConfig.IdleTimeout.count() << "秒\n";
-    oss << "监控间隔: " << _pConfig.MonitorInterval.count() << "秒\n";
+    oss << "连接超时: " << _pConfig.ConnectionTimeout.count() << "毫秒\n";
+    oss << "空闲超时: " << _pConfig.IdleTimeout.count() << "毫秒\n";
+    oss << "监控间隔: " << _pConfig.MonitorInterval.count() << "毫秒\n";
     oss << "================================\n";
     
     return oss.str();

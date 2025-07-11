@@ -19,7 +19,7 @@
 #include <vector>
 #include <optional>
 #include <chrono>
-#include <mysqlx/xdevapi.h>
+#include <mysql.h>
 
 class FKUserEntity;
 class FKMySQLConnectionPool;
@@ -58,11 +58,13 @@ public:
 private:
     // 通用查询方法，根据条件查询单个用户
     std::optional<FKUserEntity> _findUserByCondition(const std::string& whereClause, 
-                                                    const std::string& paramName, 
-                                                    const auto& paramValue);
+                                                    const std::string& paramValue);
 
     // 从结果集构建用户实体
-    FKUserEntity _buildUserFromRow(const mysqlx::Row& row, const mysqlx::RowResult::Columns& columnsInfo);
+    FKUserEntity _buildUserFromRow(MYSQL_RES* result, MYSQL_ROW row);
+
+    // 解析MySQL时间戳字符串为std::chrono::system_clock::time_point
+    std::chrono::system_clock::time_point parseTimestamp(const std::string& timestampStr);
 
     // 表名
     std::string _tableName;

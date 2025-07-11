@@ -16,9 +16,14 @@ public:
 	explicit FKLauncherShell(QWidget* parent = nullptr);
 	virtual ~FKLauncherShell();
 	static void ShowMessage(const QString& title, const QString& text, NXMessageBarType::MessageMode mode, NXMessageBarType::PositionPolicy position, int displayMsec = 2000);
+protected:
+	virtual void paintEvent(QPaintEvent* event) override;
 private:
 	void _initUi();
 	void _initAnimation();
+
+	void _drawEdgeShadow(QPainter& painter, const QRect& rect,
+		const QColor& color, int shadowWidth) const noexcept;
 
 	// private slots
 	Q_SLOT void _onTogglePannelButtonClicked();

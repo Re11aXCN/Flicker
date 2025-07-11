@@ -1,7 +1,7 @@
 ﻿/*************************************************************************************
  *
  * @ Filename	 : FKMySQLConnectionPool.h
- * @ Description : 
+ * @ Description : MySQL连接池，使用纯C API
  * 
  * @ Version	 : V1.0
  * @ Author		 : Re11a
@@ -27,29 +27,10 @@
 #include <atomic>
 #include <condition_variable>
 
-#include <mysqlx/xdevapi.h>
-
 #include "FKMacro.h"
 #include "Source/FKStructConfig.h"
-// MySQL连接包装类，包含连接和最后活动时间
-class FKMySQLConnection {
-public:
-	FKMySQLConnection(std::unique_ptr<mysqlx::Session> session)
-		: _session(std::move(session)), _lastActiveTime(std::chrono::steady_clock::now()) {
-	}
-
-	mysqlx::Session* getSession() { return _session.get(); }
-	void updateActiveTime() { _lastActiveTime = std::chrono::steady_clock::now(); }
-	std::chrono::steady_clock::time_point getLastActiveTime() const { return _lastActiveTime; }
-	bool isExpired(std::chrono::milliseconds timeout) const {
-		auto now = std::chrono::steady_clock::now();
-		return std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastActiveTime) > timeout;
-	}
-
-private:
-	std::unique_ptr<mysqlx::Session> _session;
-	std::chrono::steady_clock::time_point _lastActiveTime;
-};
+#include "FKMySQLConnection.h"
+// FKMySQLConnection类已移至单独的文件
 
 // MySQL连接池类，使用单例模式
 class FKMySQLConnectionPool {
@@ -70,7 +51,7 @@ public:
     auto executeWithConnection(Func&& func) {
         // 使用shared_ptr确保连接在任何情况下都能被正确释放
         auto conn = getConnection();
-        if (!conn || !conn->getSession()) {
+        if (!conn || !conn->getMysql()) {
             throw std::runtime_error("无法获取有效的数据库连接");
         }
         
@@ -78,7 +59,7 @@ public:
             // 更新最后活动时间
             conn->updateActiveTime();
             // 执行操作并捕获结果
-            auto result = func(conn->getSession());
+            auto result = func(conn->getMysql());
             // 操作成功，释放连接
             releaseConnection(std::move(conn));
             return result;
@@ -98,37 +79,37 @@ public:
     auto executeTransaction(Func&& func) {
         // 使用shared_ptr确保连接在任何情况下都能被正确释放
         auto conn = getConnection();
-        if (!conn || !conn->getSession()) {
+        if (!conn || !conn->getMysql()) {
             throw std::runtime_error("无法获取有效的数据库连接进行事务操作");
         }
         
         try {
             // 更新最后活动时间
             conn->updateActiveTime();
-            auto session = conn->getSession();
+            auto mysql = conn->getMysql();
             
             // 开始事务
-            session->startTransaction();
+            conn->startTransaction();
             
             try {
                 // 执行事务操作
-                auto result = func(session);
+                auto result = func(mysql);
                 
                 // 提交事务
-                session->commit();
+                conn->commit();
                 
                 releaseConnection(std::move(conn));
                 return result;
             } catch (const std::exception& e) {
                 // 事务操作异常，回滚事务
                 std::println("事务执行异常，执行回滚: {}", e.what());
-                session->rollback();
+                conn->rollback();
                 releaseConnection(std::move(conn));
                 throw;
             } catch (...) {
                 // 捕获所有其他类型的异常
                 std::println("执行事务操作时发生未知异常，执行回滚");
-                session->rollback();
+                conn->rollback();
                 releaseConnection(std::move(conn));
                 throw;
             }
