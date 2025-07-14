@@ -14,6 +14,11 @@ int main(int argc, char* argv[])
     QFontDatabase::addApplicationFont(":/Resource/Font/iconfont.ttf");
     FKLauncherShell w;
     w.show();
-    FK_CLIENT_INFO("Flicker Client started");
-    return a.exec();
+    FK_CLIENT_INFO("Flicker Client started!!!");
+
+    int ret = a.exec();  // 事件循环
+
+    // 程序退出前显式关闭日志系统
+    FKLogger::getInstance().shutdown();
+    return ret;
 }

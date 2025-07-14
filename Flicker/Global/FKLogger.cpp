@@ -11,6 +11,139 @@
 #endif
 
 #include "FKUtils.h"
+template<typename Mutex>
+class html_format_sink : public spdlog::sinks::base_sink<Mutex>
+{
+public:
+    explicit html_format_sink(const spdlog::filename_t& filename,
+        bool truncate = false,
+        const spdlog::file_event_handlers& event_handlers = {})
+        : file_helper_{ event_handlers }
+    {
+        //  - 如果文件不存在，创建后大小为0，写入header。
+        //  -如果文件存在且truncate = true，那么文件被清空，大小为0，写入header。
+        //  - 如果文件存在且truncate = false（追加模式），且文件大小为0（可能是之前创建但没写入内容），那么写入
+        bool file_empty = true;
+        try {
+            if (fs::exists(filename)) {
+                file_empty = (fs::file_size(filename) == 0);
+            }
+        }
+        catch (...) {
+            // 文件访问异常时视为空文件
+            file_empty = true;
+        }
+
+        file_helper_.open(filename, truncate);
+
+        if (file_empty || truncate) {
+            _write_header();
+        }
+    }
+
+    ~html_format_sink()
+    {
+        // 不再闭合html 浏览器对不完整 HTML 有容错机制，能正常渲染已写入内容
+        //_write_footer();
+    }
+
+    const spdlog::filename_t& filename() const {
+        return file_helper_.filename();
+    }
+
+    void truncate() {
+        std::lock_guard<Mutex> lock(spdlog::sinks::base_sink<Mutex>::mutex_);
+        file_helper_.reopen(true);
+    }
+protected:
+    void sink_it_(const spdlog::details::log_msg& msg) override
+    {
+        // 格式化消息
+        spdlog::memory_buf_t msg_formatted;
+        spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, msg_formatted);
+
+        // 根据日志级别设置颜色
+        const char* prefix = _level_to_color(msg.level);
+        constexpr const char* suffix = "</font><br>\n";
+
+        spdlog::memory_buf_t font_prefix, font_suffix;
+        font_prefix.append(prefix, prefix + std::strlen(prefix));
+        font_suffix.append(suffix, suffix + std::strlen(suffix));
+
+        // 写入带颜色的日志消息
+        file_helper_.write(font_prefix);
+        file_helper_.write(msg_formatted);
+        file_helper_.write(font_suffix);
+    }
+
+    void flush_() override
+    {
+        file_helper_.flush();
+    }
+
+private:
+    void _write_header()
+    {
+        // HTML头部，使用UTF-8编码，设置微软雅黑字体
+        static constexpr const char* header = R"(<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Log Output</title>
+<style>
+body {
+    background-color: #282C34;
+    color: #ABB2BF;
+    font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 10px;
+    white-space: pre-wrap;
+}
+</style>
+</head>
+<body>
+)";
+
+        spdlog::memory_buf_t html_header;
+        html_header.append(header, header + std::strlen(header));
+        file_helper_.write(html_header);
+    }
+
+    void _write_footer()
+    {
+        // HTML尾部
+        static constexpr const char* footer = R"(</body></html>)";
+
+        spdlog::memory_buf_t html_footer;
+        html_footer.append(footer, footer + std::strlen(footer));
+        file_helper_.write(html_footer);
+    }
+
+    static const char* _level_to_color(spdlog::level::level_enum level)
+    {
+        switch (level)
+        {
+        case spdlog::level::trace: return R"(<font color="#DCDFE4">)";
+        case spdlog::level::debug: return R"(<font color="#56B6C2">)";
+        case spdlog::level::info: return R"(<font color="#98C379">)";
+        case spdlog::level::warn: return R"(<font color="#E5C07B">)";
+        case spdlog::level::err: return R"(<font color="#E06C75">)";
+        case spdlog::level::critical: return R"(<font color="#DCDFE4" style="background-color:#E06C75;">)";
+        case spdlog::level::off:
+        case spdlog::level::n_levels: break;
+        }
+        return "";
+    }
+
+    // 文件辅助类，用于文件操作
+    spdlog::details::file_helper file_helper_;
+};
+
+using html_format_sink_mt = html_format_sink<std::mutex>;
+using html_format_sink_st = html_format_sink<spdlog::details::null_mutex>;
+
+
 FKLogger::FKLogger()
 {
 
@@ -18,7 +151,6 @@ FKLogger::FKLogger()
 
 FKLogger::~FKLogger()
 {
-    if(_logger) _logger->flush();
 }
 
 FKLogger& FKLogger::getInstance()
@@ -45,15 +177,15 @@ bool FKLogger::initialize(const std::string& filename, GeneratePolicy generatePo
 
         std::string actualFilename = _createLogFlie();
 
-        // 创建控制台和文件接收器
+        // 创建控制台和HTML文件接收器
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(actualFilename, truncate);
-        std::vector<spdlog::sink_ptr> sinks{ console_sink, file_sink };
+        auto html_sink = std::make_shared<html_format_sink_mt>(actualFilename, truncate);
+        std::vector<spdlog::sink_ptr> sinks{ console_sink, html_sink };
 
         _logger = std::make_shared<spdlog::async_logger>(actualFilename, sinks.begin(), sinks.end(),
             spdlog::thread_pool(), spdlog::async_overflow_policy::block);
         spdlog::register_logger(_logger);
-        
+
 
         // 完整调试格式（含线程、文件、函数、行号）
         _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] {File: %s Func: %! Line: %#} \r\n\t[%l]: %v%$");
@@ -75,7 +207,7 @@ bool FKLogger::initialize(const std::string& filename, GeneratePolicy generatePo
     }
 }
 
-void FKLogger::shutdow()
+void FKLogger::shutdown()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
@@ -97,7 +229,7 @@ void FKLogger::flush()
 }
 
 std::string FKLogger::_createLogFlie()
-{    
+{
     // 创建logs目录（如果不存在）
     fs::path appParentDir = _getExecutablePath().parent_path();
     fs::path logsDir = appParentDir / "logs";
@@ -107,7 +239,7 @@ std::string FKLogger::_createLogFlie()
     switch (_generatePolicy)
     {
     case SingleFile: {
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, ".log");
+        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, ".log.html");
         break;
     }
     case MultiplePerDay: {
@@ -122,7 +254,7 @@ std::string FKLogger::_createLogFlie()
         std::stringstream dateStr;
         dateStr << std::put_time(&tm_now, "%Y-%m-%d");
 
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log");
+        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log.html");
         break;
     }
     case MultiplePerRun: {
@@ -139,8 +271,8 @@ std::string FKLogger::_createLogFlie()
         std::stringstream dateStr;
         dateStr << std::put_time(&tm_now, "#%Y-%m-%d  #%H-%M-%S")
             << "." << std::setfill('0') << std::setw(3) << ms.count();
-        
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log");
+
+        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log.html");
         break;
     }
     default: throw std::runtime_error("There is no policy specified for generating log files!");

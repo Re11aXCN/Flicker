@@ -23,7 +23,7 @@ public:
     [[nodiscard("Logs can only be used after initialization is complete!")]] 
     bool initialize(const std::string& filename, GeneratePolicy generatePolicy, bool truncate = false);
 
-    void shutdow();
+    void shutdown();
     void flush();
 private:
     FKLogger();
@@ -68,12 +68,14 @@ private:
 #endif
 
 #define FK_CLIENT_TRACE(...)    FK_LOG(spdlog::level::trace, __VA_ARGS__)
+#define FK_CLIENT_DEBUG(...)    FK_LOG(spdlog::level::debug, __VA_ARGS__)
 #define FK_CLIENT_INFO(...)     FK_LOG(spdlog::level::info, __VA_ARGS__)
 #define FK_CLIENT_WARN(...)     FK_LOG(spdlog::level::warn, __VA_ARGS__)
 #define FK_CLIENT_ERROR(...)    FK_LOG(spdlog::level::err, __VA_ARGS__)
 #define FK_CLIENT_CRITICAL(...) FK_LOG(spdlog::level::critical, __VA_ARGS__)
 
 #define FK_SERVER_TRACE(...)    FK_LOG(spdlog::level::trace, __VA_ARGS__)
+#define FK_SERVER_DEBUG(...)    FK_LOG(spdlog::level::debug, __VA_ARGS__)
 #define FK_SERVER_INFO(...)     FK_LOG(spdlog::level::info, __VA_ARGS__)
 #define FK_SERVER_WARN(...)     FK_LOG(spdlog::level::warn, __VA_ARGS__)
 #define FK_SERVER_ERROR(...)    FK_LOG(spdlog::level::err, __VA_ARGS__)
