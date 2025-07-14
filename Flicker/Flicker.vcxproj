@@ -101,7 +101,7 @@
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <QtMoc>
       <ExecutionDescription>Moc'ing %(Identity)...</ExecutionDescription>
@@ -121,7 +121,7 @@
     </QtUic>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>NexUsd.lib;jsoncpp.lib</AdditionalDependencies>
+      <AdditionalDependencies>NexUsd.lib;jsoncpp.lib;spdlogd.lib;fmtd.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -130,6 +130,7 @@
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>_RELEASE;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <QtMoc>
       <ExecutionDescription>Moc'ing %(Identity)...</ExecutionDescription>
@@ -141,7 +142,7 @@
     </QtRcc>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>NexUs.lib;jsoncpp.lib</AdditionalDependencies>
+      <AdditionalDependencies>NexUs.lib;jsoncpp.lib;spdlog.lib;fmt.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
@@ -149,7 +150,8 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_RELWITHDEBINFO;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <QtMoc>
       <ExecutionDescription>Moc'ing %(Identity)...</ExecutionDescription>
@@ -161,7 +163,7 @@
     </QtRcc>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>NexUs.lib;jsoncpp.lib</AdditionalDependencies>
+      <AdditionalDependencies>NexUs.lib;jsoncpp.lib;spdlog.lib;fmt.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -219,6 +221,7 @@
     <QtMoc Include="UI\Components\FKSwitchPannel.h" />
     <QtMoc Include="UI\Components\FKLineEdit.h" />
     <ClInclude Include="Global\FKConstant.h" />
+    <ClInclude Include="Global\FKLogger.h" />
     <ClInclude Include="Global\FKMacro.h" />
     <ClInclude Include="Global\FKDef.h">
       <!-- <Generator>QtMoc</Generator> -->
@@ -237,6 +240,7 @@
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Global\FKLogger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="UI\Components\FKIconLabel.cpp" />
     <ClCompile Include="UI\Components\FKLineEdit.cpp" />

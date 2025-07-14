@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "新建配置文件",
+    "Projects": [
+      {
+        "Path": "Flicker\\Flicker.vcxproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "FKGateServer\\FKGateServer.vcxproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

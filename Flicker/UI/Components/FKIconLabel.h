@@ -5,19 +5,19 @@
 
 class FKIconLabel : public NXText
 {
-	Q_OBJECT
+    Q_OBJECT
 public:
-	explicit FKIconLabel(const QString& iconString, QWidget* parent = nullptr);
-	~FKIconLabel() override;
-	void setBorderRadius(int radius);
+    explicit FKIconLabel(const QString& iconString, QWidget* parent = nullptr);
+    ~FKIconLabel() override;
+    void setBorderRadius(int radius);
 
 protected:
-	void enterEvent(QEnterEvent* event) override;
-	void leaveEvent(QEvent* event) override;
-	void paintEvent(QPaintEvent* event) override;
+    void enterEvent(QEnterEvent* event) override;
+    void leaveEvent(QEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 private:
-	QString  _pIconString;
-	bool _pMouseHover{ false };
+    QString  _pIconString;
+    bool _pMouseHover{ false };
 };
 
 #endif // !FK_ICONLABEL_H_

@@ -16,9 +16,9 @@ FKLineEdit::FKLineEdit(const ButtonConfig& buttonConfig, QWidget* parent)
     , _pButtonVisible(buttonConfig.ButtonVisible)
 {
     //_pButtonWidth = this->fontMetrics().horizontalAdvance(_pButtonText);
-	// 设置文本边距，为右侧按钮区域留出空间
-	setTextMargins(0, 0, _pButtonWidth + 5, 0);
-	setCursor(Qt::IBeamCursor);
+    // 设置文本边距，为右侧按钮区域留出空间
+    setTextMargins(0, 0, _pButtonWidth + 5, 0);
+    setCursor(Qt::IBeamCursor);
 }
 
 FKLineEdit::~FKLineEdit()
@@ -50,11 +50,11 @@ void FKLineEdit::paintEvent(QPaintEvent* event)
         btnColor = NXThemeColor(NXThemeType::Light, PrimaryNormal);
     }
 
-	painter.setPen(btnColor);
-	painter.drawText(btnRect, Qt::AlignCenter, _pButtonText);
+    painter.setPen(btnColor);
+    painter.drawText(btnRect, Qt::AlignCenter, _pButtonText);
 
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(NXThemeColor(NXThemeType::Light, PrimaryNormal));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(NXThemeColor(NXThemeType::Light, PrimaryNormal));
     painter.drawRoundedRect(QRectF(QPointF{ btnRect.x() - (qreal)getContentsPaddings().left(), btnRect.y() + btnRect.height() * 0.2 },
         QSizeF{ 3.0, btnRect.height() - btnRect.height() * 0.4 }), 2, 2);
 
@@ -98,10 +98,10 @@ void FKLineEdit::mouseReleaseEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton && _pButtonPressed)
     {
         _pButtonPressed = false;
-		if (_isMousePosInButtonRect(event->pos()) && _pButtonEnabled && isInputValid())
-		{
-			Q_EMIT buttonClicked();
-		}
+        if (_isMousePosInButtonRect(event->pos()) && _pButtonEnabled && isInputValid())
+        {
+            Q_EMIT buttonClicked();
+        }
         
         update();
         event->accept();
@@ -112,8 +112,8 @@ void FKLineEdit::mouseReleaseEvent(QMouseEvent* event)
 
 void FKLineEdit::leaveEvent(QEvent* event)
 {
-	_pButtonHovered = false;
-	_pButtonPressed = false;
+    _pButtonHovered = false;
+    _pButtonPressed = false;
     setCursor(Qt::IBeamCursor);
     update();
     NXLineEdit::leaveEvent(event);
