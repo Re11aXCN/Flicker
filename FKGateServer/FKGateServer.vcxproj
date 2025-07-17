@@ -35,12 +35,9 @@
     <ClInclude Include="Source\FKStructConfig.h" />
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp" />
     <ClInclude Include="Source\Grpc\FKGrpcServicePoolManager.h" />
-    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpc.grpc.pb.h" />
-    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpc.pb.h" />
-    <ClInclude Include="Source\Grpc\Password\FKPasswordGrpcClient.h" />
-    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.grpc.pb.h" />
-    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.pb.h" />
-    <ClInclude Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpcClient.h" />
+    <ClInclude Include="Source\Grpc\Service\FKGrpcService.grpc.pb.h" />
+    <ClInclude Include="Source\Grpc\Service\FKGrpcService.pb.h" />
+    <ClInclude Include="Source\Grpc\Service\FKGrpcServiceClient.hpp" />
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
     <ClInclude Include="Source\MySQL\FKMySQLConnection.h" />
     <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h" />
@@ -56,10 +53,8 @@
     <ClCompile Include="Source\Asio\FKServer.cpp" />
     <ClCompile Include="Source\FKConfigManager.cpp" />
     <ClCompile Include="Source\Grpc\FKGrpcServicePoolManager.cpp" />
-    <ClCompile Include="Source\Grpc\Password\FKPasswordGrpc.grpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\Password\FKPasswordGrpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.grpc.pb.cc" />
-    <ClCompile Include="Source\Grpc\VerifyCode\FKVerifyCodeGrpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\Service\FKGrpcService.grpc.pb.cc" />
+    <ClCompile Include="Source\Grpc\Service\FKGrpcService.pb.cc" />
     <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp" />
     <ClCompile Include="Source\MySQL\FKMySQLConnection.cpp" />
     <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp" />
@@ -195,11 +190,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;_UNICODE;UNICODE;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(SolutionDir)Flicker;$(SolutionDir)Flicker\Global;$(SolutionDir)Flicker\Source;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -214,12 +210,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_RELEASE;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(SolutionDir)Flicker;$(SolutionDir)Flicker\Global;$(SolutionDir)Flicker\Source;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -234,12 +231,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_RELWITHDEBINFO;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(SolutionDir)Flicker;$(SolutionDir)Flicker\Global;$(SolutionDir)Flicker\Source;$(SolutionDir)NexUs\Source\include;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

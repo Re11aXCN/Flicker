@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKUserEntity.h
+ * @ Filename     : FKUserEntity.h
  * @ Description : 
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/22
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -22,16 +22,24 @@
 // 用户实体类
 class FKUserEntity {
 public:
-    // 构造函数
     explicit FKUserEntity() = default;
     ~FKUserEntity() = default;
 
-    FKUserEntity(std::size_t id, const std::string& uuid, const std::string& username,
-                const std::string& email, const std::string& password, const std::string& salt,
-                const std::chrono::system_clock::time_point& createTime = std::chrono::system_clock::now(),
-                const std::optional<std::chrono::system_clock::time_point>& updateTime = std::nullopt)
-        : _id(id), _uuid(uuid), _username(username), _email(email), _password(password), _salt(salt),
-          _createTime(createTime), _updateTime(updateTime) {}
+    FKUserEntity(const std::string& username,
+                const std::string& email, const std::string& password)
+        : _username(username), _email(email), _password(password) {}
+
+    FKUserEntity(size_t id, const std::string& uuid, const std::string& username,
+        const std::string& email, const std::string& password,
+        const std::chrono::system_clock::time_point& createTime, const std::optional<std::chrono::system_clock::time_point>& updateTime)
+        : _id(id), _uuid(uuid), _username(username), _email(email), _password(password), _createTime(createTime), _updateTime(updateTime) {
+    }
+
+    FKUserEntity(const FKUserEntity& other) = default;
+    FKUserEntity& operator=(const FKUserEntity& other) = default;
+
+    FKUserEntity(FKUserEntity&& other) = default;
+    FKUserEntity& operator=(FKUserEntity&& other) = default;
 
     // Getters
     std::size_t getId() const { return _id; }
@@ -39,7 +47,6 @@ public:
     const std::string& getUsername() const { return _username; }
     const std::string& getEmail() const { return _email; }
     const std::string& getPassword() const { return _password; }
-    const std::string& getSalt() const { return _salt; }
     const std::chrono::system_clock::time_point& getCreateTime() const { return _createTime; }
     const std::optional<std::chrono::system_clock::time_point>& getUpdateTime() const { return _updateTime; }
 
@@ -49,7 +56,6 @@ public:
     void setUsername(const std::string& username) { _username = username; }
     void setEmail(const std::string& email) { _email = email; }
     void setPassword(const std::string& password) { _password = password; }
-    void setSalt(const std::string& salt) { _salt = salt; }
     void setCreateTime(const std::chrono::system_clock::time_point& createTime) { _createTime = createTime; }
     void setUpdateTime(const std::optional<std::chrono::system_clock::time_point>& updateTime) { _updateTime = updateTime; }
 
@@ -57,14 +63,12 @@ public:
     std::string toString() const;
 private:
     std::size_t _id{0};
-    std::string _uuid;
+    std::string _uuid{};
     std::string _username;
     std::string _email;
     std::string _password;
-    std::string _salt;  // 存储BCrypt盐值
-    std::chrono::system_clock::time_point _createTime;
-    std::optional<std::chrono::system_clock::time_point> _updateTime;
+    std::chrono::system_clock::time_point _createTime{};
+    std::optional<std::chrono::system_clock::time_point> _updateTime{std::nullopt};
 };
-
 
 #endif // !FK_USER_ENTITY_H_

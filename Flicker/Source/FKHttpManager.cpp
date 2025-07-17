@@ -25,7 +25,7 @@ FKHttpManager::FKHttpManager(QObject* parent /*= nullptr*/)
 
 }
 
-void FKHttpManager::sendHttpRequest(FKHttp::ServiceType serviceType, const QString& url, const QJsonObject& json)
+void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QString& url, const QJsonObject& json)
 {
     QByteArray data = QJsonDocument(json).toJson();
     QNetworkRequest request(url);
@@ -55,8 +55,8 @@ void FKHttpManager::sendHttpRequest(FKHttp::ServiceType serviceType, const QStri
         if (parseError.error != QJsonParseError::NoError) {
             QJsonObject errorObj;
             // cast uint16_t向上转换int（隐式转换）  ok，uint32_t向下转换int（可能丢失数据）  error
-            errorObj.insert("response_status_code", static_cast<int>(FKHttp::status::internal_server_error));
-            errorObj.insert("message", FKUtils::qconcat("Gateway: ", QString::fromUtf8(magic_enum::enum_name(FKHttp::status::internal_server_error))));
+            errorObj.insert("response_status_code", static_cast<int>(flicker::http::status::internal_server_error));
+            errorObj.insert("message", FKUtils::qconcat("Server: ", QString::fromUtf8(magic_enum::enum_name(flicker::http::status::internal_server_error))));
             Q_EMIT this->httpRequestFinished(serviceType, errorObj);
             return;
         }

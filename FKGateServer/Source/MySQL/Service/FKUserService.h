@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKUserService.h
+ * @ Filename     : FKUserService.h
  * @ Description : 
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/22
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -27,13 +27,9 @@
 #include "FKMacro.h"
 #include "MySQL/Mapper/FKUserMapper.h"
 class FKUserEntity;
-// 用户管理类，使用单例模式
 class FKUserService {
-    SINGLETON_CREATE_H(FKUserService)
-
 public:
-    DbOperator::UserRegisterResult registerUser(const std::string& username, const std::string& email,
-                                   const std::string& password, const std::string& salt);
+    DbOperator::Status registerUser(const std::string& username, const std::string& email, const std::string& password);
     bool isUsernameExists(const std::string& username);
     bool isEmailExists(const std::string& email);
 
@@ -46,8 +42,8 @@ public:
 private:
     FKUserService();
     ~FKUserService();
-	// 初始化，创建用户表
-	bool _initialize();
+    // 初始化，创建用户表
+    bool _initialize();
 
     // 用户数据访问对象
     FKUserMapper _pUserMapper;

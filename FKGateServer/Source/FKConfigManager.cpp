@@ -1,27 +1,23 @@
 ﻿#include "FKConfigManager.h"
+
 #include <fstream>
-#include <print>
 #include <filesystem>
 
+#include "FKLogger.h"
 SINGLETON_CREATE_CPP(FKConfigManager)
 FKConfigManager::FKConfigManager()
 {
-    std::println("FKConfigManager 已创建");
-    
-    // 自动加载配置文件
     std::string configPath = "config.json";
     
     // 加载配置文件，如果加载失败则使用默认配置
     if (!loadFromFile(configPath)) {
-        std::println("警告: 使用默认配置初始化服务器");
-        // 保存默认配置到文件，以便后续修改
         saveToFile(configPath);
     }
 }
 
 FKConfigManager::~FKConfigManager()
 {
-    std::println("FKConfigManager 已销毁");
+    FK_SERVER_INFO("FKConfigManager 已销毁");
 }
 
 bool FKConfigManager::loadFromFile(const std::string& filePath)
@@ -30,13 +26,12 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
     
     try {
         if (!std::filesystem::exists(filePath)) {
-            std::println("配置文件 {} 不存在，将使用默认配置", filePath);
+            FK_SERVER_WARN(std::format("配置文件 {} 不存在，将使用默认配置初始化服务器", filePath));
             return false;
         }
         
         std::ifstream configFile(filePath);
         if (!configFile.is_open()) {
-            std::println("无法打开配置文件: {}", filePath);
             return false;
         }
 
@@ -44,7 +39,7 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
         Json::CharReaderBuilder builder;
         std::string errs;
         if (!Json::parseFromStream(builder, configFile, &root, &errs)) {
-            std::println("解析配置文件失败: {}", errs);
+            FK_SERVER_ERROR(std::format("解析Json配置文件失败，错误原因: {}", errs));
             return false;
         }
         
@@ -69,20 +64,19 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
         }
         
         // 读取gRPC服务配置
-        if (root.isMember("grpc_services")) {
-            const Json::Value& services = root["grpc_services"];
+        if (root.isMember("rpc_services")) {
+            const Json::Value& services = root["rpc_services"];
             for (const auto& serviceName : services.getMemberNames()) {
                 // 将服务名称转换为枚举
-                auto serviceTypeOpt = magic_enum::enum_cast<gRPC::ServiceType>(serviceName);
+                auto serviceTypeOpt = magic_enum::enum_cast<flicker::grpc::service>(serviceName);
                 if (!serviceTypeOpt.has_value()) {
-                    std::println("未知的服务类型: {}", serviceName);
                     continue;
                 }
                 
-                gRPC::ServiceType serviceType = serviceTypeOpt.value();
+                flicker::grpc::service serviceType = serviceTypeOpt.value();
                 const Json::Value& serviceConfig = services[serviceName];
 
-				FKGrpcServiceConfig config;
+                FKGrpcServiceConfig config;
                 if (serviceConfig.isMember("host")) config.Host = serviceConfig["host"].asString();
                 if (serviceConfig.isMember("port")) config.Port = serviceConfig["port"].asInt();
                 if (serviceConfig.isMember("pool_size")) config.PoolSize = serviceConfig["pool_size"].asUInt();
@@ -98,37 +92,37 @@ bool FKConfigManager::loadFromFile(const std::string& filePath)
             }
         }
 
-		// 读取Redis配置
-		if (root.isMember("redis")) {
-			const Json::Value& redis = root["redis"];
-			if (redis.isMember("host")) _pRedisConfig.Host = redis["host"].asString();
-			if (redis.isMember("port")) _pRedisConfig.Port = redis["port"].asInt();
-			if (redis.isMember("password")) _pRedisConfig.Password = redis["password"].asString();
+        // 读取Redis配置
+        if (root.isMember("redis")) {
+            const Json::Value& redis = root["redis"];
+            if (redis.isMember("host")) _pRedisConfig.Host = redis["host"].asString();
+            if (redis.isMember("port")) _pRedisConfig.Port = redis["port"].asInt();
+            if (redis.isMember("password")) _pRedisConfig.Password = redis["password"].asString();
             if (redis.isMember("pool_size")) _pRedisConfig.PoolSize = redis["pool_size"].asInt();
             if (redis.isMember("connection_timeout_ms")) _pRedisConfig.ConnectionTimeout = std::chrono::milliseconds{ redis["connection_timeout_ms"].asInt() };
-			if (redis.isMember("socket_timeout_ms")) _pRedisConfig.SocketTimeout = std::chrono::milliseconds{ redis["socket_timeout_ms"].asInt() };
-			if (redis.isMember("db_index")) _pRedisConfig.DBIndex = redis["db_index"].asInt();
+            if (redis.isMember("socket_timeout_ms")) _pRedisConfig.SocketTimeout = std::chrono::milliseconds{ redis["socket_timeout_ms"].asInt() };
+            if (redis.isMember("db_index")) _pRedisConfig.DBIndex = redis["db_index"].asInt();
         }
         
         // 读取数据库配置
         if (root.isMember("mysql")) {
-			const Json::Value& mysql = root["mysql"];
-			if (mysql.isMember("host")) _pMySQLConfig.Host = mysql["host"].asString();
-			if (mysql.isMember("port")) _pMySQLConfig.Port = mysql["port"].asInt();
+            const Json::Value& mysql = root["mysql"];
+            if (mysql.isMember("host")) _pMySQLConfig.Host = mysql["host"].asString();
+            if (mysql.isMember("port")) _pMySQLConfig.Port = mysql["port"].asInt();
             if (mysql.isMember("username")) _pMySQLConfig.Username = mysql["username"].asString();
-			if (mysql.isMember("password")) _pMySQLConfig.Password = mysql["password"].asString();
-			if (mysql.isMember("schema")) _pMySQLConfig.Schema = mysql["schema"].asString();
+            if (mysql.isMember("password")) _pMySQLConfig.Password = mysql["password"].asString();
+            if (mysql.isMember("schema")) _pMySQLConfig.Schema = mysql["schema"].asString();
             if (mysql.isMember("pool_size")) _pMySQLConfig.PoolSize = mysql["pool_size"].asInt();
-			if (mysql.isMember("connection_timeout_ms")) _pMySQLConfig.ConnectionTimeout = std::chrono::milliseconds{ mysql["connection_timeout_ms"].asInt() };
-			if (mysql.isMember("idle_timeout_ms")) _pMySQLConfig.IdleTimeout = std::chrono::milliseconds{ mysql["idle_timeout_ms"].asInt() };
+            if (mysql.isMember("connection_timeout_ms")) _pMySQLConfig.ConnectionTimeout = std::chrono::milliseconds{ mysql["connection_timeout_ms"].asInt() };
+            if (mysql.isMember("idle_timeout_ms")) _pMySQLConfig.IdleTimeout = std::chrono::milliseconds{ mysql["idle_timeout_ms"].asInt() };
             if (mysql.isMember("monitor_interval_ms")) _pMySQLConfig.MonitorInterval = std::chrono::milliseconds{ mysql["monitor_interval_ms"].asInt() };
         }
 
-        std::println("成功加载配置文件: {}", filePath);
+        FK_SERVER_INFO(std::format("成功加载配置文件: {}", filePath));
         return true;
     }
     catch (const std::exception& e) {
-        std::println("加载配置文件异常: {}", e.what());
+        FK_SERVER_ERROR(std::format("加载配置文件异常: {}", e.what()));
         return false;
     }
 }
@@ -166,17 +160,17 @@ bool FKConfigManager::saveToFile(const std::string& filePath) const
             serviceConfig["port"] = static_cast<Json::UInt>(config.Port);
             serviceConfig["pool_size"] = static_cast<Json::UInt>(config.PoolSize);
             serviceConfig["use_ssl"] = config.UseSSL;
-			serviceConfig["keep_alive_time_ms"] = static_cast<Json::UInt>(config.KeepAliveTime.count());
-			serviceConfig["keep_alive_timeout_ms"] = static_cast<Json::UInt>(config.KeepAliveTimeout.count());
-			serviceConfig["max_reconnect_backoff_ms"] = static_cast<Json::UInt>(config.MaxReconnectBackoff.count());
-			serviceConfig["grpclb_call_timeout_ms"] = static_cast<Json::UInt>(config.GrpclbCallTimeout.count());
+            serviceConfig["keep_alive_time_ms"] = static_cast<Json::UInt>(config.KeepAliveTime.count());
+            serviceConfig["keep_alive_timeout_ms"] = static_cast<Json::UInt>(config.KeepAliveTimeout.count());
+            serviceConfig["max_reconnect_backoff_ms"] = static_cast<Json::UInt>(config.MaxReconnectBackoff.count());
+            serviceConfig["grpclb_call_timeout_ms"] = static_cast<Json::UInt>(config.GrpclbCallTimeout.count());
             
             serviceConfig["keep_alive_permit_without_calls"] = config.KeepAlivePermitWithoutCalls;
-			serviceConfig["http2_max_ping_without_data"] = config.Http2MaxPingWithoutData;
+            serviceConfig["http2_max_ping_without_data"] = config.Http2MaxPingWithoutData;
             
             grpcServices[std::string(serviceName)] = serviceConfig;
         }
-        root["grpc_services"] = grpcServices;
+        root["rpc_services"] = grpcServices;
 
         // Redis配置
         Json::Value redis;
@@ -190,19 +184,18 @@ bool FKConfigManager::saveToFile(const std::string& filePath) const
         root["redis"] = redis;
 
         // 数据库配置
-		Json::Value mysql;
-		mysql["host"] = _pMySQLConfig.Host;
-		mysql["port"] = static_cast<Json::UInt>(_pMySQLConfig.Port);
-		mysql["password"] = _pMySQLConfig.Password;
-		mysql["pool_size"] = static_cast<Json::UInt>(_pMySQLConfig.PoolSize);
-		mysql["connection_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.ConnectionTimeout.count());
-		mysql["idle_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.IdleTimeout.count());
-		mysql["monitor_interval"] = static_cast<Json::UInt>(_pMySQLConfig.MonitorInterval.count());
+        Json::Value mysql;
+        mysql["host"] = _pMySQLConfig.Host;
+        mysql["port"] = static_cast<Json::UInt>(_pMySQLConfig.Port);
+        mysql["password"] = _pMySQLConfig.Password;
+        mysql["pool_size"] = static_cast<Json::UInt>(_pMySQLConfig.PoolSize);
+        mysql["connection_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.ConnectionTimeout.count());
+        mysql["idle_timeout"] = static_cast<Json::UInt>(_pMySQLConfig.IdleTimeout.count());
+        mysql["monitor_interval"] = static_cast<Json::UInt>(_pMySQLConfig.MonitorInterval.count());
         
         // 写入文件
         std::ofstream configFile(filePath);
         if (!configFile.is_open()) {
-            std::println("无法打开配置文件进行写入: {}", filePath);
             return false;
         }
         
@@ -211,11 +204,11 @@ bool FKConfigManager::saveToFile(const std::string& filePath) const
         std::unique_ptr<Json::StreamWriter> writer(writerBuilder.newStreamWriter());
         writer->write(root, &configFile);
         
-        std::println("成功保存配置到文件: {}", filePath);
+        FK_SERVER_INFO(std::format("成功保存配置到文件: {}", filePath));
         return true;
     }
     catch (const std::exception& e) {
-        std::println("保存配置文件异常: {}", e.what());
+        FK_SERVER_ERROR(std::format("保存配置文件异常: {}", e.what()));
         return false;
     }
 }

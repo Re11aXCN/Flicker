@@ -24,10 +24,10 @@ class FKHttpManager : public QObject, public std::enable_shared_from_this<FKHttp
     SINGLETON_CREATE_SHARED_H(FKHttpManager)
 public:
     ~FKHttpManager() = default;
-    void sendHttpRequest(FKHttp::ServiceType serviceType, const QString& url, const QJsonObject& json);
+    void sendHttpRequest(flicker::http::service serviceType, const QString& url, const QJsonObject& json);
 
 Q_SIGNALS:
-    void httpRequestFinished(FKHttp::ServiceType serviceType, const QJsonObject& json);
+    void httpRequestFinished(flicker::http::service serviceType, const QJsonObject& json);
 private:
     explicit FKHttpManager(QObject* parent = nullptr);
 

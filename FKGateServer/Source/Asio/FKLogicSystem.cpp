@@ -1,519 +1,632 @@
 ﻿#include "FKLogicSystem.h"
 
-#include <print>
 #include <random>
 #include <string>
 #include <vector>
 #include <json/json.h>
 
+#include "FKLogger.h"
 #include "FKUtils.h"
 #include "Asio/FKHttpConnection.h"
-#include "Grpc/VerifyCode/FKVerifyCodeGrpcClient.h"
-#include "Grpc/Password/FKPasswordGrpcClient.h"
 #include "Redis/FKRedisConnectionPool.h"
 #include "MySQL/Entity/FKUserEntity.h"
 #include "MySQL/Service/FKUserService.h"
+#include "Grpc/Service/FKGrpcServiceClient.hpp"
 
-using namespace FKVerifyCodeGrpc;
-using namespace FKPasswordGrpc;
+using namespace FKGrpcService;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
 
 FKLogicSystem::FKLogicSystem()
 {
-	auto getTestFunc = [](std::shared_ptr<FKHttpConnection> connection) {
-		Json::Value root;
-		for (const auto& [key, value] : connection->getQueryParams()) {
-			root[key] = value; 
-		}
+    auto getVerifyCodeFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        // 读取请求体
+        std::string body = flicker::buffers_to_string(connection->getRequest().body().data());
+        FK_SERVER_INFO(std::format("收到客户端请求数据: {}", body));
+        auto& httpResponse = connection->getResponse();
+        // 设置响应头
+        httpResponse.set(flicker::http::field::content_type, "application/json; charset=utf-8");
+        httpResponse.set(flicker::http::field::server, "GateServer");
+        httpResponse.set(flicker::http::field::date, FKUtils::get_gmtime());
+        Json::Value responseRoot;
+        // 解析JSON
+        Json::Value requestRoot;
+        Json::CharReaderBuilder readerBuilder;
+        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+        std::string errors;
+        bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
 
-		// 序列化JSON为字符串
-		Json::StreamWriterBuilder writerBuilder;
-		writerBuilder["indentation"] = ""; // 紧凑格式（无缩进）
-		std::string jsonOutput = Json::writeString(writerBuilder, root);
+        if (!isValidJson) {
+            FK_SERVER_ERROR(std::format("Invalid JSON format: {}", errors));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+            responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+            httpResponse.result(flicker::http::status::bad_request);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
 
-		// 输出JSON到响应体
-		auto& responseBody = connection->getResponse().body();
-		boost::beast::ostream(responseBody) << jsonOutput;
-		};
+        // 验证必需字段
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::VerifyCode) ||
+            !requestRoot.isMember("data") ||
+            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
+            !requestRoot["data"].isMember("verify_type") || requestRoot["data"]["verify_type"].empty())
+        {
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+            responseRoot["message"] = "The user does not have access permissions!";
+            httpResponse.result(flicker::http::status::unauthorized);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
+        std::string email = requestRoot["data"]["email"].asString();
+        flicker::http::service serviceType = static_cast<flicker::http::service>(requestRoot["data"]["verify_type"].asInt());
+        try {
+            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByEmail(email);
+            if (serviceType == flicker::http::service::Register && user.has_value()) {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
+                responseRoot["message"] = FKUtils::concat("The user '", email, "'already exist! Please choose another one!");
+                httpResponse.result(flicker::http::status::conflict);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
+            else if (serviceType == flicker::http::service::ResetPassword &&!user.has_value()) {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+                responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist!");
+                httpResponse.result(flicker::http::status::unauthorized);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
+            else {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+                responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+                httpResponse.result(flicker::http::status::bad_request);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
 
-	auto getVerifyCodeFunc = [](std::shared_ptr<FKHttpConnection> connection) {
-		// 读取请求体
-		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
-		std::println("Received Body: \n{}", body);
+            // 调用grpc服务
+            FKGrpcServiceClient<flicker::grpc::service::VerifyCode> client;
 
-		// 设置响应头
-		connection->getResponse().set(boost::beast::http::field::content_type, "text/json; charset=utf-8");
-		Json::Value responseRoot;
-		// 解析JSON
-		Json::Value requestRoot;
-		Json::CharReaderBuilder readerBuilder;
-		std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
-		std::string errors;
-		bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+            VerifyCodeRequestBody grpcRequest;
+            grpcRequest.set_rpc_request_type(static_cast<int32_t>(flicker::http::service::VerifyCode));
+            grpcRequest.set_email(email);
+            auto [grpcResponse, grpcStatus]= client.getVerifyCode(grpcRequest);
 
-		if (!isValidJson) {
-			std::println("Invalid JSON format: {}", errors);
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
-			responseRoot["message"] = "Invalid JSON format: " + errors;
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return;
-		}
+            // 根据grpc状态设置HTTP状态
+            if (grpcResponse.rpc_response_code() != 0) { // 自定义的状态码
+                FK_SERVER_ERROR(std::format("grpc 内部错误: {}", grpcResponse.message()));
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                httpResponse.result(flicker::http::status::service_unavailable);
+            }
+            else {
+                if (grpcStatus.ok()) { // grpc内部的 status
+                    // 创建data对象
+                    Json::Value dataObj;
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+                    responseRoot["message"] = "The verification code is successfully sent to the email address and is valid within five minutes!";
+                    responseRoot["data"] = dataObj;
 
-		// 验证必需字段
-		if (!requestRoot.isMember("data") ||
-			!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty()) {
+                    dataObj["request_service_type"] = requestRoot["request_service_type"];
+                    dataObj["verify_type"] = requestRoot["data"]["verify_type"];
+                    dataObj["verify_code"] = grpcResponse.verify_code();
+                    httpResponse.result(flicker::http::status::ok);
+                }
+                else {
+                    FK_SERVER_ERROR(std::format("grpc 调用失败: {}", FKUtils::concat("grpc error! code: ", magic_enum::enum_name(grpcStatus.error_code()), ", message: ", grpcStatus.error_message())));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::request_timeout);
+                    responseRoot["message"] = "The request timed out! Please try again later!";
+                    httpResponse.result(flicker::http::status::request_timeout);
+                }
+            }
+        }
+        catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("获取验证码服务回调执行异常: {}", e.what()));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::internal_server_error);
+            responseRoot["message"] = "Server Internal Error!";
+            httpResponse.result(flicker::http::status::internal_server_error);
+        }
 
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
-			responseRoot["message"] = "Missing required field: email";
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return;
-		}
+        // 发送响应
+        flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+        };
 
-		try {
-			// 调用gRPC服务
-			FKVerifyCodeGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::VERIFY_CODE_SERVICE>());
+    auto registerUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        std::string body = flicker::buffers_to_string(connection->getRequest().body().data());
+        FK_SERVER_INFO(std::format("收到客户端请求数据: {}", body));
+        auto& httpResponse = connection->getResponse();
+        httpResponse.set(flicker::http::field::content_type, "application/json; charset=utf-8");
+        httpResponse.set(flicker::http::field::server, "GateServer");
+        httpResponse.set(flicker::http::field::date, FKUtils::get_gmtime());
 
-			VerifyCodeRequestBody grpcRequest;
-			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
-			grpcRequest.set_email(requestRoot["data"]["email"].asString());
-			auto [grpcResponse, grpcStatus]= client.getVerifyCode(grpcRequest);
+        Json::Value responseRoot, requestRoot;
+        Json::CharReaderBuilder readerBuilder;
+        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+        std::string errors;
+        bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
 
-			// 根据gRPC状态设置HTTP状态
-			if (grpcResponse.status_code() != 0) {
-				responseRoot["status_code"] = grpcResponse.status_code();
-				responseRoot["message"] = grpcResponse.message();
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-			}
-			else {
-				if (grpcStatus.ok()) {
-					// 创建data对象
-					Json::Value dataObj;
-					dataObj["request_type"] = grpcResponse.request_type();
-					dataObj["email"] = grpcResponse.email();
-					dataObj["verify_code"] = grpcResponse.verify_code();
-					responseRoot["data"] = dataObj;
-					connection->getResponse().result(boost::beast::http::status::ok);
-				}
-				else {
-					responseRoot["status_code"] = grpcStatus.error_code();
-					responseRoot["message"] = grpcStatus.error_message();
-					connection->getResponse().result(boost::beast::http::status::request_timeout);
-				}
-			}
-		}
-		catch (const std::exception& e) {
-			// gRPC调用异常处理
-			std::println("gRPC call failed: {}", e.what());
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::GRPC_CALL_FAILED);
-			responseRoot["message"] = "Service unavailable: " + std::string(e.what());
-			connection->getResponse().result(boost::beast::http::status::service_unavailable);
-		}
+        if (!isValidJson) {
+            FK_SERVER_ERROR(std::format("Invalid JSON format: {}", errors));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+            responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+            httpResponse.result(flicker::http::status::bad_request);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
 
-		// 发送响应
-		boost::beast::ostream(connection->getResponse().body())
-			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-		};
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::Register) ||
+            !requestRoot.isMember("data") ||
+            !requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() ||
+            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
+            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty() ||
+            !requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty())
+        {
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+            responseRoot["message"] = "Lack of necessary registration information!";
+            httpResponse.result(flicker::http::status::unauthorized);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
 
-	auto registerUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        std::string username = requestRoot["data"]["username"].asString();
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
+        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
 
-		FKUserMapper mapper;
-		mapper.findAllUsers();
-		// 读取请求体
-		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
-		std::println("Received Body: \n{}", body);
+        // 验证码前缀（与JavaScript端constants.js中定义一致）
+        const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
 
-		// 设置响应头
-		connection->getResponse().set(boost::beast::http::field::content_type, "text/json; charset=utf-8");
-		Json::Value responseRoot;
-		// 解析JSON
-		Json::Value requestRoot;
-		Json::CharReaderBuilder readerBuilder;
-		std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
-		std::string errors;
-		bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+        try {
+            // 1. 查询用户是否存在，关于邮箱查询已经在获取验证码时检查过了
+            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByUsername(username);
+            if (user.has_value()) {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
+                responseRoot["message"] = FKUtils::concat("The user '", username, "' already exist! Please choose another one!");
+                httpResponse.result(flicker::http::status::conflict);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
 
-		if (!isValidJson) {
-			std::println("Invalid JSON format: {}", errors);
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
-			responseRoot["message"] = "Invalid JSON format: " + errors;
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return false;
-		}
+            // 2. Redis 验证验证码
+            bool verificationSuccess = false;
+            FKRedisConnectionPool::getInstance()->executeWithConnection([&](sw::redis::Redis* redis) {
+                // 构建Redis键名
+                std::string redisKey = VERIFICATION_CODE_PREFIX + email;
 
-		// 验证必需字段
-		if (!requestRoot.isMember("data") ||
-			!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() ||
-			!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-			!requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty() ||
-			!requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty()) {
-			
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
-			responseRoot["message"] = "Lack of necessary registration information";
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return false;
-		}
+                // 查询验证码是否存在
+                auto optionalValue = redis->get(redisKey);
+                if (!optionalValue) {
+                    FK_SERVER_ERROR(std::format("验证码已过期或不存在: {}", email));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::forbidden);
+                    responseRoot["message"] = "The verification code has expired, please get it again";
+                    httpResponse.result(flicker::http::status::forbidden);
+                    return false;
+                }
 
-		// 获取请求数据
-		std::string username = requestRoot["data"]["username"].asString();
-		std::string email = requestRoot["data"]["email"].asString();
-		std::string hashed_password = requestRoot["data"]["hashed_password"].asString();
-		std::string verifyCode = requestRoot["data"]["verify_code"].asString();
+                // 验证码存在，检查是否匹配
+                std::string storedCode = *optionalValue;
+                if (storedCode != verifyCode) {
+                    FK_SERVER_ERROR(std::format("验证码不匹配: {} vs {}", storedCode, verifyCode));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+                    responseRoot["message"] = "The verification code is incorrect, please re-enter it";
+                    httpResponse.result(flicker::http::status::unauthorized);
+                    return false;
+                }
 
-		// 验证码前缀（与JavaScript端constants.js中定义一致）
-		const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
+                // 验证码匹配，删除Redis中的验证码（防止重用）
+                redis->del(redisKey);
+                verificationSuccess = true;
+                return true;
+            });
 
-		try {
-			bool verificationSuccess = false;
+            // 如果验证码验证失败，直接返回（错误信息已在lambda中设置）
+            if (!verificationSuccess) {
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
 
-			FKRedisConnectionPool::getInstance()->executeWithConnection([&](sw::redis::Redis* redis) {
-				// 构建Redis键名
-				std::string redisKey = VERIFICATION_CODE_PREFIX + email;
+            // 3. 调用grpc服务 bcrypt加密SHA256密码
+            FKGrpcServiceClient<flicker::grpc::service::EncryptPassword> client;
+            EncryptPasswordRequestBody grpcRequest;
+            grpcRequest.set_rpc_request_type(static_cast<int32_t>(flicker::grpc::service::EncryptPassword));
+            grpcRequest.set_hashed_password(hashedPassword);
+            
+            auto [grpcResponse, grpcStatus] = client.encryptPassword(grpcRequest);
+            if (grpcResponse.rpc_response_code() != 0) {
+                FK_SERVER_ERROR(std::format("grpc 内部错误: {}", grpcResponse.message()));
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                httpResponse.result(flicker::http::status::service_unavailable);
+            }
+            else {
+                if (grpcStatus.ok()) {
+                    // 插入用户
+                    auto result = FKUserService::getInstance()->registerUser(username, email, grpcResponse.encrypted_password());
+                    if [[likely]] (result == DbOperator::Status::Success) {
+                        Json::Value dataObj;
+                        responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+                        responseRoot["message"] = "Register successful!";
+                        responseRoot["data"] = dataObj;
+                        dataObj["request_service_type"] = requestRoot["request_service_type"];
+                        httpResponse.result(flicker::http::status::ok);
+                    }
+                    else [[unlikely]] {
+                        responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                        responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                        httpResponse.result(flicker::http::status::service_unavailable);
+                    }
+                }
+                else {
+                    FK_SERVER_ERROR(std::format("grpc 调用失败: {}", FKUtils::concat("grpc error! code: ", magic_enum::enum_name(grpcStatus.error_code()), ", message: ", grpcStatus.error_message())));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::request_timeout);
+                    responseRoot["message"] = "The request timed out! Please try again later!";
+                    httpResponse.result(flicker::http::status::request_timeout);
+                }
+            }
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("注册用户服务回调执行发生异常: {}", e.what()));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::internal_server_error);
+            responseRoot["message"] = "Server Internal Error!";
+            httpResponse.result(flicker::http::status::internal_server_error);
+        }
 
-				// 查询验证码是否存在
-				auto optionalValue = redis->get(redisKey);
-				if (!optionalValue) {
-					// 验证码不存在或已过期
-					std::println("验证码已过期或不存在: {}", email);
-					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::VERIFY_CODE_EXPIRED);
-					responseRoot["message"] = "The verification code has expired, please get it again";
-					connection->getResponse().result(boost::beast::http::status::bad_request);
-					return false;
-				}
+        flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+    };
 
-				// 验证码存在，检查是否匹配
-				std::string storedCode = *optionalValue;
-				if (storedCode != verifyCode) {
-					std::println("验证码不匹配: {} vs {}", storedCode, verifyCode);
-					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::VERIFY_CODE_ERROR);
-					responseRoot["message"] = "The verification code is incorrect, please re-enter it";
-					connection->getResponse().result(boost::beast::http::status::bad_request);
-					return false;
-				}
+    auto loginUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        std::string body = flicker::buffers_to_string(connection->getRequest().body().data());
+        FK_SERVER_INFO(std::format("收到客户端请求数据: {}", body));
+        auto& httpResponse = connection->getResponse();
+        httpResponse.set(flicker::http::field::content_type, "application/json; charset=utf-8");
+        httpResponse.set(flicker::http::field::server, "GateServer");
+        httpResponse.set(flicker::http::field::date, FKUtils::get_gmtime());
 
-				// 验证码匹配，删除Redis中的验证码（防止重用）
-				redis->del(redisKey);
-				verificationSuccess = true;
-				return true;
-			});
+        Json::Value responseRoot, requestRoot;
+        Json::CharReaderBuilder readerBuilder;
+        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+        std::string errors;
+        bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
 
-			// 如果验证码验证失败，直接返回（错误信息已在lambda中设置）
-			if (!verificationSuccess) {
-				boost::beast::ostream(connection->getResponse().body())
-					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-				return false;
-			}
+        if (!isValidJson) {
+            FK_SERVER_ERROR(std::format("Invalid JSON format: {}", errors));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+            responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+            httpResponse.result(flicker::http::status::bad_request);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
 
-			// 如果验证码验证成功，调用gRPC服务加密SHA256密码
-			FKPasswordGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::PASSWORD_SERVICE>());
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::Login) ||
+            !requestRoot.isMember("data") || 
+            !requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() || 
+            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty())
+        {
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+            responseRoot["message"] = "Lack of necessary login information!";
+            httpResponse.result(flicker::http::status::unauthorized);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
 
-			EncryptPasswordRequestBody grpcRequest;
-			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
-			grpcRequest.set_hashed_password(requestRoot["data"]["hashed_password"].asString());
-			
-			auto [grpcResponse, grpcStatus] = client.encryptPassword(grpcRequest);
-			// 根据gRPC状态设置HTTP状态
-			if (grpcResponse.status_code() != 0) {
-				responseRoot["status_code"] = grpcResponse.status_code();
-				responseRoot["message"] = grpcResponse.message();
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-			}
-			else {
-				if (grpcStatus.ok()) {
-					auto result = FKUserService::getInstance()->registerUser(username, email, grpcResponse.encrypted_password(), grpcResponse.salt());
+        std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
 
-					switch (result) {
-					case DbOperator::UserRegisterResult::SUCCESS: {
-						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
-						responseRoot["message"] = "Registration successful, please go to Login";
-						Json::Value dataObj;
-						dataObj["request_type"] = grpcResponse.request_type();
-						dataObj["encrypted_password"] = "******";
-						dataObj["salt"] = "******";
-						responseRoot["data"] = dataObj;
-						connection->getResponse().result(boost::beast::http::status::ok);
-						break;
-					}
-					case DbOperator::UserRegisterResult::USERNAME_EXISTS:
-						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
-						responseRoot["message"] = "Username already exists, please choose another one";
-						connection->getResponse().result(boost::beast::http::status::bad_request);
-						break;
-					case DbOperator::UserRegisterResult::EMAIL_EXISTS:
-						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::USER_EXIST);
-						responseRoot["message"] = "Email already exists, please use another one or recover your password";
-						connection->getResponse().result(boost::beast::http::status::bad_request);
-						break;
-					default:
-						responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::DATABASE_ERROR);
-						responseRoot["message"] = "Failed to register user due to database error";
-						connection->getResponse().result(boost::beast::http::status::internal_server_error);
-						break;
-					}
-				}
-				else {
-					responseRoot["status_code"] = grpcStatus.error_code();
-					responseRoot["message"] = grpcStatus.error_message();
-					connection->getResponse().result(boost::beast::http::status::request_timeout);
-				}
-			}
-		} catch (const std::exception& e) {
-			std::println("注册过程发生异常: {}", e.what());
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
-			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
-			connection->getResponse().result(boost::beast::http::status::internal_server_error);
-		}
+        try {
+            // 1. 查询用户
+            std::string bcryptPassword = username.contains("@")
+                ? FKUserService::getInstance()->findPasswordByEmail(username)
+                : FKUserService::getInstance()->findPasswordByUsername(username);
+            
+            if (bcryptPassword.empty()) {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+                responseRoot["message"] = FKUtils::concat("The user '", username, "' does not exist!");
+                httpResponse.result(flicker::http::status::unauthorized);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
+            
+            // 2. 验证密码
+            FKGrpcServiceClient<flicker::grpc::service::AuthenticatePwdReset> client;
 
-		boost::beast::ostream(connection->getResponse().body())
-			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-		return true;
-	};
+            AuthenticatePwdResetRequestBody grpcRequest;
+            grpcRequest.set_rpc_request_type(static_cast<int32_t>(flicker::grpc::service::AuthenticatePwdReset));
+            grpcRequest.set_hashed_password(hashedPassword);
+            grpcRequest.set_encrypted_password(bcryptPassword);
 
+            auto [grpcResponse, grpcStatus] = client.authenticatePwdReset(grpcRequest);
 
-
-	auto loginUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
-		// 读取请求体
-		std::string body = boost::beast::buffers_to_string(connection->getRequest().body().data());
-		std::println("Received Login Body: \n{}", body);
-
-		// 设置响应头
-		connection->getResponse().set(boost::beast::http::field::content_type, "text/json; charset=utf-8");
-		Json::Value responseRoot;
-		// 解析JSON
-		Json::Value requestRoot;
-		Json::CharReaderBuilder readerBuilder;
-		std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
-		std::string errors;
-		bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
-
-		if (!isValidJson) {
-			std::println("Invalid JSON format: {}", errors);
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::INVALID_JSON);
-			responseRoot["message"] = "Invalid JSON format: " + errors;
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return false;
-		}
-
-		// 验证必需字段
-		if (!requestRoot.isMember("data") || 
-			((!requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty()) && 
-			(!requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty())) ||
-			!requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty()) {
-			
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::MISSING_FIELDS);
-			responseRoot["message"] = "Missing username/email or password";
-			connection->getResponse().result(boost::beast::http::status::bad_request);
-			boost::beast::ostream(connection->getResponse().body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-			return false;
-		}
-
-		// 获取请求数据
-		std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
-		std::string email = requestRoot["data"].isMember("email") ? requestRoot["data"]["email"].asString() : "";
-		std::string hashed_password = requestRoot["data"]["hashed_password"].asString();
-		/*bool rememberPassword = requestRoot["data"].isMember("remember_password") ? requestRoot["data"]["remember_password"].asBool() : false;
-		bool autoLogin = requestRoot["data"].isMember("auto_login") ? requestRoot["data"]["auto_login"].asBool() : false;*/
-
-		try {
-			// 1. 查询用户
-			std::optional<FKUserEntity> user;
-			if (!username.empty()) {
-				user = FKUserService::getInstance()->findUserByUsername(username);
-			} else if (!email.empty()) {
-				user = FKUserService::getInstance()->findUserByEmail(email);
-			}
-			
-			// 检查用户是否存在
-			if (!user.has_value()) {
-				std::println("用户不存在: {} / {}", username, email);
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NOT_FIND_USER);
-				responseRoot["message"] = "User does not exist {" + username + " / " + email + "}";
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-				boost::beast::ostream(connection->getResponse().body())
-					<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-				return false;
-			}
-			
-			// 2. 验证密码
-			FKPasswordGrpcClient client(FKGrpcServicePoolManager::getInstance()->getServicePool<gRPC::ServiceType::PASSWORD_SERVICE>());
-
-			AuthenticatePasswordRequestBody grpcRequest;
-			grpcRequest.set_request_type(requestRoot["request_type"].asInt());
-			grpcRequest.set_hashed_password(hashed_password);
-			grpcRequest.set_encrypted_password(user->getPassword());
-
-			auto [grpcResponse, grpcStatus] = client.authenticatePassword(grpcRequest);
-
-			if (grpcResponse.status_code() != 0) {
-				std::println("密码错误: {}", user->getUsername());
-				responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::PASSWORD_ERROR);
-				responseRoot["message"] = "Incorrect password";
-				connection->getResponse().result(boost::beast::http::status::bad_request);
-			}
-			else {
-				if (grpcStatus.ok()) {
-					// 3. 登录成功，更新响应数据
+            if (grpcResponse.rpc_response_code() != 0) {
+                FK_SERVER_ERROR(std::format("grpc 内部错误: {}", grpcResponse.message()));
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                httpResponse.result(flicker::http::status::service_unavailable);
+            }
+            else {
+                if (grpcStatus.ok()) {
+                    // 3. 登录成功，更新响应数据
 
 
-				// TODO: 生成会话令牌并存储在Redis中
-				// TODO: 如果选择了记住密码，生成长期令牌
+                    // TODO: 生成会话令牌并存储在Redis中
+                    // TODO: 如果选择了记住密码，生成长期令牌
 
-				// 4. 设置成功响应
-					responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::SUCCESS);
-					responseRoot["message"] = "Login successful";
-					Json::Value dataObj;
-					dataObj["request_type"] = static_cast<int>(Http::RequestSeviceType::LOGIN_USER);
-					responseRoot["data"] = dataObj;
-					connection->getResponse().result(boost::beast::http::status::ok);
-				}
-				else {
-					responseRoot["status_code"] = grpcStatus.error_code();
-					responseRoot["message"] = grpcStatus.error_message();
-					connection->getResponse().result(boost::beast::http::status::request_timeout);
-				}
-			}
-		} catch (const std::exception& e) {
-			// 处理异常
-			std::println("登录过程发生异常: {}", e.what());
-			responseRoot["status_code"] = static_cast<int>(Http::RequestStatusCode::NETWORK_ABNORMAL);
-			responseRoot["message"] = "Server Internal Error: " + std::string(e.what());
-			connection->getResponse().result(boost::beast::http::status::internal_server_error);
-		}
+                    // 4. 设置成功响应
+                    Json::Value dataObj;
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+                    responseRoot["message"] = "Login successful!";
+                    responseRoot["data"] = dataObj;
+                    dataObj["request_service_type"] = requestRoot["request_service_type"];
+                    httpResponse.result(flicker::http::status::ok);
+                }
+                else {
+                    FK_SERVER_ERROR(std::format("grpc 调用失败: {}", FKUtils::concat("grpc error! code: ", magic_enum::enum_name(grpcStatus.error_code()), ", message: ", grpcStatus.error_message())));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::request_timeout);
+                    responseRoot["message"] = "The request timed out! Please try again later!";
+                    httpResponse.result(flicker::http::status::request_timeout);
+                }
+            }
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("登录服务回调执行发生异常: {}", e.what()));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::internal_server_error);
+            responseRoot["message"] = "Server Internal Error!";
+            httpResponse.result(flicker::http::status::internal_server_error);
+        }
 
-		// 发送响应
-		boost::beast::ostream(connection->getResponse().body())
-			<< Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-		return true;
-	};
+        // 发送响应
+        flicker::ostream(httpResponse.body())
+            << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+    };
 
-	auto resetPasswordFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+    auto authenticateUserFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        std::string body = flicker::buffers_to_string(connection->getRequest().body().data());
+        FK_SERVER_INFO(std::format("收到客户端请求数据: {}", body));
+        auto& httpResponse = connection->getResponse();
+        httpResponse.set(flicker::http::field::content_type, "application/json; charset=utf-8");
+        httpResponse.set(flicker::http::field::server, "GateServer");
+        httpResponse.set(flicker::http::field::date, FKUtils::get_gmtime());
 
-		};
+        Json::Value responseRoot, requestRoot;
+        Json::CharReaderBuilder readerBuilder;
+        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+        std::string errors;
+        bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
 
-	this->registerCallback("/get_test", Http::RequestType::GET, getTestFunc);
-	this->registerCallback("/get_verify_code", Http::RequestType::POST, getVerifyCodeFunc);
-	this->registerCallback("/register_user", Http::RequestType::POST, registerUserFunc);
-	this->registerCallback("/login_user", Http::RequestType::POST, loginUserFunc);
-	this->registerCallback("/reset_password", Http::RequestType::POST, resetPasswordFunc);
+        if (!isValidJson) {
+            FK_SERVER_ERROR(std::format("Invalid JSON format: {}", errors));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+            responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+            httpResponse.result(flicker::http::status::bad_request);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
+
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::ResetPassword) ||
+            !requestRoot.isMember("data") ||
+            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
+            !requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty())
+        {
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+            responseRoot["message"] = "Lack of necessary authenticate password reset information!";
+            httpResponse.result(flicker::http::status::unauthorized);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
+
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
+        const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
+
+        try {
+            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByEmail(email);
+            if (!user.has_value()) {
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
+                responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist, please register first!");
+                httpResponse.result(flicker::http::status::conflict);
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
+
+            bool verificationSuccess = false;
+            FKRedisConnectionPool::getInstance()->executeWithConnection([&](sw::redis::Redis* redis) {
+                std::string redisKey = VERIFICATION_CODE_PREFIX + email;
+
+                auto optionalValue = redis->get(redisKey);
+                if (!optionalValue) {
+                    FK_SERVER_ERROR(std::format("验证码已过期或不存在: {}", email));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::forbidden);
+                    responseRoot["message"] = "The verification code has expired, please get it again";
+                    httpResponse.result(flicker::http::status::forbidden);
+                    return false;
+                }
+
+                std::string storedCode = *optionalValue;
+                if (storedCode != verifyCode) {
+                    FK_SERVER_ERROR(std::format("验证码不匹配: {} vs {}", storedCode, verifyCode));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+                    responseRoot["message"] = "The verification code is incorrect, please re-enter it";
+                    httpResponse.result(flicker::http::status::unauthorized);
+                    return false;
+                }
+
+                redis->del(redisKey);
+                verificationSuccess = true;
+                return true;
+                });
+
+            // 如果验证码验证失败，直接返回（错误信息已在lambda中设置）
+            if (!verificationSuccess) {
+                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                return;
+            }
+
+            Json::Value dataObj;
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+            responseRoot["message"] = "Authentication successful!";
+            responseRoot["data"] = dataObj;
+            dataObj["request_service_type"] = requestRoot["request_service_type"];
+            httpResponse.result(flicker::http::status::ok);
+        }
+        catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("注册用户服务回调执行发生异常: {}", e.what()));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::internal_server_error);
+            responseRoot["message"] = "Server Internal Error!";
+            httpResponse.result(flicker::http::status::internal_server_error);
+        }
+
+        flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+        };
+
+    auto resetPasswordFunc = [](std::shared_ptr<FKHttpConnection> connection) {
+        std::string body = flicker::buffers_to_string(connection->getRequest().body().data());
+        FK_SERVER_INFO(std::format("收到客户端请求数据: {}", body));
+        auto& httpResponse = connection->getResponse();
+        httpResponse.set(flicker::http::field::content_type, "application/json; charset=utf-8");
+        httpResponse.set(flicker::http::field::server, "GateServer");
+        httpResponse.set(flicker::http::field::date, FKUtils::get_gmtime());
+        
+        Json::Value responseRoot, requestRoot;
+        Json::CharReaderBuilder readerBuilder;
+        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+        std::string errors;
+        bool isValidJson = reader->parse(body.c_str(), body.c_str() + body.size(), &requestRoot, &errors);
+
+        if (!isValidJson) {
+            FK_SERVER_ERROR(std::format("Invalid JSON format: {}", errors));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
+            responseRoot["message"] = "Wrong request, refusal to respond to the service!";
+            httpResponse.result(flicker::http::status::bad_request);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
+
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::ResetPassword) ||
+            !requestRoot.isMember("data") ||
+            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
+            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty())
+        {
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+            responseRoot["message"] = "Lack of necessary reset password information!";
+            httpResponse.result(flicker::http::status::unauthorized);
+            flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+            return;
+        }
+
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
+
+        try {
+            FKGrpcServiceClient<flicker::grpc::service::EncryptPassword> client;
+            EncryptPasswordRequestBody grpcRequest;
+            grpcRequest.set_rpc_request_type(static_cast<int32_t>(flicker::grpc::service::EncryptPassword));
+            grpcRequest.set_hashed_password(hashedPassword);
+
+            auto [grpcResponse, grpcStatus] = client.encryptPassword(grpcRequest);
+
+            if (grpcResponse.rpc_response_code() != 0) {
+                FK_SERVER_ERROR(std::format("grpc 内部错误: {}", grpcResponse.message()));
+                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                httpResponse.result(flicker::http::status::service_unavailable);
+            }
+            else {
+                if (grpcStatus.ok()) {
+                    if [[likely]] (FKUserService::getInstance()->updatePasswordByEmail(email, grpcResponse.encrypted_password())) {
+                        Json::Value dataObj;
+                        responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+                        responseRoot["message"] = "Reset password successful!";
+                        responseRoot["data"] = dataObj;
+                        dataObj["request_type"] = static_cast<int>(flicker::http::service::ResetPassword);
+                        httpResponse.result(flicker::http::status::ok);
+                    }
+                    else [[unlikely]] {
+                        responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::service_unavailable);
+                        responseRoot["message"] = "The service is temporarily unavailable while the server is under maintenance!";
+                        httpResponse.result(flicker::http::status::service_unavailable);
+                    }
+                }
+                else {
+                    FK_SERVER_ERROR(std::format("grpc 调用失败: {}", FKUtils::concat("grpc error! code: ", magic_enum::enum_name(grpcStatus.error_code()), ", message: ", grpcStatus.error_message())));
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::request_timeout);
+                    responseRoot["message"] = "The request timed out! Please try again later!";
+                    httpResponse.result(flicker::http::status::request_timeout);
+                }
+            }
+        }
+        catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("重置密码服务回调执行发生异常: {}", e.what()));
+            responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::internal_server_error);
+            responseRoot["message"] = "Server Internal Error!";
+            httpResponse.result(flicker::http::status::internal_server_error);
+        }
+
+        flicker::ostream(httpResponse.body())
+            << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+        };
+
+    this->registerCallback("/get_verify_code", flicker::http::verb::post, getVerifyCodeFunc);
+    this->registerCallback("/login_user", flicker::http::verb::post, loginUserFunc);
+    this->registerCallback("/register_user", flicker::http::verb::post, registerUserFunc);
+    this->registerCallback("/authenticate_user", flicker::http::verb::post, authenticateUserFunc);
+    this->registerCallback("/reset_password", flicker::http::verb::post, resetPasswordFunc);
+
 }
 
-bool FKLogicSystem::callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection)
+bool FKLogicSystem::callBack(const std::string& url, flicker::http::verb requestType, std::shared_ptr<FKHttpConnection> connection)
 {
-	try {
-		// 记录请求信息
-		std::println("处理请求: {} {}", 
-			(requestType == Http::RequestType::GET ? "GET" : "POST"), 
-			url);
-		
-		// 根据请求类型查找对应的回调函数
-		if (requestType == Http::RequestType::GET) {
-			// 检查GET回调是否存在
-			auto it = _pGetRequestCallBacks.find(url);
-			if (it == _pGetRequestCallBacks.end()) {
-				std::println("未找到GET处理函数: {}", url);
-				return false;
-			}
-			
-			// 执行回调函数
-			std::println("执行GET处理函数: {}", url);
-			it->second(connection);
-		}
-		else if (requestType == Http::RequestType::POST) {
-			// 检查POST回调是否存在
-			auto it = _pPostRequestCallBacks.find(url);
-			if (it == _pPostRequestCallBacks.end()) {
-				std::println("未找到POST处理函数: {}", url);
-				return false;
-			}
-			
-			// 执行回调函数
-			std::println("执行POST处理函数: {}", url);
-			it->second(connection);
-		}
-		else {
-			// 不支持的请求类型
-			std::println("不支持的请求类型");
-			return false;
-		}
-		
-		return true;
-	}
-	catch (const std::exception& ex) {
-		// 处理回调执行过程中的异常
-		std::println("回调执行异常: {}", ex.what());
-		
-		// 设置500错误响应
-		auto& response = connection->getResponse();
-		response.result(boost::beast::http::status::internal_server_error);
-		response.set(boost::beast::http::field::content_type, "application/json; charset=utf-8");
-		response.set(boost::beast::http::field::server, "GateServer");
-		response.set(boost::beast::http::field::date, FKUtils::get_http_date());
-		
-		// 构建错误JSON响应
-		boost::beast::ostream(response.body()) << 
-			"{\"code\":500,\"message\":\"服务器内部错误\",\"error\":\"" << 
-			ex.what() << "\"}";
-		
-		return true; // 返回true表示已处理请求
-	}
-	catch (...) {
-		// 处理未知异常
-		std::println("回调执行发生未知异常");
-		
-		// 设置500错误响应
-		auto& response = connection->getResponse();
-		response.result(boost::beast::http::status::internal_server_error);
-		response.set(boost::beast::http::field::content_type, "application/json");
-		response.set(boost::beast::http::field::server, "GateServer");
-		response.set(boost::beast::http::field::date, FKUtils::get_http_date());
-		
-		// 构建错误JSON响应
-		boost::beast::ostream(response.body()) << 
-			"{\"code\":500,\"message\":\"服务器内部错误\",\"error\":\"未知异常\"}";
-		
-		return true; // 返回true表示已处理请求
-	}
+    if (requestType == flicker::http::verb::get) {
+        auto it = _pGetRequestCallBacks.find(url);
+        if (it == _pGetRequestCallBacks.end()) {
+            FK_SERVER_ERROR(std::format("服务器未注册当前服务的GET处理函数: {}", url));
+            return false;
+        }
+
+        FK_SERVER_INFO(std::format("执行GET处理函数: {}", url));
+        it->second(connection);
+    }
+    else if (requestType == flicker::http::verb::post) {
+        auto it = _pPostRequestCallBacks.find(url);
+        if (it == _pPostRequestCallBacks.end()) {
+            FK_SERVER_ERROR(std::format("服务器未注册当前服务的POST处理函数: {}", url));
+            return false;
+        }
+
+        FK_SERVER_INFO(std::format("执行POST处理函数: {}", url));
+        it->second(connection);
+    }
+    else {
+        return false;
+    }
+
+    return true;
 }
 
-void FKLogicSystem::registerCallback(const std::string& url, Http::RequestType requestType, MessageHandler handler)
+void FKLogicSystem::registerCallback(const std::string& url, flicker::http::verb requestType, MessageHandler handler)
 {
-	// 检查参数有效性
-	if (url.empty()) {
-		std::println("错误: 尝试注册空URL的回调函数");
-		return;
-	}
-	
-	if (!handler) {
-		std::println("错误: 尝试注册空回调函数, URL: {}", url);
-		return;
-	}
-	
-	// 根据请求类型注册回调
-	if (requestType == Http::RequestType::GET) {
-		// 检查是否已存在
-		if (_pGetRequestCallBacks.find(url) != _pGetRequestCallBacks.end()) {
-			std::println("警告: 覆盖已存在的GET回调函数, URL: {}", url);
-		}
-		
-		// 注册回调
-		_pGetRequestCallBacks[url] = handler;
-		std::println("成功注册GET回调函数: {}", url);
-	}
-	else if (requestType == Http::RequestType::POST) {
-		// 检查是否已存在
-		if (_pPostRequestCallBacks.find(url) != _pPostRequestCallBacks.end()) {
-			std::println("警告: 覆盖已存在的POST回调函数, URL: {}", url);
-		}
-		
-		// 注册回调
-		_pPostRequestCallBacks[url] = handler;
-		std::println("成功注册POST回调函数: {}", url);
-	}
-	else {
-		std::println("错误: 尝试注册不支持的请求类型回调函数, URL: {}", url);
-	}
+    // 检查参数有效性
+    if (url.empty()) {
+        FK_SERVER_ERROR("尝试注册空URL的回调函数");
+        return;
+    }
+    
+    if (!handler) {
+        FK_SERVER_ERROR(std::format("尝试注册空回调函数, URL: {}", url));
+        return;
+    }
+    
+    if (requestType == flicker::http::verb::get) {
+        if (_pGetRequestCallBacks.find(url) != _pGetRequestCallBacks.end()) {
+            FK_SERVER_WARN(std::format("覆盖已存在的GET回调函数, URL: {}", url));
+        }
+        
+        _pGetRequestCallBacks[url] = handler;
+        FK_SERVER_INFO(std::format("成功注册GET回调函数: {}", url));
+    }
+    else if (requestType == flicker::http::verb::post) {
+        if (_pPostRequestCallBacks.find(url) != _pPostRequestCallBacks.end()) {
+            FK_SERVER_WARN(std::format("覆盖已存在的POST回调函数, URL: {}", url));
+        }
+        
+        _pPostRequestCallBacks[url] = handler;
+        FK_SERVER_INFO(std::format("成功注册POST回调函数: {}", url));
+    }
+    else {
+        
+    }
 }

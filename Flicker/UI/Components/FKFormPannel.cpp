@@ -252,36 +252,36 @@ void FKFormPannel::_initUI()
 void FKFormPannel::_initRegistryCallback()
 {
 #define SHOW_HTTP_RESPONSE_MESSAGE(SuccessPos, ErrorPos) \
-if (responseJsonObj["status"].toInt() != static_cast<int>(FKHttp::status::ok)) {\
-    FKLauncherShell::ShowMessage("ERROR", responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
+if (responseJsonObj["status"].toInt() != static_cast<int>(flicker::http::status::ok)) {\
+    FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
     return;\
 }\
-FKLauncherShell::ShowMessage("SUCCESS", responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::##SuccessPos)
+FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::##SuccessPos)
 
 
-    _pResponseCallbacks.insert(FKHttp::ServiceType::VERIFY_CODE, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(flicker::http::service::VerifyCode, [this](const QJsonObject& responseJsonObj) {
         if (_pFormType == Launcher::FormType::Register) {
             SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
         }
-        else { // RESET_PASSWORD_AUTH
+        else {
             SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomLeft);
         }
         QJsonObject data = responseJsonObj["data"].toObject();
-        if (data["verify_type"].toInt() == static_cast<int>(FKHttp::ServiceType::RESET_PASSWORD)) {
+        if (data["verify_type"].toInt() == static_cast<int>(flicker::http::service::ResetPassword)) {
             _pConfirmButton->setEnabled(true);
         }
         });
 
-    _pResponseCallbacks.insert(FKHttp::ServiceType::LOGIN, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(flicker::http::service::Login, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomLeft);
         });
 
-    _pResponseCallbacks.insert(FKHttp::ServiceType::REGISTER, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(flicker::http::service::Register, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
         
         });
 
-    _pResponseCallbacks.insert(FKHttp::ServiceType::RESET_PASSWORD, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(flicker::http::service::ResetPassword, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
 
         });
@@ -460,7 +460,7 @@ void FKFormPannel::_updateSwitchedUI()
 }
 
 
-void FKFormPannel::_handleServerResponse(FKHttp::ServiceType serviceType, const QJsonObject& responseJsonObj)
+void FKFormPannel::_handleServerResponse(flicker::http::service serviceType, const QJsonObject& responseJsonObj)
 {
     auto callback = _pResponseCallbacks.value(serviceType);
 
@@ -782,17 +782,15 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
     _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
     _pVerifyCodeTimer->start();
 
-    QJsonObject requestObj;
-    requestObj["request_service_type"] = static_cast<int>(FKHttp::ServiceType::VERIFY_CODE);
-
-    QJsonObject dataObj;
+    QJsonObject requestObj, dataObj;
+    requestObj["request_service_type"] = static_cast<int>(flicker::http::service::VerifyCode);
+    requestObj["data"] = dataObj;
     dataObj["email"] = _pEmailLineEdit->text().trimmed();
     dataObj["verify_type"] = _pFormType == Launcher::FormType::Register 
-        ? static_cast<int>(FKHttp::ServiceType::REGISTER)
-        : static_cast<int>(FKHttp::ServiceType::RESET_PASSWORD);
-    requestObj["data"] = dataObj;
+        ? static_cast<int>(flicker::http::service::Register)
+        : static_cast<int>(flicker::http::service::ResetPassword);
 
-    FKHttpManager::getInstance()->sendHttpRequest(FKHttp::ServiceType::VERIFY_CODE,
+    FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::VerifyCode,
         "http://localhost:8080/get_verify_code",
         requestObj);
 }
@@ -804,18 +802,18 @@ void FKFormPannel::_onComfirmButtonClicked()
     QJsonObject requestObj, dataObj;
     switch (_pFormType) {
     case Launcher::FormType::Login: {
-        requestObj["request_service_type"] = static_cast<int>(FKHttp::ServiceType::LOGIN);
+        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::Login);
         requestObj["data"] = dataObj;
         dataObj["username"] = _pUsernameLineEdit->text().trimmed();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
 
-        FKHttpManager::getInstance()->sendHttpRequest(FKHttp::ServiceType::LOGIN,
+        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::Login,
             "http://localhost:8080/login_user",
             requestObj);
         break;
     }
     case Launcher::FormType::Register: {
-        requestObj["request_service_type"] = static_cast<int>(FKHttp::ServiceType::REGISTER);
+        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::Register);
         requestObj["data"] = dataObj;
 
         dataObj["username"] = _pUsernameLineEdit->text().trimmed();
@@ -823,24 +821,32 @@ void FKFormPannel::_onComfirmButtonClicked()
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
         dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
 
-        FKHttpManager::getInstance()->sendHttpRequest(FKHttp::ServiceType::REGISTER, 
+        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::Register, 
             "http://localhost:8080/register_user",
             requestObj);
         break;
     }
     case Launcher::FormType::Authentication: {
+        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::AuthenticateUser);
+        requestObj["data"] = dataObj;
+
+        dataObj["email"] = _pEmailLineEdit->text().trimmed();
+        dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
+
+        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::AuthenticateUser,
+            "http://localhost:8080/authenticate_user",
+            requestObj);
         Q_EMIT this->switchClicked();
         break;
     }
     case Launcher::FormType::ResetPassword: {
-        requestObj["request_service_type"] = static_cast<int>(FKHttp::ServiceType::RESET_PASSWORD);
+        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::ResetPassword);
         requestObj["data"] = dataObj;
 
-        dataObj["email"] = _pUsernameLineEdit->text().trimmed();
+        dataObj["email"] = _pEmailLineEdit->text().trimmed();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
-        dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
 
-        FKHttpManager::getInstance()->sendHttpRequest(FKHttp::ServiceType::RESET_PASSWORD,
+        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::ResetPassword,
             "http://localhost:8080/reset_password",
             requestObj);
 

@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKLogicSystem.h
+ * @ Filename     : FKLogicSystem.h
  * @ Description : 
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/17
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -27,26 +27,27 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
+#include <json/json.h>
 
 #include "FKDef.h"
 #include "FKMacro.h"
 
 class FKHttpConnection;
 class FKLogicSystem {
-	SINGLETON_CREATE_SHARED_H(FKLogicSystem)
-	using MessageHandler = std::function<void(std::shared_ptr<FKHttpConnection>)>;
+    SINGLETON_CREATE_SHARED_H(FKLogicSystem)
+    using MessageHandler = std::function<void(std::shared_ptr<FKHttpConnection>)>;
 public:
 
-	// 外部调用
-	bool callBack(const std::string& url, Http::RequestType requestType, std::shared_ptr<FKHttpConnection> connection);
-	// 内部注册业务回调
-	void registerCallback(const std::string& url, Http::RequestType requestType, MessageHandler handler);
+    // 外部调用
+    bool callBack(const std::string& url, flicker::http::verb requestType, std::shared_ptr<FKHttpConnection> connection);
+    // 内部注册业务回调
+    void registerCallback(const std::string& url, flicker::http::verb requestType, MessageHandler handler);
 private:
-	FKLogicSystem();
-	~FKLogicSystem() = default;
+    FKLogicSystem();
+    ~FKLogicSystem() = default;
 
-	std::unordered_map<std::string, MessageHandler> _pPostRequestCallBacks;
-	std::unordered_map<std::string, MessageHandler> _pGetRequestCallBacks;
+    std::unordered_map<std::string, MessageHandler> _pPostRequestCallBacks;
+    std::unordered_map<std::string, MessageHandler> _pGetRequestCallBacks;
 
 };
 

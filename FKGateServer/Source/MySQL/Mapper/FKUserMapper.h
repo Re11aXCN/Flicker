@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKUserMapper.h
+ * @ Filename     : FKUserMapper.h
  * @ Description : 
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/22
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -17,7 +17,9 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <optional>
+#include <variant>
 #include <chrono>
 #include <mysql.h>
 
@@ -25,13 +27,10 @@ class FKUserEntity;
 class FKMySQLConnectionPool;
 class FKUserMapper {
 public:
-    // 构造函数
     explicit FKUserMapper(const std::string& tableName = "users");
     ~FKUserMapper();
-    // 创建用户表（如果不存在）
-    bool createTableIfNotExists();
 
-    // 插入用户
+    bool createTableIfNotExists();
     bool insertUser(FKUserEntity& user);
 
     // 根据ID查询用户
@@ -57,17 +56,20 @@ public:
 
 private:
     // 通用查询方法，根据条件查询单个用户
-    std::optional<FKUserEntity> _findUserByCondition(const std::string& whereClause, 
-                                                    const std::string& paramValue);
+    std::optional<FKUserEntity> _findUserByCondition(const std::string& whereClause, const std::string& paramValue);
 
     // 从结果集构建用户实体
     FKUserEntity _buildUserFromRow(MYSQL_RES* result, MYSQL_ROW row);
 
     // 解析MySQL时间戳字符串为std::chrono::system_clock::time_point
-    std::chrono::system_clock::time_point parseTimestamp(const std::string& timestampStr);
+    std::chrono::system_clock::time_point _parseTimestamp(const std::string& timestampStr);
+    
+    // 回退方法：手动解析MySQL时间戳字符串
+    std::chrono::system_clock::time_point _fallbackParseTimestamp(const std::string& timestampStr);
 
     // 表名
     std::string _tableName;
+    std::unordered_map<std::string, std::variant<std::size_t, std::string, std::chrono::system_clock::time_point>> _columnMap;
     
     // 连接池
     FKMySQLConnectionPool* _pConnectionPool;

@@ -1,6 +1,6 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKConfigManager.h
+ * @ Filename     : FKConfigManager.h
  * @ Description : 服务器配置单例类，集中管理服务器的各种配置参数
  *                 用于
  *                 FKAsioThreadPool 单例构造时配置初始化、
@@ -8,8 +8,8 @@
  *                 Redis 预留
  *                 Mysql 预留
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/22
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -30,7 +30,6 @@
 #include "FKDef.h"
 #include "Source/FKStructConfig.h"
 
-// 服务器配置类，使用单例模式
 struct FKConfigManager {
     SINGLETON_CREATE_H(FKConfigManager)
 
@@ -39,11 +38,11 @@ public:
     bool saveToFile(const std::string& filePath) const;
 
     const FKServerConfig& getServerConfig() const { return _pServerConfig; }
-	const FKAsioThreadPoolConfig& getAsioThreadPoolConfig() const { return _pAsioThreadPoolConfig; }
-	const FKGrpcServiceConfig& getGrpcServiceConfig(gRPC::ServiceType type) const { return _pGrpcServiceConfigs.at(type); }
-	const FKRedisConfig& getRedisConfig() const { return _pRedisConfig; }
-	const FKMySQLConfig& getMySQLConnectionString() const { return _pMySQLConfig; }
-	const std::chrono::milliseconds& getRequestTimeout() const { return _pRequestTimeout; }
+    const FKAsioThreadPoolConfig& getAsioThreadPoolConfig() const { return _pAsioThreadPoolConfig; }
+    const FKGrpcServiceConfig& getGrpcServiceConfig(flicker::grpc::service type) const { return _pGrpcServiceConfigs.at(type); }
+    const FKRedisConfig& getRedisConfig() const { return _pRedisConfig; }
+    const FKMySQLConfig& getMySQLConnectionString() const { return _pMySQLConfig; }
+    const std::chrono::milliseconds& getRequestTimeout() const { return _pRequestTimeout; }
 
 private:
     FKConfigManager();
@@ -56,16 +55,16 @@ private:
     FKAsioThreadPoolConfig _pAsioThreadPoolConfig;
     
     // GRPC服务配置
-    std::unordered_map<gRPC::ServiceType, FKGrpcServiceConfig> _pGrpcServiceConfigs;
+    std::unordered_map<flicker::grpc::service, FKGrpcServiceConfig> _pGrpcServiceConfigs;
     
-	// Redis配置
-	FKRedisConfig _pRedisConfig;
+    // Redis配置
+    FKRedisConfig _pRedisConfig;
 
     // 数据库配置
-	FKMySQLConfig _pMySQLConfig;
+    FKMySQLConfig _pMySQLConfig;
 
-	// 超时配置
-	std::chrono::milliseconds _pRequestTimeout{ 10 };
+    // 超时配置
+    std::chrono::milliseconds _pRequestTimeout{ 10 };
 
     // 互斥锁，保证线程安全
     mutable std::mutex _pConfigMutex;

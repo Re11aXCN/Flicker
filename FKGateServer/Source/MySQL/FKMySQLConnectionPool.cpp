@@ -1,32 +1,30 @@
-﻿#include "FKMySQLConnectionPool.h"
-#include <print>
+#include "FKMySQLConnectionPool.h"
+
 #include <sstream>
+#include "FKLogger.h"
 #include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
 
 FKMySQLConnectionPool::FKMySQLConnectionPool() {
-    std::println("MySQL连接池已创建");
-    
     try {
         // 从配置管理器获取MySQL配置
         auto& config = FKConfigManager::getInstance()->getMySQLConnectionString();
         _initialize(config);
     } catch (const std::exception& e) {
-        std::println("初始化MySQL连接池失败: {}", e.what());
+        FK_SERVER_ERROR(std::format("初始化MySQL连接池发生异常: {}", e.what()));
     }
 }
 
 FKMySQLConnectionPool::~FKMySQLConnectionPool() {
     shutdown();
-    std::println("MySQL连接池已销毁");
 }
 
 void FKMySQLConnectionPool::_initialize(const FKMySQLConfig& config) {
     std::lock_guard<std::mutex> lock(_pMutex);
     
     if (_pIsInitialized) {
-        std::println("MySQL连接池已经初始化");
+        FK_SERVER_WARN("MySQL连接池已经初始化");
         return;
     }
     
@@ -34,23 +32,19 @@ void FKMySQLConnectionPool::_initialize(const FKMySQLConfig& config) {
     
     // 初始化MySQL库
     if (mysql_library_init(0, nullptr, nullptr)) {
-        std::println("MySQL库初始化失败");
+        FK_SERVER_ERROR("MySQL库初始化失败");
         return;
     }
     
     // 创建初始连接
     for (size_t i = 0; i < _pConfig.PoolSize; ++i) {
-        try {
-            auto conn = _createConnection();
-            if (conn) {
-                _pConnectionPool.push(std::move(conn));
-            }
-        } catch (const std::exception& e) {
-            std::println("创建MySQL连接失败: {}", e.what());
+        auto conn = _createConnection();
+        if (conn) {
+            _pConnectionPool.push(std::move(conn));
         }
     }
     
-    std::println("MySQL连接池初始化完成，创建了 {} 个连接", _pConnectionPool.size());
+    FK_SERVER_INFO(std::format("MySQL连接池初始化完成，创建了 {} 个连接", _pConnectionPool.size()));
     
     // 标记为已初始化
     _pIsInitialized = true;
@@ -70,30 +64,39 @@ void FKMySQLConnectionPool::shutdown() {
         _pIsInitialized = false;
     }
     
-    // 通知监控线程退出
-    _pCondVar.notify_all();
-    
-    // 等待监控线程结束
-    if (_pMonitorThread.joinable()) {
-        _pMonitorThread.join();
+    try {
+        // 通知监控线程退出
+        _pCondVar.notify_all();
+        
+        // 等待监控线程结束
+        if (_pMonitorThread.joinable()) {
+            _pMonitorThread.join();
+        }
+        
+        // 清空连接池
+        std::lock_guard<std::mutex> lock(_pMutex);
+        while (!_pConnectionPool.empty()) {
+            auto conn = _pConnectionPool.front();
+            _pConnectionPool.pop();
+            // conn的析构函数会自动关闭连接
+        }
+        
+        // 关闭MySQL库
+        mysql_library_end();
+        
+        FK_SERVER_INFO("MySQL连接池已关闭");
+    } catch (const std::exception& e) {
+        FK_SERVER_ERROR(std::format("关闭MySQL连接池时发生异常: {}", e.what()));
+    } catch (...) {
+        FK_SERVER_ERROR("关闭MySQL连接池时发生未知异常");
     }
-    
-    // 清空连接池
-    std::lock_guard<std::mutex> lock(_pMutex);
-    while (!_pConnectionPool.empty()) {
-        _pConnectionPool.pop();
-    }
-    
-    // 关闭MySQL库
-    mysql_library_end();
-    
-    std::println("MySQL连接池已关闭");
 }
 
 std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
+    MYSQL* mysql = nullptr;
     try {
         // 初始化MySQL连接
-        MYSQL* mysql = mysql_init(nullptr);
+        mysql = mysql_init(nullptr);
         if (!mysql) {
             throw std::runtime_error("MySQL初始化失败");
         }
@@ -107,9 +110,9 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
         // 使用会话变量设置自动重连
         // 注意：连接后需要执行SET SESSION wait_timeout和SET SESSION interactive_timeout
         // 来延长连接超时时间，防止连接断开
-		// 设置自动重连
-		//char reconnect = 1;
-		//mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
+        // 设置自动重连
+        //char reconnect = 1;
+        //mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
         // 设置字符集
         mysql_options(mysql, MYSQL_SET_CHARSET_NAME, "utf8mb4");
@@ -127,23 +130,39 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
             )) {
             std::string error = mysql_error(mysql);
             mysql_close(mysql);
+            mysql = nullptr;
             throw std::runtime_error("MySQL连接失败: " + error);
         }
         
         // 设置会话变量来延长连接超时时间，替代已弃用的MYSQL_OPT_RECONNECT
         if (mysql_query(mysql, "SET SESSION wait_timeout=28800") != 0) {
-            std::println("设置wait_timeout失败: {}", mysql_error(mysql));
+            std::string error = mysql_error(mysql);
+            FK_SERVER_ERROR(std::format("设置wait_timeout失败: {}", error));
+            // 不抛出异常，继续尝试设置interactive_timeout
         }
         
         if (mysql_query(mysql, "SET SESSION interactive_timeout=28800") != 0) {
-            std::println("设置interactive_timeout失败: {}", mysql_error(mysql));
+            std::string error = mysql_error(mysql);
+            FK_SERVER_ERROR(std::format("设置interactive_timeout失败: {}", error));
+            // 不抛出异常，继续使用连接
         }
         
         // 创建连接包装对象
         return std::make_shared<FKMySQLConnection>(mysql);
     } catch (const std::exception& e) {
-        std::println("创建MySQL连接失败: {}", e.what());
+        FK_SERVER_ERROR(std::format("创建MySQL连接发生异常: {}", e.what()));
+        if (mysql) {
+            mysql_close(mysql);
+            mysql = nullptr;
+        }
         throw;
+    } catch (...) {
+        FK_SERVER_ERROR("创建MySQL连接时发生未知异常");
+        if (mysql) {
+            mysql_close(mysql);
+            mysql = nullptr;
+        }
+        throw std::runtime_error("创建MySQL连接时发生未知异常");
     }
 }
 
@@ -170,8 +189,13 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::getConnection() {
     
     if (_pConnectionPool.empty()) {
         // 连接池为空，创建新连接
-        std::println("MySQL连接池已用尽，创建新连接");
-        return _createConnection();
+        FK_SERVER_WARN("MySQL连接池已用尽，创建新连接");
+        try {
+            return _createConnection();
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("创建MySQL连接发生异常: {}", e.what()));
+            throw; // 重新抛出异常，让调用者处理
+        }
     }
     
     // 从池中获取连接
@@ -182,13 +206,18 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::getConnection() {
         // 检查连接是否有效
         if (conn->isValid()) {
             return conn;
-        } else {
-            std::println("连接已失效，创建新连接");
-            return _createConnection();
-        }
-    } catch (const std::exception& e) {
-        std::println("连接已失效，创建新连接: {}", e.what());
+        } 
+
+        FK_SERVER_WARN("连接已失效，创建新连接");
         return _createConnection();
+    } catch (const std::exception& e) {
+        FK_SERVER_ERROR(std::format("检查连接有效性发生异常: {}", e.what()));
+        try {
+            return _createConnection();
+        } catch (const std::exception& e2) {
+            FK_SERVER_ERROR(std::format("创建MySQL连接发生异常: {}", e2.what()));
+            throw std::runtime_error("无法获取有效的数据库连接");
+        }
     }
 }
 
@@ -202,71 +231,96 @@ void FKMySQLConnectionPool::releaseConnection(std::shared_ptr<FKMySQLConnection>
         return;
     }
     
-    // 更新最后活动时间
-    conn->updateActiveTime();
-    
-    // 将连接放回池中
-    _pConnectionPool.push(std::move(conn));
+    try {
+        // 检查连接是否有效
+        if (conn->isValid()) {
+            // 更新最后活动时间
+            conn->updateActiveTime();
+            
+            // 将连接放回池中
+            _pConnectionPool.push(std::move(conn));
+        } else {
+            FK_SERVER_WARN("释放无效连接，不放回连接池");
+            // 无效连接不放回池中，conn的析构函数会自动关闭连接
+        }
+    } catch (const std::exception& e) {
+        FK_SERVER_ERROR(std::format("释放连接时发生异常: {}", e.what()));
+        // 发生异常的连接不放回池中
+    }
 }
 
 void FKMySQLConnectionPool::_monitorThreadFunc() {
-    std::println("MySQL连接池监控线程已启动");
-    
+    FK_SERVER_INFO("MySQL连接池监控线程已启动");
     while (!_pIsShutdown) {
-        // 等待监控间隔时间或者收到关闭通知
-        {
-            std::unique_lock<std::mutex> lock(_pMutex);
-            if (_pCondVar.wait_for(lock, _pConfig.MonitorInterval, [this] { return _pIsShutdown.load(); })) {
-                // 收到关闭通知
-                break;
-            }
-            
-            if (_pConnectionPool.empty()) {
-                continue;
-            }
-            
-            // 检查并关闭超时连接
-            size_t initialSize = _pConnectionPool.size();
-            std::queue<std::shared_ptr<FKMySQLConnection>> tempQueue;
-            
-            // 遍历连接池中的所有连接
-            while (!_pConnectionPool.empty()) {
-                auto conn = _pConnectionPool.front();
-                _pConnectionPool.pop();
+        try {
+            // 等待监控间隔时间或者收到关闭通知
+            {
+                std::unique_lock<std::mutex> lock(_pMutex);
+                if (_pCondVar.wait_for(lock, _pConfig.MonitorInterval, [this] { return _pIsShutdown.load(); })) {
+                    // 收到关闭通知
+                    break;
+                }
                 
-                // 检查连接是否超时
-                if (conn->isExpired(_pConfig.IdleTimeout)) {
-                    // 连接已超时，不放回池中
-                    std::println("关闭超时MySQL连接");
-                    // conn的析构函数会自动关闭连接
-                } else {
-                    // 检查连接是否有效
+                if (_pConnectionPool.empty()) {
+                    continue;
+                }
+                
+                // 检查并关闭超时连接
+                size_t initialSize = _pConnectionPool.size();
+                std::queue<std::shared_ptr<FKMySQLConnection>> tempQueue;
+                
+                // 遍历连接池中的所有连接
+                while (!_pConnectionPool.empty()) {
+                    auto conn = _pConnectionPool.front();
+                    _pConnectionPool.pop();
+                    
+                    if (!conn) {
+                        // 跳过空连接
+                        continue;
+                    }
+                    
                     try {
-                        if (conn->isValid()) {
-                            // 连接有效且未超时，放回临时队列
-                            tempQueue.push(std::move(conn));
-                        } else {
-                            std::println("关闭无效MySQL连接");
+                        // 检查连接是否超时
+                        if (conn->isExpired(_pConfig.IdleTimeout)) {
+                            // 连接已超时，不放回池中
+                            FK_SERVER_WARN("关闭超时MySQL连接");
                             // conn的析构函数会自动关闭连接
+                        } else {
+                            // 检查连接是否有效
+                            if (conn->isValid()) {
+                                // 连接有效且未超时，放回临时队列
+                                tempQueue.push(std::move(conn));
+                            } else {
+                                FK_SERVER_WARN("关闭无效MySQL连接");
+                                // conn的析构函数会自动关闭连接
+                            }
                         }
                     } catch (const std::exception& e) {
-                        std::println("检查连接有效性异常: {}", e.what());
+                        FK_SERVER_ERROR(std::format("检查连接有效性异常: {}", e.what()));
                         // 连接异常，不放回池中
                     }
                 }
+                
+                // 将临时队列中的连接放回连接池
+                _pConnectionPool = std::move(tempQueue);
+                
+                if (initialSize != _pConnectionPool.size()) {
+                    FK_SERVER_INFO(std::format("MySQL连接池监控: 关闭了 {} 个超时或无效连接，当前连接数: {}", 
+                        initialSize - _pConnectionPool.size(), _pConnectionPool.size()));
+                }
             }
-            
-            // 将临时队列中的连接放回连接池
-            _pConnectionPool = std::move(tempQueue);
-            
-            if (initialSize != _pConnectionPool.size()) {
-                std::println("MySQL连接池监控: 关闭了 {} 个超时或无效连接，当前连接数: {}", 
-                    initialSize - _pConnectionPool.size(), _pConnectionPool.size());
-            }
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("MySQL连接池监控线程异常: {}", e.what()));
+            // 短暂休眠，避免因异常导致的CPU占用过高
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        } catch (...) {
+            FK_SERVER_ERROR("MySQL连接池监控线程发生未知异常");
+            // 短暂休眠，避免因异常导致的CPU占用过高
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
     
-    std::println("MySQL连接池监控线程已退出");
+    FK_SERVER_INFO("MySQL连接池监控线程已退出");
 }
 
 std::string FKMySQLConnectionPool::getStatus() const {

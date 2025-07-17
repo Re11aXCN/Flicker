@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKAsioThreadPool.h
+ * @ Filename     : FKAsioThreadPool.h
  * @ Description : 高效的Asio线程池实现，支持多线程运行io_context
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/19
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -24,7 +24,7 @@
 #include <span>
 #include <source_location>
 #include <format>
-#include <print>
+
 #include <boost/asio.hpp>
 #include <boost/asio/experimental/channel.hpp>
 #include "FKMacro.h"
@@ -36,20 +36,20 @@
  */
 class FKAsioThreadPool
 {
-	SINGLETON_CREATE_H(FKAsioThreadPool)
+    SINGLETON_CREATE_H(FKAsioThreadPool)
 public:
-	// 使用别名简化类型定义
-	using ioContext = boost::asio::io_context;
-	using executor = ioContext::executor_type;
-	using workGuard = boost::asio::executor_work_guard<executor>;
-	using taskChannel = boost::asio::experimental::channel<void(boost::system::error_code, std::function<void()>)>;
-	
-	// 任务优先级枚举
-	enum class Priority {
-		high,
-		normal,
-		low
-	};
+    // 使用别名简化类型定义
+    using ioContext = boost::asio::io_context;
+    using executor = ioContext::executor_type;
+    using workGuard = boost::asio::executor_work_guard<executor>;
+    using taskChannel = boost::asio::experimental::channel<void(boost::system::error_code, std::function<void()>)>;
+    
+    // 任务优先级枚举
+    enum class Priority {
+        high,
+        normal,
+        low
+    };
 
     /**
      * @brief 停止线程池
@@ -106,14 +106,6 @@ private:
      * @brief 启动任务分发器
      */
     void _startTaskDispatcher();
-    
-    /**
-     * @brief 记录错误日志
-     * @param message 错误消息
-     * @param details 详细信息
-     * @param location 源代码位置
-     */
-    void _logError(std::string_view message, std::string_view details, const std::source_location& location);
 
     FKAsioThreadPool();
     ~FKAsioThreadPool();

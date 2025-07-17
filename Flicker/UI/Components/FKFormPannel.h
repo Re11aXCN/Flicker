@@ -58,7 +58,7 @@ private:
     bool _validateVerifyCode(const QString& verifyCode);
 
     // private slots
-    Q_SLOT void _handleServerResponse(FKHttp::ServiceType serviceType, const QJsonObject& responseJsonObj);
+    Q_SLOT void _handleServerResponse(flicker::http::service serviceType, const QJsonObject& responseJsonObj);
     Q_SLOT void _onGetVerifyCodeButtonClicked();
     Q_SLOT void _onComfirmButtonClicked();
     Q_SLOT void _onSwitchSigninOrResetTextClicked();
@@ -92,7 +92,7 @@ private:
     QString _pNormalStyleSheet{};
     QIcon _pShowPasswordIcon;
     QIcon _pHidePasswordIcon;
-    QHash<FKHttp::ServiceType, std::function<void(const QJsonObject&)>> _pResponseCallbacks;
+    QHash<flicker::http::service, std::function<void(const QJsonObject&)>> _pResponseCallbacks;
 
     QWidget* _pLoginRegisterWidget{ nullptr };
     QWidget* _pResetPasswordWidget{ nullptr };

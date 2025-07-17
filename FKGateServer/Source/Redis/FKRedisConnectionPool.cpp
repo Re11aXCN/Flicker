@@ -1,26 +1,25 @@
 ﻿#include "FKRedisConnectionPool.h"
 #include <sstream>
+
+#include "FKLogger.h"
 #include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_SHARED_CPP(FKRedisConnectionPool)
 
 FKRedisConnectionPool::FKRedisConnectionPool() {
-    std::println("FKRedisConnectionPool 已创建");
-
     // 初始化连接池
     _initialize(FKConfigManager::getInstance()->getRedisConfig());
 }
 
 FKRedisConnectionPool::~FKRedisConnectionPool() {
     shutdown();
-    std::println("FKRedisConnectionPool 已销毁");
 }
 
 void FKRedisConnectionPool::_initialize(const FKRedisConfig& config) {
     std::lock_guard<std::mutex> lock(_pMutex);
     
     if (_pIsInitialized) {
-        std::println("Redis连接池已初始化，请先关闭再重新初始化");
+        FK_SERVER_WARN("Redis连接池已初始化，请先关闭再重新初始化");
         return;
     }
     
@@ -36,9 +35,9 @@ void FKRedisConnectionPool::_initialize(const FKRedisConfig& config) {
         }
         
         _pIsInitialized = true;
-        std::println("Redis连接池初始化成功，连接数: {}", _pConnectionPool.size());
+        FK_SERVER_INFO(std::format("Redis连接池初始化成功，连接数: {}", _pConnectionPool.size()));
     } catch (const std::exception& e) {
-        std::println("Redis连接池初始化失败: {}", e.what());
+        FK_SERVER_ERROR(std::format("Redis连接池初始化失败: {}", e.what()));
         shutdown();
         throw;
     }
@@ -53,7 +52,7 @@ void FKRedisConnectionPool::shutdown() {
     }
     
     _pIsInitialized = false;
-    std::println("Redis连接池已关闭");
+    FK_SERVER_INFO("Redis连接池已关闭");
 }
 
 std::unique_ptr<sw::redis::Redis> FKRedisConnectionPool::_createConnection() {
@@ -83,7 +82,7 @@ std::unique_ptr<sw::redis::Redis> FKRedisConnectionPool::_createConnection() {
         
         return redis;
     } catch (const std::exception& e) {
-        std::println("创建Redis连接失败: {}", e.what());
+        FK_SERVER_ERROR(std::format("创建Redis连接失败: {}", e.what()));
         throw;
     }
 }
@@ -97,7 +96,7 @@ std::unique_ptr<sw::redis::Redis> FKRedisConnectionPool::getConnection() {
     
     if (_pConnectionPool.empty()) {
         // 连接池为空，创建新连接
-        std::println("Redis连接池已用尽，创建新连接");
+        FK_SERVER_WARN("Redis连接池已用尽，创建新连接");
         return _createConnection();
     }
     

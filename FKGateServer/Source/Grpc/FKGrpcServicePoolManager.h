@@ -1,10 +1,10 @@
 ﻿/*************************************************************************************
  *
- * @ Filename	 : FKGrpcServicePoolManager.h
+ * @ Filename     : FKGrpcServicePoolManager.h
  * @ Description : gRPC服务管理器，管理不同的gRPC业务连接池
  * 
- * @ Version	 : V1.0
- * @ Author		 : Re11a
+ * @ Version     : V1.0
+ * @ Author         : Re11a
  * @ Date Created: 2025/6/21
  * ======================================
  * HISTORICAL UPDATE HISTORY
@@ -20,7 +20,7 @@
 #include <unordered_map>
 #include <chrono>
 #include <mutex>
-#include <print>
+
 
 #include "FKDef.h"
 #include "FKMacro.h"
@@ -28,19 +28,22 @@
 #include "Source/FKStructConfig.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
-#include "./VerifyCode/FKVerifyCodeGrpc.grpc.pb.h"
-#include "./Password/FKPasswordGrpc.grpc.pb.h"
+#include "./Service/FKGrpcService.grpc.pb.h"
 
 // 服务特性模板
-template <gRPC::ServiceType T> struct ServiceTraits;
+template <flicker::grpc::service T> struct ServiceTraits;
 
 // 特化模板
-template<> struct ServiceTraits<gRPC::ServiceType::VERIFY_CODE_SERVICE> {
-	using Type = FKVerifyCodeGrpc::VerifyCodeService;
+template<> struct ServiceTraits<flicker::grpc::service::VerifyCode> {
+    using Type = FKGrpcService::Verification;
 };
 
-template<> struct ServiceTraits<gRPC::ServiceType::PASSWORD_SERVICE> {
-	using Type = FKPasswordGrpc::PasswordService;
+template<> struct ServiceTraits<flicker::grpc::service::EncryptPassword> {
+    using Type = FKGrpcService::Encryption;
+};
+
+template<> struct ServiceTraits<flicker::grpc::service::AuthenticatePwdReset> {
+    using Type = FKGrpcService::Authentication;
 };
 #pragma endregion SERVICE_TRAITS_TEMPLATE
 
@@ -49,21 +52,21 @@ class FKGrpcServicePoolManager {
 public:
     // 获取所有服务的状态信息
     std::string getAllServicesStatus() const;
-    void shutdownService(gRPC::ServiceType serviceType);
+    void shutdownService(flicker::grpc::service rpcService);
     void shutdownAllServices();
 
     // 获取特定服务类型的连接池，可以链式调用特定连接池提供服务的接口
-    template<gRPC::ServiceType ServiceType>
+    template<flicker::grpc::service rpcService>
     auto& getServicePool() {
         std::lock_guard<std::mutex> lock(_pMutex);
         
-        auto it = _pServicePools.find(ServiceType);
+        auto it = _pServicePools.find(rpcService);
         if (it == _pServicePools.end()) {
-            throw std::runtime_error(std::format("服务未初始化: {}", static_cast<int>(ServiceType)));
+            throw std::runtime_error(std::format("服务未初始化: {}", static_cast<int>(rpcService)));
         }
         
         // 使用static_cast将void*转换为具体类型
-        using ServiceTraitType = typename ServiceTraits<ServiceType>::Type;
+        using ServiceTraitType = typename ServiceTraits<rpcService>::Type;
         auto* pool = static_cast<FKGrpcConnectionPool<ServiceTraitType>*>(it->second.poolPtr);
         return *pool;
     }
@@ -71,15 +74,15 @@ public:
 private:
     FKGrpcServicePoolManager();
     ~FKGrpcServicePoolManager();
-	// 初始化特定类型的gRPC服务连接池
-	void _initializeService(gRPC::ServiceType serviceType);
+    // 初始化特定类型的gRPC服务连接池
+    void _initializeService(flicker::grpc::service rpcService);
 
-	struct ServicePoolWrapper {
-		void* poolPtr{ nullptr };
-		std::function<void()> shutdown;
-		std::function<std::string()> getStatus;
-	};
-    std::unordered_map<gRPC::ServiceType, ServicePoolWrapper> _pServicePools;
+    struct ServicePoolWrapper {
+        void* poolPtr{ nullptr };
+        std::function<void()> shutdown;
+        std::function<std::string()> getStatus;
+    };
+    std::unordered_map<flicker::grpc::service, ServicePoolWrapper> _pServicePools;
     mutable std::mutex _pMutex;
 };
 
