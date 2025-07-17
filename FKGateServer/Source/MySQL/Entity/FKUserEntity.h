@@ -18,10 +18,18 @@
 #include <string>
 #include <chrono>
 #include <optional>
+#include <array>
+#include "../Mapper/FKFieldMapper.hpp"
 
-// 用户实体类
+class FKUserMapper;
 class FKUserEntity {
+    friend class FKUserMapper;
 public:
+    using FieldTypeList = TypeList<std::size_t, std::string, std::chrono::system_clock::time_point, std::optional<std::chrono::system_clock::time_point>>;
+    static constexpr std::array<const char*, 7> FIELD_NAMES = {
+       "id", "uuid", "username", "email", "password", "create_time", "update_time"
+    };
+
     explicit FKUserEntity() = default;
     ~FKUserEntity() = default;
 
@@ -70,5 +78,6 @@ private:
     std::chrono::system_clock::time_point _createTime{};
     std::optional<std::chrono::system_clock::time_point> _updateTime{std::nullopt};
 };
+
 
 #endif // !FK_USER_ENTITY_H_

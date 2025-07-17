@@ -39,10 +39,11 @@
     <ClInclude Include="Source\Grpc\Service\FKGrpcService.pb.h" />
     <ClInclude Include="Source\Grpc\Service\FKGrpcServiceClient.hpp" />
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
+    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper.hpp" />
     <ClInclude Include="Source\MySQL\FKMySQLConnection.h" />
     <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h" />
+    <ClInclude Include="Source\MySQL\Mapper\FKFieldMapper.hpp" />
     <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h" />
-    <ClInclude Include="Source\MySQL\Service\FKUserService.h" />
     <ClInclude Include="Source\Redis\FKRedisConnectionPool.h" />
   </ItemGroup>
   <ItemGroup>
@@ -59,7 +60,6 @@
     <ClCompile Include="Source\MySQL\FKMySQLConnection.cpp" />
     <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp" />
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp" />
-    <ClCompile Include="Source\MySQL\Service\FKUserService.cpp" />
     <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

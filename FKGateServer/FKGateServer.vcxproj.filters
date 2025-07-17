@@ -57,9 +57,6 @@
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\Service\FKUserService.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp">
@@ -110,7 +107,10 @@
     <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MySQL\Service\FKUserService.h">
+    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\FKFieldMapper.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,7 +1,7 @@
 ﻿/*************************************************************************************
  *
  * @ Filename     : FKUserMapper.h
- * @ Description : 
+ * @ Description : 用户实体数据库映射器
  * 
  * @ Version     : V1.0
  * @ Author         : Re11a
@@ -17,62 +17,54 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
 #include <optional>
-#include <variant>
-#include <chrono>
+#include <memory>
 #include <mysql.h>
 
-class FKUserEntity;
-class FKMySQLConnectionPool;
-class FKUserMapper {
+#include "../Entity/FKUserEntity.h"
+#include "FKBaseMapper.hpp"
+class FKUserMapper : public FKBaseMapper<FKUserEntity, std::size_t> {
 public:
-    explicit FKUserMapper(const std::string& tableName = "users");
-    ~FKUserMapper();
-
-    bool createTableIfNotExists();
-    bool insertUser(FKUserEntity& user);
-
-    // 根据ID查询用户
-    std::optional<FKUserEntity> findUserById(int id);
-
-    // 根据UUID查询用户
-    std::optional<FKUserEntity> findUserByUuid(const std::string& uuid);
-
-    // 根据用户名查询用户
-    std::optional<FKUserEntity> findUserByUsername(const std::string& username);
-
-    // 根据邮箱查询用户
-    std::optional<FKUserEntity> findUserByEmail(const std::string& email);
-
-    // 更新用户信息
-    bool updateUser(const FKUserEntity& user);
-
-    // 删除用户
-    bool deleteUser(int id);
-
-    // 查询所有用户
-    std::vector<FKUserEntity> findAllUsers();
-
-private:
-    // 通用查询方法，根据条件查询单个用户
-    std::optional<FKUserEntity> _findUserByCondition(const std::string& whereClause, const std::string& paramValue);
-
-    // 从结果集构建用户实体
-    FKUserEntity _buildUserFromRow(MYSQL_RES* result, MYSQL_ROW row);
-
-    // 解析MySQL时间戳字符串为std::chrono::system_clock::time_point
-    std::chrono::system_clock::time_point _parseTimestamp(const std::string& timestampStr);
+    FKUserMapper();
+    ~FKUserMapper() override = default;
     
-    // 回退方法：手动解析MySQL时间戳字符串
-    std::chrono::system_clock::time_point _fallbackParseTimestamp(const std::string& timestampStr);
-
-    // 表名
-    std::string _tableName;
-    std::unordered_map<std::string, std::variant<std::size_t, std::string, std::chrono::system_clock::time_point>> _columnMap;
+    // 根据邮箱查找用户
+    std::optional<FKUserEntity> findByEmail(const std::string& email);
     
-    // 连接池
-    FKMySQLConnectionPool* _pConnectionPool;
+    // 根据用户名查找用户
+    std::optional<FKUserEntity> findByUsername(const std::string& username);
+    
+    // 根据邮箱更新密码和更新时间
+    DbOperator::Status updatePasswordByEmail(const std::string& email, 
+                                           const std::string& password);
+    
+    // 根据邮箱删除用户
+    DbOperator::Status deleteByEmail(const std::string& email);
+    
+protected:
+    // 实现基类的虚函数
+    std::string getTableName() const override;
+    std::string findByIdQuery() const override;
+    std::string findAllQuery() const override;
+    std::string insertQuery() const override;
+    std::string deleteByIdQuery() const override;
+    
+    void bindIdParam(MYSQL_STMT* stmt, std::size_t id) const override;
+    void bindInsertParams(MYSQL_STMT* stmt, const FKUserEntity& entity) const override;
+    
+    FKUserEntity createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const override;
+    
+    // 自定义查询方法
+    std::string findByEmailQuery() const;
+    std::string findByUsernameQuery() const;
+    std::string updatePasswordByEmailQuery() const;
+    std::string deleteByEmailQuery() const;
+    
+    // 自定义参数绑定方法
+    void bindEmailParam(MYSQL_STMT* stmt, const std::string& email) const;
+    void bindUsernameParam(MYSQL_STMT* stmt, const std::string& username) const;
+    void bindPasswordAndEmailParams(MYSQL_STMT* stmt, const std::string& password, 
+                                   const std::string& email) const;
 };
 
 #endif // !FK_USER_MAPPER_H_
