@@ -1,13 +1,16 @@
 ﻿/**
- * 邮件服务模块
- * 负责处理邮件发送功能
+ * 邮箱验证码服务
+ * 提供gRPC服务，处理验证码请求并发送邮件
  */
 
+const grpc = require('@grpc/grpc-js');
 const nodemailer = require('nodemailer');
 const { v4: uuidv4 } = require('uuid');
-const { mailConfig } = require('../config/config-loader');
+
+const { mailConfig, serviceConfig } = require('../config/config-loader');
+const { loadProtoFile } = require('../utils/proto-loader');
 const { ERROR_CODE, VERIFICATION } = require('../utils/constants');
-const { getRedis, queryRedis, setRedisExpire } = require('../utils/redis');
+const { getRedis, setRedisExpire } = require('../utils/redis');
 
 /**
  * 创建邮件传输对象
@@ -77,9 +80,9 @@ async function sendVerificationEmail(email, code) {
  * @param {Object} call - gRPC调用对象，包含请求信息
  * @param {Function} callback - 回调函数，用于返回响应
  */
-async function getVerificationCode(call, callback) {
-    const { email, request_type } = call.request;
-    console.log(`收到验证码请求，邮箱: ${email}, 请求类型: ${request_type}`);
+async function getVerifyCode(call, callback) {
+    const { email, rpc_request_type } = call.request;
+    console.log(`收到验证码请求，邮箱: ${email}, 请求类型: ${rpc_request_type}`);
 
     try {
         // 构建Redis键名
@@ -92,10 +95,8 @@ async function getVerificationCode(call, callback) {
 
             // 返回成功响应，使用现有验证码
             callback(null, {
-                status_code: ERROR_CODE.SUCCESS,
+                rpc_response_code: ERROR_CODE.SUCCESS,
                 message: "验证码发送成功",
-                request_type: request_type,
-                email: email,
                 verify_code: existingCode
             });
             return;
@@ -114,10 +115,8 @@ async function getVerificationCode(call, callback) {
         if (!saveResult) {
             console.error(`存储验证码到Redis失败: ${email}`);
             callback(null, {
-                status_code: ERROR_CODE.REDIS_ERROR,
+                rpc_response_code: ERROR_CODE.REDIS_ERROR,
                 message: "验证码存储失败，请稍后重试",
-                request_type: request_type,
-                email: email,
                 verify_code: ""
             });
             return;
@@ -127,10 +126,8 @@ async function getVerificationCode(call, callback) {
 
         // 返回成功响应 - 注意字段名与proto定义匹配
         callback(null, {
-            status_code: ERROR_CODE.SUCCESS,
+            rpc_response_code: ERROR_CODE.SUCCESS,
             message: "验证码发送成功",
-            request_type: request_type,
-            email: email,
             verify_code: verificationCode
         });
     } catch (error) {
@@ -138,16 +135,39 @@ async function getVerificationCode(call, callback) {
 
         // 返回错误响应 - 注意字段名与proto定义匹配
         callback(null, {
-            status_code: ERROR_CODE.EMAIL_SEND_FAILED,
+            rpc_response_code: ERROR_CODE.EMAIL_SEND_FAILED,
             message: `发送验证码失败: ${error.message}`,
-            request_type: request_type || 0,
-            email: email,
             verify_code: ""
         });
     }
 }
 
+/**
+ * 启动gRPC服务器
+ */
+function startServer() {
+    const server = new grpc.Server();
+    const protoDescriptor = loadProtoFile();
+    
+    server.addService(protoDescriptor.Verification.service, { 
+        GetVerifyCode: getVerifyCode 
+    });
 
-module.exports = {
-    getVerificationCode,
-};
+    const { host, port } = serviceConfig.verification;
+    const serverAddress = `${host}:${port}`;
+    server.bindAsync(
+        serverAddress, 
+        grpc.ServerCredentials.createInsecure(), 
+        (error, port) => {
+            if (error) {
+                console.error(`服务器绑定失败: ${error.message}`);
+                return;
+            }
+
+            console.log(`验证码服务已启动，监听地址: ${serverAddress}`);
+        }
+    );
+}
+
+// 启动服务器
+startServer();

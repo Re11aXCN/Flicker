@@ -25,9 +25,13 @@
       "host": "127.0.0.1",
       "port": 50051
     },
-    "cipher": {
+    "encryption": {
       "host": "127.0.0.1",
       "port": 50052
+    },
+    "authentication": {
+      "host": "127.0.0.1",
+      "port": 50053
     }
   }
 }

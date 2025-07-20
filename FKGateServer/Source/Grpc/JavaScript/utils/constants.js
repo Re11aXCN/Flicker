@@ -22,7 +22,7 @@ const ERROR_CODE = {
     // Redis操作错误
     REDIS_ERROR: 1,
     // 系统异常
-    EXCEPTION: 2,
+    SYSTEM_EXCEPTION: 2,
     // 邮件发送失败
     EMAIL_SEND_FAILED: 3,
     // 验证码已过期

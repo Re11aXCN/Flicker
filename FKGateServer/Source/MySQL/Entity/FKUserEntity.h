@@ -25,7 +25,15 @@ class FKUserMapper;
 class FKUserEntity {
     friend class FKUserMapper;
 public:
-    using FieldTypeList = TypeList<std::size_t, std::string, std::chrono::system_clock::time_point, std::optional<std::chrono::system_clock::time_point>>;
+    using FieldTypeList = TypeList<
+        std::size_t,                                         // id
+        std::string,                                         // uuid
+        std::string,                                         // username
+        std::string,                                         // email
+        std::string,                                         // password
+        std::chrono::system_clock::time_point,               // create_time
+        std::optional<std::chrono::system_clock::time_point> // update_time
+    >;
     static constexpr std::array<const char*, 7> FIELD_NAMES = {
        "id", "uuid", "username", "email", "password", "create_time", "update_time"
     };

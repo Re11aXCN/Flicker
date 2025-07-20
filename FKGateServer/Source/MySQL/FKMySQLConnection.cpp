@@ -1,4 +1,4 @@
-#include "FKMySQLConnection.h"
+﻿#include "FKMySQLConnection.h"
 
 #include "FKLogger.h"
 

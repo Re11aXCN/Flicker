@@ -1,7 +1,7 @@
 ﻿#ifndef FK_PASSWORD_GRPC_CLIENT_H_
 #define FK_PASSWORD_GRPC_CLIENT_H_
 
-#include "../FKGrpcServicePoolManager.h"
+#include "FKGrpcServicePoolManager.h"
 
 template<flicker::grpc::service T>
 class FKGrpcServiceClient {

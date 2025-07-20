@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 配置加载器
  * 负责加载和解析配置文件
  */
@@ -54,7 +54,8 @@ const redisConfig = {
 // 服务配置
 const serviceConfig = {
     verification: config.server.verification,
-    cipher: config.server.cipher
+    encryption: config.server.encryption,
+    authentication: config.server.authentication
 };
 
 module.exports = {

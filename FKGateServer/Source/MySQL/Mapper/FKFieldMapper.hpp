@@ -122,14 +122,9 @@ class IntrospectiveFieldMapper {
 
     // 从用户类提取字段数量
     static constexpr size_t FieldCount = std::tuple_size_v<decltype(T::FIELD_NAMES)>;
-
+public:
     // 提取字段类型列表
     using FieldTypes = typename T::FieldTypeList;
-
-    static_assert(FieldTypes::size <= FieldCount,
-        "Field type count cannot be greater than match name count");
-
-public:
     using VariantType = typename TypeListToVariant<
         typename UniqueTypes<typename FieldTypes>::type
     >::type;
@@ -140,7 +135,8 @@ public:
     constexpr IntrospectiveFieldMapper(MemberPointers... pointers) {
         /*static_assert(sizeof...(MemberPointers) == FieldCount,
             "Number of member pointers must match field count");*/
-
+        static_assert(FieldTypes::size == FieldCount,
+            "Field type count must match name count");
         // 编译时验证每个成员指针类型
         _validateMemberTypes<0>(pointers...);
     }
@@ -176,8 +172,7 @@ private:
 
     template <size_t I>
     void _populateSingle(VariantMap& map) const {
-        using MemberType = std::tuple_element_t<I,
-            typename TypeListToVariant<FieldTypes>::type>;
+        using MemberType = TypeAt_t<I, FieldTypes>;
         map[T::FIELD_NAMES[I]] = MemberType{};
     }
 };

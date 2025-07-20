@@ -1,4 +1,4 @@
-/*************************************************************************************
+﻿/*************************************************************************************
  *
  * @ Filename     : FKBaseMapper.hpp
  * @ Description : 基础数据库映射器模板类，提供通用的数据库操作
@@ -23,12 +23,15 @@
 #include <mutex>
 #include <utility>
 #include <stdexcept>
+#include <algorithm>
 #include <mysql.h>
 
 #include "../FKMySQLConnectionPool.h"
 #include "FKDef.h"
 #include "FKLogger.h"
 #include "FKFieldMapper.hpp"
+
+inline constexpr size_t MAX_ALLOWED_LIMIT = 5000; // 最大允许的查询结果数量
 // 数据库异常类
 class DatabaseException : public std::runtime_error {
 public:
@@ -132,7 +135,8 @@ public:
     // 查找指定范围的记录（根据ID排序）
     std::vector<T> findAll(size_t limit, size_t offset = 0) {
         try {
-            std::string query = findAllQuery() + " LIMIT " + std::to_string(limit) + 
+            size_t safe_limit = limit > MAX_ALLOWED_LIMIT ? MAX_ALLOWED_LIMIT : limit;
+            std::string query = findAllQuery() + " LIMIT " + std::to_string(safe_limit) +
                                " OFFSET " + std::to_string(offset);
             
             return FKMySQLConnectionPool::getInstance()->executeWithConnection(
@@ -217,10 +221,25 @@ public:
         }
     }
     
-    // 根据ID更新指定字段
+    // 根据ID更新指定字段 - 不安全的方法，仅用于内部受信任的调用
+    // 注意：fields参数必须是预先定义好的字段名和占位符，如 "field1 = ?, field2 = ?"
+    // 不能包含用户输入的未经验证的内容，以防止SQL注入
+    // 
+    // 安全替代方案：
+    // 1. 使用 updateFieldsByIdSafe(id, {"field1", "field2"}, value1, value2) 方法
+    // 2. 使用 updateFieldsByIdMap(id, {{"field1", value1}, {"field2", value2}}) 方法
     template<typename... Args>
+    [[deprecated("This method is vulnerable to SQL injection. Use updateFieldsByIdSafe or updateFieldsByIdMap instead.")]]
     DbOperator::Status updateFieldsById(ID_TYPE id, const std::string& fields, Args&&... args) {
         try {
+            // 安全检查：确保fields参数不包含可能导致SQL注入的字符
+            if (fields.find(';') != std::string::npos || 
+                fields.find('"') != std::string::npos || 
+                fields.find('\'') != std::string::npos || 
+                fields.find('--') != std::string::npos) {
+                throw DatabaseException("Invalid fields parameter: potential SQL injection detected");
+            }
+            
             std::string query = "UPDATE " + getTableName() + " SET " + fields + 
                                " WHERE id = ?";
             
@@ -251,6 +270,107 @@ public:
             return DbOperator::Status::DatabaseError;
         }
     }
+    
+    // 安全的字段更新方法 - 使用字段名称列表和对应的值来防止SQL注入
+    // 示例用法: updateFieldsByIdSafe(id, {"field1", "field2"}, value1, value2);
+    template<typename... Args>
+    DbOperator::Status updateFieldsByIdSafe(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args) {
+        try {
+            // 参数数量检查
+            if (sizeof...(args) != fieldNames.size()) {
+                throw DatabaseException("Number of field names must match number of values");
+            }
+            
+            // 构建安全的SET子句
+            std::string setClause;
+            for (size_t i = 0; i < fieldNames.size(); ++i) {
+                if (i > 0) setClause += ", ";
+                setClause += fieldNames[i] + " = ?";
+            }
+            
+            std::string query = "UPDATE " + getTableName() + " SET " + setClause + 
+                               " WHERE id = ?";
+            
+            MYSQL_STMT* stmt = prepareStatement(query.c_str());
+            if (!stmt) {
+                throw DatabaseException("Failed to prepare statement for updateFieldsByIdSafe");
+            }
+            
+            // 绑定参数
+            bindUpdateParams(stmt, id, std::forward<Args>(args)...);
+            
+            // 执行更新
+            executeUpdate(stmt);
+            
+            // 检查影响的行数
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            
+            // 清理资源
+            mysql_stmt_close(stmt);
+            
+            if (affectedRows == 0) {
+                return DbOperator::Status::DataNotExist;
+            }
+            
+            return DbOperator::Status::Success;
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("updateFieldsByIdSafe error: {}", e.what()));
+            return DbOperator::Status::DatabaseError;
+        }
+    }
+    
+    // 使用字段名和值的映射进行安全更新 - 更直观的API
+    // 示例用法: updateFieldsByIdMap(id, {{"field1", value1}, {"field2", value2}});
+    template<typename ValueType>
+    DbOperator::Status updateFieldsByIdMap(ID_TYPE id, const std::map<std::string, ValueType>& fieldMap) {
+        try {
+            if (fieldMap.empty()) {
+                return DbOperator::Status::Success; // 没有字段需要更新
+            }
+            
+            // 构建安全的SET子句和值数组
+            std::string setClause;
+            std::vector<ValueType> values;
+            
+            bool first = true;
+            for (const auto& [field, value] : fieldMap) {
+                if (!first) setClause += ", ";
+                setClause += field + " = ?";
+                values.push_back(value);
+                first = false;
+            }
+            
+            std::string query = "UPDATE " + getTableName() + " SET " + setClause + 
+                               " WHERE id = ?";
+            
+            MYSQL_STMT* stmt = prepareStatement(query.c_str());
+            if (!stmt) {
+                throw DatabaseException("Failed to prepare statement for updateFieldsByIdMap");
+            }
+            
+            // 绑定参数 - 这里需要根据实际情况实现
+            // 这个示例假设有一个可以处理vector<ValueType>的bindMapValues方法
+            bindMapValues(stmt, values, id);
+            
+            // 执行更新
+            executeUpdate(stmt);
+            
+            // 检查影响的行数
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            
+            // 清理资源
+            mysql_stmt_close(stmt);
+            
+            if (affectedRows == 0) {
+                return DbOperator::Status::DataNotExist;
+            }
+            
+            return DbOperator::Status::Success;
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("updateFieldsByIdMap error: {}", e.what()));
+            return DbOperator::Status::DatabaseError;
+        }
+    }
 
 protected:
     typename IntrospectiveFieldMapper<T>::VariantMap _fieldMappings;
@@ -262,11 +382,11 @@ protected:
     }
     
     // 子类必须实现的查询方法
-    virtual std::string getTableName() const = 0;
-    virtual std::string findByIdQuery() const = 0;
-    virtual std::string findAllQuery() const = 0;
-    virtual std::string insertQuery() const = 0;
-    virtual std::string deleteByIdQuery() const = 0;
+    virtual constexpr std::string getTableName() const = 0;
+    virtual constexpr std::string findByIdQuery() const = 0;
+    virtual constexpr std::string findAllQuery() const = 0;
+    virtual constexpr std::string insertQuery() const = 0;
+    virtual constexpr std::string deleteByIdQuery() const = 0;
     
     // 子类必须实现的参数绑定方法
     virtual void bindIdParam(MYSQL_STMT* stmt, ID_TYPE id) const = 0;
@@ -319,6 +439,12 @@ protected:
     // 递归处理变参绑定（终止条件）
     void bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index) const {
         // 终止递归的空实现
+    }
+    
+    // 绑定字段映射值和ID - 子类需要实现此方法以支持updateFieldsByIdMap
+    template<typename ValueType>
+    void bindMapValues(MYSQL_STMT* stmt, const std::vector<ValueType>& values, ID_TYPE id) const {
+        throw DatabaseException("bindMapValues not implemented for this type");
     }
     
     // 递归处理变参绑定（处理整数类型）

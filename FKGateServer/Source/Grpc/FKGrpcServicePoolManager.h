@@ -28,7 +28,7 @@
 #include "Source/FKStructConfig.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
-#include "./Service/FKGrpcService.grpc.pb.h"
+#include "FKGrpcService.grpc.pb.h"
 
 // 服务特性模板
 template <flicker::grpc::service T> struct ServiceTraits;

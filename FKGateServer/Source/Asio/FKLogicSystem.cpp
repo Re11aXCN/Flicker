@@ -10,8 +10,8 @@
 #include "Asio/FKHttpConnection.h"
 #include "Redis/FKRedisConnectionPool.h"
 #include "MySQL/Entity/FKUserEntity.h"
-#include "MySQL/Service/FKUserService.h"
-#include "Grpc/Service/FKGrpcServiceClient.hpp"
+#include "MySQL/Mapper/FKUserMapper.h"
+#include "Grpc/FKGrpcServiceClient.hpp"
 
 using namespace FKGrpcService;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
@@ -59,7 +59,8 @@ FKLogicSystem::FKLogicSystem()
         std::string email = requestRoot["data"]["email"].asString();
         flicker::http::service serviceType = static_cast<flicker::http::service>(requestRoot["data"]["verify_type"].asInt());
         try {
-            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByEmail(email);
+            FKUserMapper mapper;
+            std::optional<FKUserEntity> user = mapper.findByEmail(email);
             if (serviceType == flicker::http::service::Register && user.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
                 responseRoot["message"] = FKUtils::concat("The user '", email, "'already exist! Please choose another one!");
@@ -176,7 +177,8 @@ FKLogicSystem::FKLogicSystem()
 
         try {
             // 1. 查询用户是否存在，关于邮箱查询已经在获取验证码时检查过了
-            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByUsername(username);
+            FKUserMapper mapper;
+            std::optional<FKUserEntity> user = mapper.findByUsername(username);
             if (user.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
                 responseRoot["message"] = FKUtils::concat("The user '", username, "' already exist! Please choose another one!");
@@ -238,9 +240,10 @@ FKLogicSystem::FKLogicSystem()
             }
             else {
                 if (grpcStatus.ok()) {
+                    FKUserMapper mapper;
                     // 插入用户
-                    auto result = FKUserService::getInstance()->registerUser(username, email, grpcResponse.encrypted_password());
-                    if [[likely]] (result == DbOperator::Status::Success) {
+                    auto result = mapper.insert(FKUserEntity{ username, email, grpcResponse.encrypted_password() });
+                    if (result == DbOperator::Status::Success) [[likely]] {
                         Json::Value dataObj;
                         responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
                         responseRoot["message"] = "Register successful!";
@@ -311,11 +314,12 @@ FKLogicSystem::FKLogicSystem()
 
         try {
             // 1. 查询用户
-            std::string bcryptPassword = username.contains("@")
-                ? FKUserService::getInstance()->findPasswordByEmail(username)
-                : FKUserService::getInstance()->findPasswordByUsername(username);
+            FKUserMapper mapper;
+            std::optional<std::string> bcryptPassword = username.contains("@")
+                ? mapper.findPasswordByEmail(username)
+                : mapper.findPasswordByUsername(username);
             
-            if (bcryptPassword.empty()) {
+            if (!bcryptPassword.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
                 responseRoot["message"] = FKUtils::concat("The user '", username, "' does not exist!");
                 httpResponse.result(flicker::http::status::unauthorized);
@@ -329,7 +333,7 @@ FKLogicSystem::FKLogicSystem()
             AuthenticatePwdResetRequestBody grpcRequest;
             grpcRequest.set_rpc_request_type(static_cast<int32_t>(flicker::grpc::service::AuthenticatePwdReset));
             grpcRequest.set_hashed_password(hashedPassword);
-            grpcRequest.set_encrypted_password(bcryptPassword);
+            grpcRequest.set_encrypted_password(bcryptPassword.value());
 
             auto [grpcResponse, grpcStatus] = client.authenticatePwdReset(grpcRequest);
 
@@ -414,7 +418,8 @@ FKLogicSystem::FKLogicSystem()
         const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
 
         try {
-            std::optional<FKUserEntity> user = FKUserService::getInstance()->findUserByEmail(email);
+            FKUserMapper mapper;
+            std::optional<FKUserEntity> user = mapper.findByEmail(email);
             if (!user.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
                 responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist, please register first!");
@@ -527,7 +532,9 @@ FKLogicSystem::FKLogicSystem()
             }
             else {
                 if (grpcStatus.ok()) {
-                    if [[likely]] (FKUserService::getInstance()->updatePasswordByEmail(email, grpcResponse.encrypted_password())) {
+                    FKUserMapper mapper;
+                    auto result = mapper.updatePasswordByEmail(email, grpcResponse.encrypted_password());
+                    if (result == DbOperator::Status::Success) [[likely]] {
                         Json::Value dataObj;
                         responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
                         responseRoot["message"] = "Reset password successful!";

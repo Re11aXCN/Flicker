@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FKGateServer", "FKGateServe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NexUs", "NexUs\NexUs.vcxproj", "{5B0F1707-797D-421C-8441-846F6BE473CF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FKLogger", "FKLogger\FKLogger.vcxproj", "{08DCEE5D-077C-4E92-B693-331F707FC39A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -34,6 +36,12 @@ Global
 		{5B0F1707-797D-421C-8441-846F6BE473CF}.Release|x64.Build.0 = Release|x64
 		{5B0F1707-797D-421C-8441-846F6BE473CF}.RelWithDebInfo|x64.ActiveCfg = Release|x64
 		{5B0F1707-797D-421C-8441-846F6BE473CF}.RelWithDebInfo|x64.Build.0 = Release|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.Debug|x64.ActiveCfg = Debug|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.Debug|x64.Build.0 = Debug|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.Release|x64.ActiveCfg = Release|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.Release|x64.Build.0 = Release|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.RelWithDebInfo|x64.ActiveCfg = Debug|x64
+		{08DCEE5D-077C-4E92-B693-331F707FC39A}.RelWithDebInfo|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

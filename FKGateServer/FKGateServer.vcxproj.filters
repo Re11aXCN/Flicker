@@ -48,10 +48,10 @@
     <ClCompile Include="Source\MySQL\FKMySQLConnection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\Service\FKGrpcService.grpc.pb.cc">
+    <ClCompile Include="Source\Grpc\FKGrpcService.grpc.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\Service\FKGrpcService.pb.cc">
+    <ClCompile Include="Source\Grpc\FKGrpcService.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
@@ -95,13 +95,13 @@
     <ClInclude Include="Source\MySQL\FKMySQLConnection.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\Service\FKGrpcServiceClient.hpp">
+    <ClInclude Include="Source\Grpc\FKGrpcServiceClient.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\Service\FKGrpcService.grpc.pb.h">
+    <ClInclude Include="Source\Grpc\FKGrpcService.grpc.pb.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\Service\FKGrpcService.pb.h">
+    <ClInclude Include="Source\Grpc\FKGrpcService.pb.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h">

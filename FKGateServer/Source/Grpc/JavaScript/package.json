@@ -3,14 +3,16 @@
   "version": "1.0.0",
   "description": "Flicker应用的gRPC服务，包括邮箱验证码和密码加密服务",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "start:verification": "node verification-server.js",
-    "start:cipher": "node cipher-server.js",
-    "dev:verification": "nodemon verification-server.js",
-    "dev:cipher": "nodemon cipher-server.js",
-    "dev": "concurrently \"npm run dev:verification\" \"npm run dev:cipher\""
-  },
+    "scripts": {
+        "start": "node index.js",
+        "start:verification": "node ./server/verification.js",
+        "start:encryption": "node ./server/encryption.js",
+        "start:authentication": "node ./server/authentication.js",
+        "dev:verification": "nodemon ./server/verification.js",
+        "dev:encryption": "nodemon ./server/encryption.js",
+        "dev:authentication": "nodemon ./server/authentication.js",
+        "dev": "concurrently \"npm run dev:verification\" \"npm run dev:encryption\" \"npm run dev:authentication\""
+    },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",
     "@grpc/proto-loader": "^0.7.15",

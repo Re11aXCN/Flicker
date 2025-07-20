@@ -7,8 +7,13 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <filesystem>
+#ifdef FKLOGGER
+#define LOG_EXPORT __declspec(dllexport)
+#else
+#define LOG_EXPORT __declspec(dllimport)
+#endif
 namespace fs = std::filesystem;
-class FKLogger {
+class LOG_EXPORT FKLogger {
 public:
     enum GeneratePolicy : std::uint8_t {
         SingleFile,       // 单个日志文件

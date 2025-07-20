@@ -61,9 +61,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Global\FKLogger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Resource\ico\resource.h">
@@ -82,9 +79,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Global\FKDef.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\FKLogger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
