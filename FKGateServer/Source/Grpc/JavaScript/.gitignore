@@ -33,7 +33,8 @@ dist
 
 # IDE配置文件
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
 *.swp
 *.swo
 

@@ -1,30 +1,39 @@
-﻿{
-  "name": "flicker-grpc-services",
-  "version": "1.0.0",
-  "description": "Flicker应用的gRPC服务，包括邮箱验证码和密码加密服务",
-  "main": "index.js",
+{
+    "name": "flicker-grpc-server",
+    "version": "1.0.0",
+    "description": "Flicker应用的gRPC服务，包括邮箱验证码和密码加密服务",
+    "main": "index.js",
     "scripts": {
-        "start": "node index.js",
-        "start:verification": "node ./server/verification.js",
-        "start:encryption": "node ./server/encryption.js",
-        "start:authentication": "node ./server/authentication.js",
-        "dev:verification": "nodemon ./server/verification.js",
-        "dev:encryption": "nodemon ./server/encryption.js",
-        "dev:authentication": "nodemon ./server/authentication.js",
-        "dev": "concurrently \"npm run dev:verification\" \"npm run dev:encryption\" \"npm run dev:authentication\""
+        "start": "cross-env NODE_ENV=production node index.js",
+        "start:verification": "cross-env NODE_ENV=production node ./server/verification.js",
+        "start:encryption": "cross-env NODE_ENV=production node ./server/encryption.js",
+        "start:authentication": "cross-env NODE_ENV=production node ./server/authentication.js",
+        "dev": "cross-env NODE_ENV=development nodemon index.js",
+        "dev:verification": "cross-env NODE_ENV=development nodemon ./server/verification.js",
+        "dev:encryption": "cross-env NODE_ENV=development nodemon ./server/encryption.js",
+        "dev:authentication": "cross-env NODE_ENV=development nodemon ./server/authentication.js",
+        "dev:all": "cross-env NODE_ENV=development concurrently \"npm run dev:verification\" \"npm run dev:encryption\" \"npm run dev:authentication\"",
+        "debug": "cross-env NODE_ENV=development node --inspect index.js",
+        "debug:verification": "cross-env NODE_ENV=development node --inspect ./server/verification.js",
+        "debug:encryption": "cross-env NODE_ENV=development node --inspect ./server/encryption.js",
+        "debug:authentication": "cross-env NODE_ENV=development node --inspect ./server/authentication.js"
     },
-  "dependencies": {
-    "@grpc/grpc-js": "^1.13.4",
-    "@grpc/proto-loader": "^0.7.15",
-    "bcrypt": "^6.0.0",
-    "ioredis": "^5.6.1",
-    "nodemailer": "^7.0.3",
-    "uuid": "^11.1.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1",
-    "concurrently": "^8.2.2"
-  },
-  "author": "",
-  "license": "ISC"
+    "dependencies": {
+        "@grpc/grpc-js": "^1.13.4",
+        "@grpc/proto-loader": "^0.7.15",
+        "@yuuang/ffi-rs-win32-x64-msvc": "^1.3.0",
+        "bcrypt": "^6.0.0",
+        "ffi-rs": "^1.3.0",
+        "ioredis": "^5.6.1",
+        "nodemailer": "^7.0.3",
+        "uuid": "^11.1.0"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "cross-env": "^7.0.3",
+        "eslint": "^9.31.0",
+        "nodemon": "^3.0.1"
+    },
+    "author": "",
+    "license": "ISC"
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 密码加密服务
  * 提供gRPC服务，处理密码加密请求
  */
@@ -9,6 +9,7 @@ const bcrypt = require('bcrypt');
 const { serviceConfig } = require('../config/config-loader');
 const { loadProtoFile } = require('../utils/proto-loader');
 const { ERROR_CODE } = require('../utils/constants');
+const { Logger } = require('../utils/logger');
 
 /**
  * 处理密码加密请求
@@ -17,10 +18,10 @@ const { ERROR_CODE } = require('../utils/constants');
  */
 async function encryptPassword(call, callback) {
     const { rpc_request_type, hashed_password } = call.request;
-    console.log('收到密码加密请求');
+    Logger.info('收到密码加密请求');
     
     if (!hashed_password) {
-        console.error('密码参数为空');
+        Logger.error('密码参数为空');
         callback(null, {
             rpc_response_code: ERROR_CODE.FORM_PARAMS_MISSING,
             message: '密码参数不能为空',
@@ -37,7 +38,7 @@ async function encryptPassword(call, callback) {
         // 使用盐值加密密码
         const encryptedPassword = await bcrypt.hash(hashed_password, salt);
         
-        console.log('密码加密成功');
+        Logger.info('密码加密成功');
         
         // 返回加密后的密码
         callback(null, {
@@ -46,7 +47,7 @@ async function encryptPassword(call, callback) {
             encrypted_password: encryptedPassword
         });
     } catch (error) {
-        console.error(`密码加密失败: ${error.message}`);
+        Logger.error(`密码加密失败: ${error.message}`);
         
         callback(null, {
             rpc_response_code: ERROR_CODE.ENCRYPT_ERROR,
@@ -74,11 +75,11 @@ function startServer() {
         grpc.ServerCredentials.createInsecure(),
         (error, port) => {
             if (error) {
-                console.error(`服务器绑定失败: ${error.message}`);
+                Logger.error(`服务器绑定失败: ${error.message}`);
                 return;
             }
 
-            console.log(`密码加密服务已启动，监听地址: ${serverAddress}`);
+            Logger.info(`密码加密服务已启动，监听地址: ${serverAddress}`);
         }
     );
 }

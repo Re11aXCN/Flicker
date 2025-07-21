@@ -430,3 +430,131 @@ mysql_query(mysql, "CREATE TABLE test (id INT)");
 - **多语句查询**：启用多语句时（分号分隔），需循环调用`mysql_next_result()`处理所有结果，对每个结果集按需释放。
 
 **总结**：只有返回结果集的语句（主要是SELECT类查询）需要调用`mysql_store_result()`/`mysql_use_result()`和`mysql_free_result()`；建表、INSERT/UPDATE/DELETE等操作只需检查`mysql_query()`返回值及`mysql_affected_rows()`即可。
+
+### js加载dll
+
+（1）三方库
+
+* [ffi-napi](https://blog.kinoko.fun/2025/01/21/2025/nodejs-ffinapi/)：一些需要的配置版本较低，当前电脑的node、python、msbuild都不兼容，具体体现在没有最新的node的call方法（不考虑使用）
+* [ffi-rs](https://github.com/zhangyuang/node-ffi-rs/blob/master/README_Zh.md)：由rust/ts重写的ffi方法，更现代，可以直接使用
+
+当前版本
+
+python 3.12
+
+node 22.16.0
+
+msbuild vs2022最新（2025/6/25版本）
+
+（2）dll加载问题/及解决办法
+
+1. 
+
+如果你生成的dll中包含了其他的C++三方库，那么需要一并加载dll，显示指定
+
+例如C++设计的FKLogger，其引用了spdlog、fmt俩个库，需要将这两个库的dll和fklogger.dll保持同级目录
+
+```
+parentdir
+-spdlog.dll
+-fmt.dll
+-fklogger.dll
+```
+
+显示指定，
+
+```js
+const spdlogPath = path.join(dllDir, 'spdlog.dll');
+const fmtPath = path.join(dllDir, 'fmt.dll');
+const fkloggerPath = path.join(dllDir, 'fklogger.dll');
+
+// 打开动态库
+open({
+    library: 'spdlog',
+    path: spdlogPath
+});
+open({
+    library: 'fmt',
+    path: fmtPath
+});
+open({
+    library: 'fklogger',
+    path: fkloggerPath
+});
+```
+
+
+
+2. 
+
+node.exe是通过**环境变量中的PATH**进行查找dll的，
+
+```javascript
+console.log('PATH:', process.env.PATH);
+```
+
+生成的dll如果放在package.json中，或者C:\Windows\System32中都能够被正确加载。
+
+但是如果你指定一个未在环境变量的路径，那么将找不到
+
+```js
+const { open, load, DataType, define } = require('ffi-rs');
+const path = require('path');
+
+const dllDir = 'E:/Development/Project/my/Flicker/Bin/Flicker_RelWithDebInfo_x64';
+const spdlogPath = path.join(dllDir, 'spdlog.dll');
+
+open({
+    library: 'spdlog',
+    path: spdlogPath
+}); // 错误，错误码位126，即找不到正确的dll路径进行加载
+```
+
+* 解决办法一：
+
+将dll移动到package.json目录，最简单，但是不太好管理
+
+* [尝试解决办法二](https://github.com/node-ffi/node-ffi/issues/294)：
+
+测试不能够成功
+
+```js
+open({
+    library: 'kernel32',
+    path: 'kernel32.dll'
+});
+const kernel32 = define({
+    SetDllDirectoryW: {
+        library: "kernel32",
+        retType: DataType.Boolean,
+        paramsType: [DataType.String]
+    }
+})
+const success = kernel32.SetDllDirectoryW([dllDir]);
+
+const spdlogPath = path.join(dllDir, 'spdlog.dll');
+open({
+    library: 'spdlog',
+    path: spdlogPath
+});
+```
+
+* 解决办法三：
+
+设置临时环境变量，完美解决
+
+```js
+const dllDir = 'E:/Development/Project/my/Flicker/Bin/Flicker_RelWithDebInfo_x64';
+const isWindows = process.platform === 'win32';
+const separator = isWindows ? ';' : ':';
+process.env.PATH = `${dllDir}${separator}${process.env.PATH}`;
+console.log('Updated PATH:', process.env.PATH);
+
+const spdlogPath = path.join(dllDir, 'spdlog.dll');
+open({
+    library: 'spdlog',
+    path: spdlogPath
+});
+```
+
+<u>**问题引申至c++调用python一样需要设置环境变量，详细见PDFWiz的c++调用python纠正图片代码，然后C++/CLI封装给C#调用**</u>

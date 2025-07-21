@@ -1,0 +1,3 @@
+@echo off
+echo 正在启动生产环境...
+npm run start

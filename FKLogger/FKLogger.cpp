@@ -174,7 +174,6 @@ bool FKLogger::initialize(const std::string& filename, GeneratePolicy generatePo
 
         spdlog::init_thread_pool(8192, 1);
 
-
         std::string actualFilename = _createLogFlie();
 
         // 创建控制台和HTML文件接收器

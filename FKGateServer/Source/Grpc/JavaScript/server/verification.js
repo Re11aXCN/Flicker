@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 邮箱验证码服务
  * 提供gRPC服务，处理验证码请求并发送邮件
  */
@@ -11,6 +11,7 @@ const { mailConfig, serviceConfig } = require('../config/config-loader');
 const { loadProtoFile } = require('../utils/proto-loader');
 const { ERROR_CODE, VERIFICATION } = require('../utils/constants');
 const { getRedis, setRedisExpire } = require('../utils/redis');
+const { Logger } = require('../utils/logger');
 
 /**
  * 创建邮件传输对象
@@ -40,10 +41,10 @@ async function sendMail(mailOptions) {
     return new Promise((resolve, reject) => {
         transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
-                console.error(`邮件发送失败: ${error.message}`);
+                Logger.error(`邮件发送失败: ${error.message}`);
                 reject(error);
             } else {
-                console.log(`邮件发送成功: ${info.response}`);
+                Logger.info(`邮件发送成功: ${info.response}`);
                 resolve(info.response);
             }
         });
@@ -82,7 +83,7 @@ async function sendVerificationEmail(email, code) {
  */
 async function getVerifyCode(call, callback) {
     const { email, rpc_request_type } = call.request;
-    console.log(`收到验证码请求，邮箱: ${email}, 请求类型: ${rpc_request_type}`);
+    Logger.info(`收到验证码请求，邮箱: ${email}, 请求类型: ${rpc_request_type}`);
 
     try {
         // 构建Redis键名
@@ -91,7 +92,7 @@ async function getVerifyCode(call, callback) {
         // 检查是否已存在验证码（可选：如果已存在且未过期，可以重用）
         const existingCode = await getRedis(redisKey);
         if (existingCode) {
-            console.log(`邮箱 ${email} 已有验证码，重用现有验证码`);
+            Logger.info(`邮箱 ${email} 已有验证码，重用现有验证码`);
 
             // 返回成功响应，使用现有验证码
             callback(null, {
@@ -104,16 +105,16 @@ async function getVerifyCode(call, callback) {
 
         // 生成唯一验证码
         const verificationCode = uuidv4().substring(0, 6).toUpperCase();
-        console.log(`生成验证码: ${verificationCode} 用于邮箱: ${email}`);
+        Logger.info(`生成验证码: ${verificationCode} 用于邮箱: ${email}`);
 
         // 使用emailService发送验证邮件
         await sendVerificationEmail(email, verificationCode);
-        console.log(`邮件发送成功: ${email}`);
+        Logger.info(`邮件发送成功: ${email}`);
 
         // 将验证码存储到Redis，设置过期时间为5分钟
         const saveResult = await setRedisExpire(redisKey, verificationCode, VERIFICATION.EXPIRATION);
         if (!saveResult) {
-            console.error(`存储验证码到Redis失败: ${email}`);
+            Logger.error(`存储验证码到Redis失败: ${email}`);
             callback(null, {
                 rpc_response_code: ERROR_CODE.REDIS_ERROR,
                 message: "验证码存储失败，请稍后重试",
@@ -122,7 +123,7 @@ async function getVerifyCode(call, callback) {
             return;
         }
 
-        console.log(`验证码已存储到Redis，过期时间: ${VERIFICATION.EXPIRATION}秒`);
+        Logger.info(`验证码已存储到Redis，过期时间: ${VERIFICATION.EXPIRATION}秒`);
 
         // 返回成功响应 - 注意字段名与proto定义匹配
         callback(null, {
@@ -131,7 +132,7 @@ async function getVerifyCode(call, callback) {
             verify_code: verificationCode
         });
     } catch (error) {
-        console.error(`发送验证码邮件时发生错误: ${error.message}`);
+        Logger.error(`发送验证码邮件时发生错误: ${error.message}`);
 
         // 返回错误响应 - 注意字段名与proto定义匹配
         callback(null, {
@@ -160,11 +161,11 @@ function startServer() {
         grpc.ServerCredentials.createInsecure(), 
         (error, port) => {
             if (error) {
-                console.error(`服务器绑定失败: ${error.message}`);
+                Logger.error(`服务器绑定失败: ${error.message}`);
                 return;
             }
 
-            console.log(`验证码服务已启动，监听地址: ${serverAddress}`);
+            Logger.info(`验证码服务已启动，监听地址: ${serverAddress}`);
         }
     );
 }

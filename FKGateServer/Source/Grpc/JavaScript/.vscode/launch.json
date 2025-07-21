@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "开发模式 - 所有服务",
+      "skipFiles": [ "<node_internals>/**" ],
+      "program": "${workspaceFolder}/index.js",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "生产模式 - 所有服务",
+      "skipFiles": [ "<node_internals>/**" ],
+      "program": "${workspaceFolder}/index.js",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试 - 验证码服务",
+      "skipFiles": [ "<node_internals>/**" ],
+      "program": "${workspaceFolder}/verification.js",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试 - 加密服务",
+      "skipFiles": [ "<node_internals>/**" ],
+      "program": "${workspaceFolder}/encryption.js",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试 - 认证服务",
+      "skipFiles": [ "<node_internals>/**" ],
+      "program": "${workspaceFolder}/authentication.js",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}

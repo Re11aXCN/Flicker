@@ -1,4 +1,4 @@
-﻿{
+{
     "mail": {
         "smtp": {
             "host": "smtp.qq.com",
@@ -33,5 +33,7 @@
             "host": "127.0.0.1",
             "port": 50053
         }
-    }
+    },
+    "debug": false,
+    "logLevel": "info"
 }

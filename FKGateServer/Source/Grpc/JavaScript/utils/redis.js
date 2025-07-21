@@ -1,10 +1,11 @@
-﻿/**
+/**
  * Redis工具模块
  * 提供Redis连接和操作的封装
  */
 
 const { redisConfig } = require('../config/config-loader');
 const Redis = require("ioredis");
+const { Logger } = require('./logger');
 
 // 创建Redis客户端实例
 const redisClient = new Redis({
@@ -22,7 +23,7 @@ const redisClient = new Redis({
  * 监听错误信息
  */
 redisClient.on("error", function (err) {
-    console.error(`Redis连接错误: ${err.message}`);
+    Logger.error(`Redis连接错误: ${err.message}`);
 });
 
 /**
@@ -34,13 +35,13 @@ async function getRedis(key) {
     try {
         const result = await redisClient.get(key);
         if (result === null) {
-            console.log(`键 ${key} 不存在`);
+            Logger.debug(`键 ${key} 不存在`);
             return null;
         }
-        console.log(`成功获取键 ${key} 的值: ${result}`);
+        Logger.debug(`成功获取键 ${key} 的值: ${result}`);
         return result;
     } catch (error) {
-        console.error(`获取键 ${key} 时发生错误:`, error);
+        Logger.error(`获取键 ${key} 时发生错误: ${error.message}`);
         return null;
     }
 }
@@ -54,10 +55,10 @@ async function queryRedis(key) {
     try {
         const result = await redisClient.exists(key);
         const exists = result === 1;
-        console.log(`键 ${key} ${exists ? '存在' : '不存在'}`);
+        Logger.debug(`键 ${key} ${exists ? '存在' : '不存在'}`);
         return exists;
     } catch (error) {
-        console.error(`查询键 ${key} 时发生错误:`, error);
+        Logger.error(`查询键 ${key} 时发生错误: ${error.message}`);
         return null;
     }
 }
@@ -73,10 +74,10 @@ async function setRedisExpire(key, value, exptime) {
     try {
         // 使用单个命令设置键值和过期时间，更高效
         await redisClient.set(key, value, 'EX', exptime);
-        console.log(`成功设置键 ${key} 的值，过期时间 ${exptime} 秒`);
+        Logger.debug(`成功设置键 ${key} 的值，过期时间 ${exptime} 秒`);
         return true;
     } catch (error) {
-        console.error(`设置键 ${key} 时发生错误:`, error);
+        Logger.error(`设置键 ${key} 时发生错误: ${error.message}`);
         return false;
     }
 }
@@ -89,10 +90,10 @@ async function setRedisExpire(key, value, exptime) {
 async function deleteRedis(key) {
     try {
         await redisClient.del(key);
-        console.log(`成功删除键 ${key}`);
+        Logger.debug(`成功删除键 ${key}`);
         return true;
     } catch (error) {
-        console.error(`删除键 ${key} 时发生错误:`, error);
+        Logger.error(`删除键 ${key} 时发生错误: ${error.message}`);
         return false;
     }
 }
@@ -102,7 +103,7 @@ async function deleteRedis(key) {
  */
 function quit() {
     redisClient.quit();
-    console.log('Redis连接已关闭');
+    Logger.info('Redis连接已关闭');
 }
 
 module.exports = { 

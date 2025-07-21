@@ -1,14 +1,12 @@
 ﻿#include "FKLogger.h" // 引入你原始的头文件
 #include <string>
 
-// 定义导出宏，与你的 FKLogger.h 保持一致
-#ifdef FKLOGGERWRAPPER_EXPORT // 我们将在编译时定义这个
+#ifdef FKLOGGERWRAPPER_EXPORT
 #define FKLOGGERWRAPPER_API __declspec(dllexport)
 #else
 #define FKLOGGERWRAPPER_API __declspec(dllimport)
 #endif
 
-// 使用 extern "C" 来防止 C++ 名字修饰
 extern "C" {
 
     /**

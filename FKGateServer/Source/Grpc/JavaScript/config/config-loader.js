@@ -7,13 +7,50 @@ const fs = require('fs');
 const path = require('path');
 
 /**
+ * 获取当前运行环境
+ * @returns {string} 当前环境 ('development' 或 'production')
+ */
+function getEnvironment() {
+    return process.env.NODE_ENV || 'development';
+}
+
+/**
+ * 获取配置文件路径
+ * @returns {string} 配置文件路径
+ */
+function getConfigPath() {
+    const env = getEnvironment();
+    let configFileName;
+    
+    switch (env) {
+        case 'production':
+            configFileName = 'config.prod.json';
+            break;
+        case 'development':
+        default:
+            configFileName = 'config.dev.json';
+            break;
+    }
+    
+    // 如果指定的环境配置文件不存在，回退到默认配置
+    const envConfigPath = path.join(__dirname, configFileName);
+    if (!fs.existsSync(envConfigPath)) {
+        console.warn(`环境配置文件 ${configFileName} 不存在，使用默认配置文件`);
+        return path.join(__dirname, 'config.json');
+    }
+    
+    return envConfigPath;
+}
+
+/**
  * 加载配置文件
  * @returns {Object} 解析后的配置对象
  */
 function loadConfig() {
     try {
-        // 使用相对路径，从当前文件所在目录读取配置
-        const configPath = path.join(__dirname, 'config.json');
+        const configPath = getConfigPath();
+        console.log(`正在加载配置文件: ${configPath}`);
+        
         let configData = fs.readFileSync(configPath, 'utf8');
 
         // 修复：移除开头的 BOM 字符
