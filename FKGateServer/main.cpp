@@ -2,9 +2,11 @@
 #include <functional>
 #include <iostream>
 #include <json/json.h>
+
+//WinSock has defined an error that triggers boost if the mysql header file is in front
+#include "Asio/FKServer.h"
 #include <mysql.h>
 
-#include "Asio/FKServer.h"
 #include "Source/FKConfigManager.h"
 #include "FKLogger.h"
 #include "MySQL/FKMySQLConnectionPool.h"
@@ -33,7 +35,6 @@ INDEX idx_username (username)
 )
 ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 )";
-// 执行创建用户表SQL
                 if (mysql_query(mysql, createTableSQL.c_str())) {
                     FK_SERVER_ERROR(std::format("创建用户表失败: {}", mysql_error(mysql)));
                     return false;
@@ -41,6 +42,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                 return true;
             }
             catch (const std::exception& e) {
+                FK_SERVER_ERROR(std::format("创建用户表异常: {}", e.what()));
                 return false;
             }
             });

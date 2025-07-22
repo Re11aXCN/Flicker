@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 邮箱验证码服务
  * 提供gRPC服务，处理验证码请求并发送邮件
  */
@@ -7,11 +7,20 @@ const grpc = require('@grpc/grpc-js');
 const nodemailer = require('nodemailer');
 const { v4: uuidv4 } = require('uuid');
 
-const { mailConfig, serviceConfig } = require('../config/config-loader');
-const { loadProtoFile } = require('../utils/proto-loader');
+const { mailConfig, serviceConfig, loadConfig, setLogger: setConfigLogger } = require('../config/config-loader');
+const { loadProtoFile, setLogger: setProtoLogger } = require('../utils/proto-loader');
 const { ERROR_CODE, VERIFICATION } = require('../utils/constants');
-const { getRedis, setRedisExpire } = require('../utils/redis');
-const { Logger } = require('../utils/logger');
+const { getRedis, setRedisExpire, setLogger: setRedisLogger } = require('../utils/redis');
+const { createLogger } = require('../utils/logger');
+
+// 创建验证码服务专用的日志实例
+const logFileName = process.env.LOG_FILE_NAME || 'Flicker-RPC-Verification';
+const Logger = createLogger('验证码服务', logFileName);
+
+// 为各个工具类设置日志记录器，确保它们使用验证码服务的日志实例
+setConfigLogger(Logger);
+setProtoLogger(Logger);
+setRedisLogger(Logger);
 
 /**
  * 创建邮件传输对象
@@ -148,7 +157,7 @@ async function getVerifyCode(call, callback) {
  */
 function startServer() {
     const server = new grpc.Server();
-    const protoDescriptor = loadProtoFile();
+    const protoDescriptor = loadProtoFile(Logger);
     
     server.addService(protoDescriptor.Verification.service, { 
         GetVerifyCode: getVerifyCode 

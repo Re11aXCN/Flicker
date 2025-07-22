@@ -6,6 +6,24 @@
 const fs = require('fs');
 const path = require('path');
 
+// 默认使用console作为日志记录器
+let currentLogger = {
+    info: console.info,
+    error: console.error,
+    debug: console.debug,
+    warn: console.warn
+};
+
+/**
+ * 设置当前使用的日志记录器
+ * @param {Object} logger - 日志记录器实例
+ */
+function setLogger(logger) {
+    if (logger && typeof logger.info === 'function') {
+        currentLogger = logger;
+    }
+}
+
 /**
  * 获取当前运行环境
  * @returns {string} 当前环境 ('development' 或 'production')
@@ -35,7 +53,7 @@ function getConfigPath() {
     // 如果指定的环境配置文件不存在，回退到默认配置
     const envConfigPath = path.join(__dirname, configFileName);
     if (!fs.existsSync(envConfigPath)) {
-        console.warn(`环境配置文件 ${configFileName} 不存在，使用默认配置文件`);
+        currentLogger.warn(`环境配置文件 ${configFileName} 不存在，使用默认配置文件`);
         return path.join(__dirname, 'config.json');
     }
     
@@ -44,13 +62,16 @@ function getConfigPath() {
 
 /**
  * 加载配置文件
+ * @param {Object} [logger] - 可选的日志记录器实例
  * @returns {Object} 解析后的配置对象
  */
-function loadConfig() {
+function loadConfig(logger) {
+    // 如果提供了logger参数，则使用它
+    if (logger && typeof logger.info === 'function') {
+        currentLogger = logger;
+    }
     try {
         const configPath = getConfigPath();
-        console.log(`正在加载配置文件: ${configPath}`);
-        
         let configData = fs.readFileSync(configPath, 'utf8');
 
         // 修复：移除开头的 BOM 字符
@@ -60,7 +81,7 @@ function loadConfig() {
 
         return JSON.parse(configData);
     } catch (error) {
-        console.error(`加载配置文件失败: ${error.message}`);
+        currentLogger.error(`加载配置文件失败: ${error.message}`);
         throw new Error(`配置文件加载失败: ${error.message}`);
     }
 }
@@ -99,5 +120,7 @@ module.exports = {
     mailConfig,
     mysqlConfig,
     redisConfig,
-    serviceConfig
+    serviceConfig,
+    setLogger,
+    loadConfig
 };

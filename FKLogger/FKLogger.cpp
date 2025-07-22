@@ -164,22 +164,32 @@ std::shared_ptr<spdlog::logger> FKLogger::getLogger() const
     return _logger;
 }
 
-bool FKLogger::initialize(const std::string& filename, GeneratePolicy generatePolicy, bool truncate/* = false*/)
+bool FKLogger::initialize(const std::string& fileName, GeneratePolicy generatePolicy, bool truncate/* = false*/
+    , const std::string& fileDir/* = ""*/)
 {
     try {
         std::lock_guard<std::mutex> lock(_mutex);
 
-        _filename = filename;
         _generatePolicy = generatePolicy;
 
         spdlog::init_thread_pool(8192, 1);
 
-        std::string actualFilename = _createLogFlie();
+        std::string actualFilename;
+        // 创建logs目录（如果不存在）
+        if (fileDir.empty()) {
+            fs::path appParentDir = _getExecutablePath().parent_path();
+            fs::path logsDir = appParentDir / "logs";
+            fs::create_directories(logsDir);
+            actualFilename = _createLogFlie(logsDir.string(), fileName);
+        }
+        else {
+            actualFilename = _createLogFlie(fileDir, fileName);
+        }
 
         // 创建控制台和HTML文件接收器
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        auto html_sink = std::make_shared<html_format_sink_mt>(actualFilename, truncate);
-        std::vector<spdlog::sink_ptr> sinks{ console_sink, html_sink };
+        auto file_format_sink = std::make_shared<html_format_sink_mt>(actualFilename, truncate);
+        std::vector<spdlog::sink_ptr> sinks{ console_sink, file_format_sink };
 
         _logger = std::make_shared<spdlog::async_logger>(actualFilename, sinks.begin(), sinks.end(),
             spdlog::thread_pool(), spdlog::async_overflow_policy::block);
@@ -187,7 +197,11 @@ bool FKLogger::initialize(const std::string& filename, GeneratePolicy generatePo
 
 
         // 完整调试格式（含线程、文件、函数、行号）
-        _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] {File: %s Func: %! Line: %#} \r\n\t[%l]: %v%$");
+#ifdef _RELEASE
+        _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] [%l]: %v%$");
+#else
+        _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] [%l]: %v {File: %s Func: %! Line: %#}%$");
+#endif
 
 #ifdef _DEBUG
         _logger->set_level(spdlog::level::debug);
@@ -227,18 +241,13 @@ void FKLogger::flush()
     }
 }
 
-std::string FKLogger::_createLogFlie()
+std::string FKLogger::_createLogFlie(const std::string& fileDir, const std::string& fileName)
 {
-    // 创建logs目录（如果不存在）
-    fs::path appParentDir = _getExecutablePath().parent_path();
-    fs::path logsDir = appParentDir / "logs";
-    fs::create_directories(logsDir);
-
     std::string actualFilename;
     switch (_generatePolicy)
     {
     case SingleFile: {
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, ".log.html");
+        actualFilename = FKUtils::concat(fileDir, FKUtils::local_separator(), fileName, ".log.html");
         break;
     }
     case MultiplePerDay: {
@@ -253,7 +262,7 @@ std::string FKLogger::_createLogFlie()
         std::stringstream dateStr;
         dateStr << std::put_time(&tm_now, "%Y-%m-%d");
 
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log.html");
+        actualFilename = FKUtils::concat(fileDir, FKUtils::local_separator(), fileName, " - [", dateStr.str(), "].log.html");
         break;
     }
     case MultiplePerRun: {
@@ -271,7 +280,7 @@ std::string FKLogger::_createLogFlie()
         dateStr << std::put_time(&tm_now, "#%Y-%m-%d  #%H-%M-%S")
             << "." << std::setfill('0') << std::setw(3) << ms.count();
 
-        actualFilename = FKUtils::concat(logsDir.string(), FKUtils::local_separator(), _filename, " - [", dateStr.str(), "].log.html");
+        actualFilename = FKUtils::concat(fileDir, FKUtils::local_separator(), fileName, " - [", dateStr.str(), "].log.html");
         break;
     }
     default: throw std::runtime_error("There is no policy specified for generating log files!");

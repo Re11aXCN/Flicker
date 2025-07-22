@@ -450,7 +450,7 @@ msbuild vs2022最新（2025/6/25版本）
 
 1. 
 
-如果你生成的dll中包含了其他的C++三方库，那么需要一并加载dll，显示指定
+如果你生成的dll中包含了其他的C++三方库，那么需要一并加载dll（同级目录），显示可以不指定
 
 例如C++设计的FKLogger，其引用了spdlog、fmt俩个库，需要将这两个库的dll和fklogger.dll保持同级目录
 
@@ -461,14 +461,14 @@ parentdir
 -fklogger.dll
 ```
 
-显示指定，
+不显示指定，
 
 ```js
-const spdlogPath = path.join(dllDir, 'spdlog.dll');
-const fmtPath = path.join(dllDir, 'fmt.dll');
+/*const spdlogPath = path.join(dllDir, 'spdlog.dll');
+const fmtPath = path.join(dllDir, 'fmt.dll');*/
 const fkloggerPath = path.join(dllDir, 'fklogger.dll');
 
-// 打开动态库
+/*// 打开动态库
 open({
     library: 'spdlog',
     path: spdlogPath
@@ -476,7 +476,7 @@ open({
 open({
     library: 'fmt',
     path: fmtPath
-});
+});*/
 open({
     library: 'fklogger',
     path: fkloggerPath

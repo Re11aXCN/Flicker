@@ -1,11 +1,19 @@
-﻿#include "FKLogger.h" // 引入你原始的头文件
-#include <string>
+﻿#include "FKLogger.h"
 
 #ifdef FKLOGGERWRAPPER_EXPORT
 #define FKLOGGERWRAPPER_API __declspec(dllexport)
 #else
 #define FKLOGGERWRAPPER_API __declspec(dllimport)
 #endif
+#define FKWRAPPER_LOG(level, ...) \
+    do { \
+        try { \
+            auto logger = FKLogger::getInstance().getLogger(); \
+            if (logger) { \
+                logger->log(level, __VA_ARGS__); \
+            } \
+        } catch (...) {} \
+    } while (0)
 
 extern "C" {
 
@@ -16,11 +24,11 @@ extern "C" {
      * @param truncate 是否在启动时清空旧日志。
      * @return 如果初始化成功，返回 true。
      */
-    FKLOGGERWRAPPER_API bool FKLogger_Initialize(const char* filename, int policy, bool truncate) {
+    FKLOGGERWRAPPER_API bool FKLogger_Initialize(const char* fileName, int policy, bool truncate = false, const char* fileDir = nullptr) {
         // 将 C 风格的 int 转换为 C++ 的 enum
         auto fk_policy = static_cast<FKLogger::GeneratePolicy>(policy);
         // 调用原始 C++ 单例的方法
-        return FKLogger::getInstance().initialize(std::string(filename), fk_policy, truncate);
+        return FKLogger::getInstance().initialize(std::string(fileName), fk_policy, truncate, fileDir);
     }
 
     /**
@@ -37,39 +45,22 @@ extern "C" {
         FKLogger::getInstance().flush();
     }
 
-    // 注意：你不能直接调用 C++ 的宏 (FK_CLIENT_INFO)。
-    // 我们需要创建函数来间接实现日志记录。
-
-    /**
-     * @brief 记录一条 Info 级别的日志。
-     * @param message 要记录的日志消息。
-     */
     FKLOGGERWRAPPER_API void FKLogger_Info(const char* message) {
-        // 我们在这里调用原始的宏，{} 是 spdlog 的格式化占位符
-        FK_CLIENT_INFO("{}", message);
+        FKWRAPPER_LOG(spdlog::level::info, message);
     }
-
-    /**
-     * @brief 记录一条 Warn 级别的日志。
-     * @param message 要记录的日志消息。
-     */
     FKLOGGERWRAPPER_API void FKLogger_Warn(const char* message) {
-        FK_CLIENT_WARN("{}", message);
+        FKWRAPPER_LOG(spdlog::level::warn, message);
     }
-
-    /**
-     * @brief 记录一条 Error 级别的日志。
-     * @param message 要记录的日志消息。
-     */
     FKLOGGERWRAPPER_API void FKLogger_Error(const char* message) {
-        FK_CLIENT_ERROR("{}", message);
+        FKWRAPPER_LOG(spdlog::level::err, message);
     }
-
-    /**
-     * @brief 记录一条 Debug 级别的日志。
-     * @param message 要记录的日志消息。
-     */
+    FKLOGGERWRAPPER_API void FKLogger_Trace(const char* message) {
+        FKWRAPPER_LOG(spdlog::level::trace, message);
+    }
+    FKLOGGERWRAPPER_API void FKLogger_Critical(const char* message) {
+        FKWRAPPER_LOG(spdlog::level::critical, message);
+    } 
     FKLOGGERWRAPPER_API void FKLogger_Debug(const char* message) {
-        FK_CLIENT_DEBUG("{}", message);
+        FKWRAPPER_LOG(spdlog::level::debug, message);
     }
 }

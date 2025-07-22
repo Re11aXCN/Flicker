@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 密码验证服务
  * 提供gRPC服务，处理密码验证请求
  */
@@ -6,10 +6,18 @@
 const grpc = require('@grpc/grpc-js');
 const bcrypt = require('bcrypt');
 
-const { serviceConfig } = require('../config/config-loader');
-const { loadProtoFile } = require('../utils/proto-loader');
+const { serviceConfig, loadConfig, setLogger: setConfigLogger } = require('../config/config-loader');
+const { loadProtoFile, setLogger: setProtoLogger } = require('../utils/proto-loader');
 const { ERROR_CODE } = require('../utils/constants');
-const { Logger } = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+
+// 创建认证服务专用的日志实例
+const logFileName = process.env.LOG_FILE_NAME || 'Flicker-RPC-Authentication';
+const Logger = createLogger('认证服务', logFileName);
+
+// 为各个工具类设置日志记录器，确保它们使用认证服务的日志实例
+setConfigLogger(Logger);
+setProtoLogger(Logger);
 
 /**
  * 处理密码重置验证请求
@@ -58,7 +66,7 @@ async function authenticatePwdReset(call, callback) {
  */
 function startServer() {
     const server = new grpc.Server();
-    const protoDescriptor = loadProtoFile();
+    const protoDescriptor = loadProtoFile(Logger);
     
     server.addService(protoDescriptor.Authentication.service, {
         AuthenticatePwdReset: authenticatePwdReset

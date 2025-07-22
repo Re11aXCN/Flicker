@@ -26,7 +26,8 @@ public:
     std::shared_ptr<spdlog::logger> getLogger() const;
 
     [[nodiscard("Logs can only be used after initialization is complete!")]] 
-    bool initialize(const std::string& filename, GeneratePolicy generatePolicy, bool truncate = false);
+    bool initialize(const std::string& fileName, GeneratePolicy generatePolicy, bool truncate = false
+        , const std::string& fileDir = "");
 
     void shutdown();
     void flush();
@@ -36,11 +37,10 @@ private:
     FKLogger(const FKLogger&) = delete;
     FKLogger& operator=(const FKLogger&) = delete;
 
-    std::string _createLogFlie();
+    std::string _createLogFlie(const std::string& fileDir, const std::string& fileName);
     fs::path _getExecutablePath();
 
     GeneratePolicy _generatePolicy{ SingleFile };
-    std::string _filename;
 
     std::mutex _mutex;
     std::shared_ptr<spdlog::logger> _logger;
