@@ -61,26 +61,34 @@ FKLogicSystem::FKLogicSystem()
         try {
             FKUserMapper mapper;
             std::optional<FKUserEntity> user = mapper.findByEmail(email);
-            if (serviceType == flicker::http::service::Register && user.has_value()) {
-                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
-                responseRoot["message"] = FKUtils::concat("The user '", email, "'already exist! Please choose another one!");
-                httpResponse.result(flicker::http::status::conflict);
-                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-                return;
+            switch (serviceType) {
+            case flicker::http::service::Register: {
+                if (user.has_value()) {
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
+                    responseRoot["message"] = FKUtils::concat("The user '", email, "'already exist! Please choose another one!");
+                    httpResponse.result(flicker::http::status::conflict);
+                    flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                    return;
+                }
+                break;
             }
-            else if (serviceType == flicker::http::service::ResetPassword &&!user.has_value()) {
-                responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
-                responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist!");
-                httpResponse.result(flicker::http::status::unauthorized);
-                flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
-                return;
+            case flicker::http::service::ResetPassword: {
+                if (!user.has_value()) {
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
+                    responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist!");
+                    httpResponse.result(flicker::http::status::unauthorized);
+                    flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
+                    return;
+                }
+                break;
             }
-            else {
+            default: {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::bad_request);
                 responseRoot["message"] = "Wrong request, refusal to respond to the service!";
                 httpResponse.result(flicker::http::status::bad_request);
                 flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
                 return;
+            }
             }
 
             // 调用grpc服务
@@ -102,13 +110,13 @@ FKLogicSystem::FKLogicSystem()
                 if (grpcStatus.ok()) { // grpc内部的 status
                     // 创建data对象
                     Json::Value dataObj;
-                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
-                    responseRoot["message"] = "The verification code is successfully sent to the email address and is valid within five minutes!";
-                    responseRoot["data"] = dataObj;
-
                     dataObj["request_service_type"] = requestRoot["request_service_type"];
                     dataObj["verify_type"] = requestRoot["data"]["verify_type"];
                     dataObj["verify_code"] = grpcResponse.verify_code();
+                    responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
+                    responseRoot["message"] = "The verification code is successfully sent to the email address and is valid within five minutes!";
+                    responseRoot["data"] = dataObj;
+                    
                     httpResponse.result(flicker::http::status::ok);
                 }
                 else {
@@ -245,10 +253,10 @@ FKLogicSystem::FKLogicSystem()
                     auto result = mapper.insert(FKUserEntity{ username, email, grpcResponse.encrypted_password() });
                     if (result == DbOperator::Status::Success) [[likely]] {
                         Json::Value dataObj;
+                        dataObj["request_service_type"] = requestRoot["request_service_type"];
                         responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
                         responseRoot["message"] = "Register successful!";
                         responseRoot["data"] = dataObj;
-                        dataObj["request_service_type"] = requestRoot["request_service_type"];
                         httpResponse.result(flicker::http::status::ok);
                     }
                     else [[unlikely]] {
@@ -353,10 +361,10 @@ FKLogicSystem::FKLogicSystem()
 
                     // 4. 设置成功响应
                     Json::Value dataObj;
+                    dataObj["request_service_type"] = requestRoot["request_service_type"];
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
                     responseRoot["message"] = "Login successful!";
                     responseRoot["data"] = dataObj;
-                    dataObj["request_service_type"] = requestRoot["request_service_type"];
                     httpResponse.result(flicker::http::status::ok);
                 }
                 else {
@@ -462,10 +470,10 @@ FKLogicSystem::FKLogicSystem()
             }
 
             Json::Value dataObj;
+            dataObj["request_service_type"] = requestRoot["request_service_type"];
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
             responseRoot["message"] = "Authentication successful!";
             responseRoot["data"] = dataObj;
-            dataObj["request_service_type"] = requestRoot["request_service_type"];
             httpResponse.result(flicker::http::status::ok);
         }
         catch (const std::exception& e) {
@@ -536,10 +544,10 @@ FKLogicSystem::FKLogicSystem()
                     auto result = mapper.updatePasswordByEmail(email, grpcResponse.encrypted_password());
                     if (result == DbOperator::Status::Success) [[likely]] {
                         Json::Value dataObj;
+                        dataObj["request_type"] = static_cast<int>(flicker::http::service::ResetPassword);
                         responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);
                         responseRoot["message"] = "Reset password successful!";
                         responseRoot["data"] = dataObj;
-                        dataObj["request_type"] = static_cast<int>(flicker::http::service::ResetPassword);
                         httpResponse.result(flicker::http::status::ok);
                     }
                     else [[unlikely]] {

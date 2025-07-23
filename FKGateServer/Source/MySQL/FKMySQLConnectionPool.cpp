@@ -1,13 +1,16 @@
 ﻿#include "FKMySQLConnectionPool.h"
 
 #include <sstream>
+#include "FKUtils.h"
 #include "FKLogger.h"
 #include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
 
+std::string my_ini_file;
 FKMySQLConnectionPool::FKMySQLConnectionPool() {
     try {
+        my_ini_file = FKUtils::concat(FKUtils::get_env<"MYSQL_HOME">(), FKUtils::local_separator(), "data", FKUtils::local_separator(), "my.ini");
         // 从配置管理器获取MySQL配置
         auto& config = FKConfigManager::getInstance()->getMySQLConnectionString();
         _initialize(config);
@@ -95,28 +98,41 @@ void FKMySQLConnectionPool::shutdown() {
 std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
     MYSQL* mysql = nullptr;
     try {
-        // 初始化MySQL连接
-        mysql = mysql_init(nullptr);
+        // mysql_init() 函数内部申请了一片内存，返回了首地址。
+        mysql = mysql_init(mysql);
         if (!mysql) {
             throw std::runtime_error("MySQL初始化失败");
         }
-        
-        // 设置连接选项
-        unsigned int timeout = static_cast<unsigned int>(_pConfig.ConnectionTimeout.count());
-        mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
-        
+        /*unsigned long max_allowed_packet = 512 * 1024 * 1024;
+        unsigned long net_buffer_length =1024;
+        uint32_t connect_timeout = 10;
+        uint32_t read_timeout = 30;
+        uint32_t write_timeout = 60;
+        uint32_t retry_count = 1;
+        uint32_t compress = 1;
+        uint32_t zstd_level = 7;*/
 
-        // MySQL 8.0.34+版本已弃用MYSQL_OPT_RECONNECT
-        // 使用会话变量设置自动重连
-        // 注意：连接后需要执行SET SESSION wait_timeout和SET SESSION interactive_timeout
-        // 来延长连接超时时间，防止连接断开
-        // 设置自动重连
-        //char reconnect = 1;
-        //mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
-
-        // 设置字符集
+        /*mysql_options(mysql, MYSQL_OPT_RETRY_COUNT, &retry_count);
+        mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &connect_timeout);
+        mysql_options(mysql, MYSQL_OPT_READ_TIMEOUT, &read_timeout);
+        mysql_options(mysql, MYSQL_OPT_WRITE_TIMEOUT, &write_timeout);
+        mysql_options(mysql, MYSQL_OPT_MAX_ALLOWED_PACKET, &max_allowed_packet);
+        mysql_options(mysql, MYSQL_OPT_NET_BUFFER_LENGTH, &net_buffer_length);
         mysql_options(mysql, MYSQL_SET_CHARSET_NAME, "utf8mb4");
-        
+        mysql_options(mysql, MYSQL_OPT_COMPRESS, &compress);
+        mysql_options(mysql, MYSQL_OPT_COMPRESSION_ALGORITHMS, "zlib,zstd,uncompressed");
+        mysql_options(mysql, MYSQL_OPT_ZSTD_COMPRESSION_LEVEL, &zstd_level);*/
+        //// MySQL 8.0.34+版本已弃用MYSQL_OPT_RECONNECT
+        //// 使用会话变量设置自动重连
+        //// 注意：连接后需要执行SET SESSION wait_timeout和SET SESSION interactive_timeout
+        //// 来延长连接超时时间，防止连接断开
+        //// 设置自动重连
+        ////char reconnect = 1;
+        ////mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
+
+        mysql_options(mysql, MYSQL_READ_DEFAULT_FILE, my_ini_file.c_str());
+        mysql_options(mysql, MYSQL_READ_DEFAULT_GROUP, "mysqld");
+
         // 建立连接
         if (!mysql_real_connect(
                 mysql, 
@@ -133,20 +149,7 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
             mysql = nullptr;
             throw std::runtime_error("MySQL连接失败: " + error);
         }
-        
-        // 设置会话变量来延长连接超时时间，替代已弃用的MYSQL_OPT_RECONNECT
-        if (mysql_query(mysql, "SET SESSION wait_timeout=28800") != 0) {
-            std::string error = mysql_error(mysql);
-            FK_SERVER_ERROR(std::format("设置wait_timeout失败: {}", error));
-            // 不抛出异常，继续尝试设置interactive_timeout
-        }
-        
-        if (mysql_query(mysql, "SET SESSION interactive_timeout=28800") != 0) {
-            std::string error = mysql_error(mysql);
-            FK_SERVER_ERROR(std::format("设置interactive_timeout失败: {}", error));
-            // 不抛出异常，继续使用连接
-        }
-        
+
         // 创建连接包装对象
         return std::make_shared<FKMySQLConnection>(mysql);
     } catch (const std::exception& e) {

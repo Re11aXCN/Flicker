@@ -3,6 +3,10 @@
  * @ Filename     : FKBaseMapper.hpp
  * @ Description : 基础数据库映射器模板类，提供通用的数据库操作
  * 
+ * TODO:
+ * —— updateFieldsByIdMap暂且未完全实现
+ * —— bindUpdateParams需要支持更多的C++数据类型和SQL数据类型映射
+ * 
  * @ Version     : V1.0
  * @ Author         : Re11a
  * @ Date Created: 2025/6/22
@@ -29,6 +33,7 @@
 #include "../FKMySQLConnectionPool.h"
 #include "FKDef.h"
 #include "FKLogger.h"
+#include "FKUtils.h"
 #include "FKFieldMapper.hpp"
 
 inline constexpr size_t MAX_ALLOWED_LIMIT = 5000; // 最大允许的查询结果数量
@@ -37,7 +42,72 @@ class DatabaseException : public std::runtime_error {
 public:
     explicit DatabaseException(const std::string& message) : std::runtime_error(message) {}
 };
+// MySQL语句智能指针，用于自动管理MYSQL_STMT资源
+class MySQLStmtPtr {
+private:
+    MYSQL_STMT* _stmt;
+    bool _released;
 
+public:
+    explicit MySQLStmtPtr(MYSQL_STMT* stmt) : _stmt(stmt), _released(false) {}
+
+    ~MySQLStmtPtr() {
+        release();
+    }
+
+    // 禁止复制
+    MySQLStmtPtr(const MySQLStmtPtr&) = delete;
+    MySQLStmtPtr& operator=(const MySQLStmtPtr&) = delete;
+
+    // 允许移动
+    MySQLStmtPtr(MySQLStmtPtr&& other) noexcept : _stmt(other._stmt), _released(other._released) {
+        other._stmt = nullptr;
+        other._released = true;
+    }
+
+    MySQLStmtPtr& operator=(MySQLStmtPtr&& other) noexcept {
+        if (this != &other) {
+            release();
+            _stmt = other._stmt;
+            _released = other._released;
+            other._stmt = nullptr;
+            other._released = true;
+        }
+        return *this;
+    }
+
+    // 获取原始指针
+    MYSQL_STMT* get() const {
+        return _stmt;
+    }
+
+    // 释放资源
+    void release() {
+        if (_stmt && !_released) {
+            mysql_stmt_close(_stmt);
+            _released = true;
+        }
+        _stmt = nullptr;
+    }
+
+    // 转换为原始指针
+    operator MYSQL_STMT* () const {
+        return _stmt;
+    }
+
+    // 检查是否有效
+    bool isValid() const {
+        return _stmt != nullptr && !_released;
+    }
+
+    // 释放所有权（不关闭语句）
+    MYSQL_STMT* release_ownership() {
+        MYSQL_STMT* temp = _stmt;
+        _stmt = nullptr;
+        _released = true;
+        return temp;
+    }
+};
 // 基础数据库映射器模板类
 template<typename T, typename ID_TYPE>
 class FKBaseMapper {
@@ -67,28 +137,34 @@ public:
     // 根据id查找单条记录
     std::optional<T> findById(ID_TYPE id) {
         try {
-            MYSQL_STMT* stmt = prepareStatement(findByIdQuery().c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(findByIdQuery().c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for findById");
             }
             
             // 绑定参数
-            bindIdParam(stmt, id);
+            bindIdParam(stmtPtr, id);
             
             // 执行查询
-            executeQuery(stmt);
+            executeQuery(stmtPtr);
             
             // 获取元数据
-            MYSQL_RES* meta = mysql_stmt_result_metadata(stmt);
+            MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
             if (!meta) {
-                mysql_stmt_close(stmt);
                 throw DatabaseException("No metadata available for findById query");
             }
+            
+            // 使用智能指针确保meta资源被释放
+            struct MetaGuard {
+                MYSQL_RES* res;
+                ~MetaGuard() { if(res) mysql_free_result(res); }
+            } metaGuard{meta};
             
             // 获取结果
             std::optional<T> result;
             try {
-                result = fetchSingleResult(stmt, meta);
+                result = fetchSingleResult(stmtPtr, meta);
             } catch (const DatabaseException& e) {
                 // 如果没有找到结果，返回空optional
                 if (std::string(e.what()).find("No results found") != std::string::npos) {
@@ -98,10 +174,7 @@ public:
                 }
             }
             
-            // 清理资源
-            mysql_free_result(meta);
-            mysql_stmt_close(stmt);
-            
+            // 不需要手动释放资源，智能指针和守卫会自动处理
             return result;
         } catch (const std::exception& e) {
             FK_SERVER_ERROR(std::format("findById error: {}", e.what()));
@@ -136,8 +209,8 @@ public:
     std::vector<T> findAll(size_t limit, size_t offset = 0) {
         try {
             size_t safe_limit = limit > MAX_ALLOWED_LIMIT ? MAX_ALLOWED_LIMIT : limit;
-            std::string query = findAllQuery() + " LIMIT " + std::to_string(safe_limit) +
-                               " OFFSET " + std::to_string(offset);
+            std::string query = FKUtils::concat(findAllQuery(), " LIMIT ", std::to_string(safe_limit), 
+                               " OFFSET ", std::to_string(offset));
             
             return FKMySQLConnectionPool::getInstance()->executeWithConnection(
                 [&query, this](MYSQL* mysql) -> std::vector<T> {
@@ -162,20 +235,19 @@ public:
     // 插入记录
     DbOperator::Status insert(const T& entity) {
         try {
-            MYSQL_STMT* stmt = prepareStatement(insertQuery().c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(insertQuery().c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for insert");
             }
             
             // 绑定参数
-            bindInsertParams(stmt, entity);
+            bindInsertParams(stmtPtr, entity);
             
             // 执行更新
-            executeUpdate(stmt);
+            executeUpdate(stmtPtr);
             
-            // 清理资源
-            mysql_stmt_close(stmt);
-            
+            // 资源会由智能指针自动清理
             return DbOperator::Status::Success;
         } catch (const std::exception& e) {
             std::string error = e.what();
@@ -193,23 +265,22 @@ public:
     // 根据ID删除记录
     DbOperator::Status deleteById(ID_TYPE id) {
         try {
-            MYSQL_STMT* stmt = prepareStatement(deleteByIdQuery().c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(deleteByIdQuery().c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for deleteById");
             }
             
             // 绑定参数
-            bindIdParam(stmt, id);
+            bindIdParam(stmtPtr, id);
             
             // 执行更新
-            executeUpdate(stmt);
+            executeUpdate(stmtPtr);
             
             // 检查影响的行数
-            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
             
-            // 清理资源
-            mysql_stmt_close(stmt);
-            
+            // 资源会由智能指针自动清理
             if (affectedRows == 0) {
                 return DbOperator::Status::DataNotExist;
             }
@@ -240,26 +311,25 @@ public:
                 throw DatabaseException("Invalid fields parameter: potential SQL injection detected");
             }
             
-            std::string query = "UPDATE " + getTableName() + " SET " + fields + 
-                               " WHERE id = ?";
+            std::string query = FKUtils::concat("UPDATE ", getTableName(), " SET ", fields,  
+                               " WHERE id = ?");
             
-            MYSQL_STMT* stmt = prepareStatement(query.c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsById");
             }
             
             // 绑定参数
-            bindUpdateParams(stmt, id, std::forward<Args>(args)...);
+            bindUpdateParams(stmtPtr, id, std::forward<Args>(args)...);
             
             // 执行更新
-            executeUpdate(stmt);
+            executeUpdate(stmtPtr);
             
             // 检查影响的行数
-            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
             
-            // 清理资源
-            mysql_stmt_close(stmt);
-            
+            // 资源会由智能指针自动清理
             if (affectedRows == 0) {
                 return DbOperator::Status::DataNotExist;
             }
@@ -288,26 +358,25 @@ public:
                 setClause += fieldNames[i] + " = ?";
             }
             
-            std::string query = "UPDATE " + getTableName() + " SET " + setClause + 
-                               " WHERE id = ?";
+            std::string query = FKUtils::concat("UPDATE ", getTableName(), " SET ", setClause,
+                " WHERE id = ?");
             
-            MYSQL_STMT* stmt = prepareStatement(query.c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsByIdSafe");
             }
             
             // 绑定参数
-            bindUpdateParams(stmt, id, std::forward<Args>(args)...);
+            bindUpdateParams(stmtPtr, id, std::forward<Args>(args)...);
             
             // 执行更新
-            executeUpdate(stmt);
+            executeUpdate(stmtPtr);
             
             // 检查影响的行数
-            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
             
-            // 清理资源
-            mysql_stmt_close(stmt);
-            
+            // 资源会由智能指针自动清理
             if (affectedRows == 0) {
                 return DbOperator::Status::DataNotExist;
             }
@@ -340,27 +409,26 @@ public:
                 first = false;
             }
             
-            std::string query = "UPDATE " + getTableName() + " SET " + setClause + 
-                               " WHERE id = ?";
+            std::string query = FKUtils::concat("UPDATE ", getTableName(), " SET ", setClause,
+                " WHERE id = ?");
             
-            MYSQL_STMT* stmt = prepareStatement(query.c_str());
-            if (!stmt) {
+            // 使用智能指针管理MYSQL_STMT资源
+            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsByIdMap");
             }
             
             // 绑定参数 - 这里需要根据实际情况实现
             // 这个示例假设有一个可以处理vector<ValueType>的bindMapValues方法
-            bindMapValues(stmt, values, id);
+            bindMapValues(stmtPtr, values, id);
             
             // 执行更新
-            executeUpdate(stmt);
+            executeUpdate(stmtPtr);
             
             // 检查影响的行数
-            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmt);
+            my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
             
-            // 清理资源
-            mysql_stmt_close(stmt);
-            
+            // 资源会由智能指针自动清理
             if (affectedRows == 0) {
                 return DbOperator::Status::DataNotExist;
             }
@@ -389,15 +457,16 @@ protected:
     virtual constexpr std::string deleteByIdQuery() const = 0;
     
     // 子类必须实现的参数绑定方法
-    virtual void bindIdParam(MYSQL_STMT* stmt, ID_TYPE id) const = 0;
-    virtual void bindInsertParams(MYSQL_STMT* stmt, const T& entity) const = 0;
+    virtual void bindIdParam(MySQLStmtPtr& stmtPtr, ID_TYPE id) const = 0;
+    virtual void bindInsertParams(MySQLStmtPtr& stmtPtr, const T& entity) const = 0;
     
     // 子类必须实现的结果处理方法
     virtual T createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const = 0;
     
     // 更新参数绑定方法（变参模板）
     template<typename... Args>
-    void bindUpdateParams(MYSQL_STMT* stmt, ID_TYPE id, Args&&... args) const {
+    void bindUpdateParams(MySQLStmtPtr& stmtPtr, ID_TYPE id, Args&&... args) const {
+        MYSQL_STMT* stmt = stmtPtr;
         // 计算参数总数（字段值 + ID）
         constexpr size_t paramCount = sizeof...(Args) + 1;
         
@@ -436,17 +505,17 @@ protected:
         }
     }
     
-    // 递归处理变参绑定（终止条件）
-    void bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index) const {
-        // 终止递归的空实现
-    }
-    
     // 绑定字段映射值和ID - 子类需要实现此方法以支持updateFieldsByIdMap
     template<typename ValueType>
     void bindMapValues(MYSQL_STMT* stmt, const std::vector<ValueType>& values, ID_TYPE id) const {
         throw DatabaseException("bindMapValues not implemented for this type");
     }
     
+    // 递归处理变参绑定（终止条件）
+    void bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index) const {
+        // 终止递归的空实现
+    }
+
     // 递归处理变参绑定（处理整数类型）
     template<typename T, typename... Rest>
     typename std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>>
@@ -518,41 +587,43 @@ protected:
     }
 
     // 准备预处理语句
-    MYSQL_STMT* prepareStatement(const char* query) const {
+    MySQLStmtPtr prepareStatement(const char* query) const {
         return FKMySQLConnectionPool::getInstance()->executeWithConnection(
-            [query](MYSQL* mysql) -> MYSQL_STMT* {
+            [query](MYSQL* mysql) -> MySQLStmtPtr {
                 MYSQL_STMT* stmt = mysql_stmt_init(mysql);
                 if (!stmt) {
                     throw std::runtime_error("Statement init failed");
                 }
                 
+                MySQLStmtPtr stmtPtr(stmt);
+                
                 if (mysql_stmt_prepare(stmt, query, strlen(query))) {
                     std::string error = mysql_error(mysql);
-                    mysql_stmt_close(stmt);
                     throw std::runtime_error("Prepare failed: " + error);
                 }
                 
-                return stmt;
+                return stmtPtr;
             }
         );
     }
     
     // 执行查询
-    void executeQuery(MYSQL_STMT* stmt) const {
+    void executeQuery(MySQLStmtPtr& stmtPtr) const {
+        MYSQL_STMT* stmt = stmtPtr;
         if (mysql_stmt_execute(stmt)) {
             std::string error = mysql_stmt_error(stmt);
-            mysql_stmt_close(stmt);
             throw DatabaseException("Execute failed: " + error);
         }
     }
     
     // 执行更新
-    void executeUpdate(MYSQL_STMT* stmt) const {
-        executeQuery(stmt); // 执行逻辑相同
+    void executeUpdate(MySQLStmtPtr& stmtPtr) const {
+        executeQuery(stmtPtr); // 执行逻辑相同
     }
     
     // 获取单个结果
-    T fetchSingleResult(MYSQL_STMT* stmt, MYSQL_RES* meta) const {
+    T fetchSingleResult(MySQLStmtPtr& stmtPtr, MYSQL_RES* meta) const {
+        MYSQL_STMT* stmt = stmtPtr;
         if (mysql_stmt_store_result(stmt)) {
             std::string error = mysql_stmt_error(stmt);
             throw DatabaseException("Store result failed: " + error);

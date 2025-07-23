@@ -22,14 +22,14 @@ int main(int argc, char* argv[])
                 // 创建用户表SQL
                 std::string createTableSQL = R"(
 CREATE TABLE IF NOT EXISTS
-user (
+users (
 id INT AUTO_INCREMENT PRIMARY KEY,
 uuid VARCHAR(36) NOT NULL UNIQUE,
 username VARCHAR(30) NOT NULL UNIQUE,
 email VARCHAR(320) NOT NULL UNIQUE,
 password VARCHAR(60) NOT NULL, 
 create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-update_time TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+update_time TIMESTAMP DEFAULT NULL,
 INDEX idx_email (email),
 INDEX idx_username (username)
 )

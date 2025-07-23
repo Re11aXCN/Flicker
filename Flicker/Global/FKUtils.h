@@ -14,6 +14,7 @@
 *************************************************************************************/
 #ifndef FK_UTILS_H_
 #define FK_UTILS_H_
+#include <wchar.h>
 #include <cctype> 
 #include <array>
 #include <algorithm>
@@ -24,10 +25,15 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include <chrono>
+#include <cstdlib>
 #ifdef QT_CORE_LIB
 #include <QString>
 #include <QColor>
+#endif
+#if defined(_WIN32)
+#include <Windows.h>
 #endif
 namespace FKUtils {
     namespace helper {
@@ -80,6 +86,22 @@ ENDIANNESS返回结果
             if (c >= 'a' && c <= 'f') return c - 'a' + 10;
             throw std::invalid_argument("Invalid hexadecimal character");
         }
+
+        // 编译期字符串视图（C++17起可用）
+        template<size_t N>
+        struct ConstexprString {
+            char value[N];
+
+            constexpr ConstexprString(const char(&str)[N]) {
+                for (size_t i = 0; i < N; ++i) {
+                    value[i] = str[i];
+                }
+            }
+
+            constexpr operator const char* () const { return value; }
+            constexpr const char* data() const { return value; }
+            constexpr size_t size() const { return N - 1; } // 减去空字符
+        };
     };
 
     /**
@@ -405,6 +427,69 @@ ENDIANNESS返回结果
 #else
         return "/";
 #endif
+    }
+
+    template<helper::ConstexprString Name>
+    std::string get_env_w() {
+#if defined(_WIN32)
+        // 名称: UTF-8 → UTF-16 (动态缓冲区)
+        const int nameLen = MultiByteToWideChar(CP_UTF8, 0, Name, -1, nullptr, 0);
+        if (nameLen == 0) throw std::runtime_error("环境变量名转换失败");
+        std::wstring wideName(nameLen, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, Name, -1, wideName.data(), nameLen);
+
+        // 获取值: 动态适应长度
+        DWORD valueLen = GetEnvironmentVariableW(wideName.data(), nullptr, 0);
+        if (valueLen == 0) {
+            if (GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+                throw std::runtime_error("环境变量不存在");
+            throw std::runtime_error("获取环境变量失败");
+        }
+
+        std::wstring wideValue(valueLen, L'\0');
+        valueLen = GetEnvironmentVariableW(wideName.data(), wideValue.data(), valueLen);
+        if (valueLen == 0) throw std::runtime_error("获取环境变量失败");
+
+        // 值: UTF-16 → UTF-8 (动态缓冲区)
+        const int resultLen = WideCharToMultiByte(CP_UTF8, 0,
+            wideValue.data(), -1, nullptr, 0, nullptr, nullptr);
+        if (resultLen == 0) throw std::runtime_error("值转换失败");
+
+        std::string result(resultLen, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wideValue.data(), -1,
+            result.data(), resultLen, nullptr, nullptr);
+        return result;
+#else
+        const char* value = std::getenv(Name);
+        if (!value) {
+            throw std::runtime_error("环境变量不存在");
+        }
+        return std::string(value);
+#endif
+/*
+#if defined(_WIN32)
+        //_wgetenv(Name);
+        wchar_t buffer[MAX_PATH];
+        char path[MAX_PATH];
+        if (!GetEnvironmentVariable(Name, buffer, MAX_PATH)) {
+            throw std::runtime_error("获取环境变量MYSQL_HOME失败");
+        }
+        size_t convertedChars = 0;  // 存储转换后的字节数
+        errno_t err = wcstombs_s(
+            &convertedChars,  // 接收转换字节数的指针 [CORRECTED]
+            path,             // 目标char缓冲区
+            MAX_PATH,         // 目标缓冲区大小
+            buffer,           // 源wchar_t缓冲区
+            _TRUNCATE         // 自动截断超长内容 [SAFER]
+        );
+
+        if (err != 0) {
+            throw std::runtime_error("宽字符转换失败");
+        }
+#else
+        const char* path = std::getenv(Name)
+#endif
+*/
     }
 };
 #ifdef QT_CORE_LIB

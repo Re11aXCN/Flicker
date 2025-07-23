@@ -109,7 +109,7 @@ class Logger {
             const result = FKLoggerLib.FKLogger_Initialize([fileName, policy, truncate, fileDir]);
             if (result) {
                 this.initialized = true;
-                this.info(`${this.serviceName}日志系统初始化成功`);
+                //this.info(`${this.serviceName}日志系统初始化成功`);
             } else {
                 console.error(`${this.serviceName}日志系统初始化失败`);
             }
