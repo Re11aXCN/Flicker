@@ -22,7 +22,6 @@ namespace flicker = boost::beast;
 namespace boost::beast {
     namespace http {
         enum class service : uint16_t {
-            Unknown,
             VerifyCode,
             Login,
             Register,
@@ -47,7 +46,6 @@ namespace boost::beast {
     }
     namespace grpc {
         enum class service : uint16_t {
-            Unknown,
             VerifyCode,
             EncryptPassword,
             AuthenticatePwdReset,

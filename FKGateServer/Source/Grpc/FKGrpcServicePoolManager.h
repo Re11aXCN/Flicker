@@ -75,7 +75,8 @@ private:
     FKGrpcServicePoolManager();
     ~FKGrpcServicePoolManager();
     // 初始化特定类型的gRPC服务连接池
-    void _initializeService(flicker::grpc::service rpcService);
+    template<flicker::grpc::service rpcService>
+    void _initializeService();
 
     struct ServicePoolWrapper {
         void* poolPtr{ nullptr };

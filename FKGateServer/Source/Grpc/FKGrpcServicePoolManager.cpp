@@ -7,87 +7,38 @@
 SINGLETON_CREATE_SHARED_CPP(FKGrpcServicePoolManager)
 
 FKGrpcServicePoolManager::FKGrpcServicePoolManager() {
-    // 记录初始化失败的服务，但继续尝试初始化其他服务
-    std::vector<std::string> failedServices;
-    
-    try {
-        _initializeService(flicker::grpc::service::VerifyCode);
-    } catch (const std::exception& e) {
-        failedServices.push_back(std::string("验证码服务: ") + e.what());
-    }
-    
-    try {
-        _initializeService(flicker::grpc::service::EncryptPassword);
-    } catch (const std::exception& e) {
-        failedServices.push_back(std::string("密码加密服务: ") + e.what());
-    }
-    
-    try {
-        _initializeService(flicker::grpc::service::AuthenticatePwdReset);
-    } catch (const std::exception& e) {
-        failedServices.push_back(std::string("密码重置验证服务: ") + e.what());
-    }
-    
-    // 如果有服务初始化失败，记录错误信息
-    if (!failedServices.empty()) {
-        std::string errorMsg = "以下服务初始化失败:\n";
-        for (const auto& service : failedServices) {
-            errorMsg += "- " + service + "\n";
-        }
-        FK_SERVER_ERROR(errorMsg);
-    }
+    _initializeService<flicker::grpc::service::VerifyCode>();
+    _initializeService<flicker::grpc::service::EncryptPassword>();
+    _initializeService<flicker::grpc::service::AuthenticatePwdReset>();
 }
 
 FKGrpcServicePoolManager::~FKGrpcServicePoolManager() {
     shutdownAllServices();
 }
 
-void FKGrpcServicePoolManager::_initializeService(flicker::grpc::service rpcService) {
-#define GRPC_SERVICE_CASE(type, name)  case type: { \
-        using service_type = ServiceTraits<type>::Type; \
-        try { \
-            std::unique_ptr<FKGrpcConnectionPool<service_type>> pool( \
-                new FKGrpcConnectionPool<service_type>(configManager->getGrpcServiceConfig(type)) \
-            ); \
-            auto rawPool = pool.release(); \
-            _pServicePools[type] = { \
-               .poolPtr = rawPool, \
-               .shutdown = [rawPool] { \
-                    rawPool->shutdown(); \
-                    delete rawPool; \
-                }, \
-               .getStatus = [rawPool] { \
-                    return rawPool->getStatus(); \
-                } \
-            }; \
-            FK_SERVER_INFO(std::format("已初始化{}服务连接池", name));\
-        } catch (const std::exception& e) { \
-            FK_SERVER_ERROR(std::format("初始化{}服务连接池失败: {}", name, e.what())); \
-            throw; \
-        } \
-        break; \
-    }
-
-    std::lock_guard<std::mutex> lock(_pMutex);
-    if (_pServicePools.find(rpcService) != _pServicePools.end()) {
+template<flicker::grpc::service rpcService>
+void FKGrpcServicePoolManager::_initializeService() {
+    if (_pServicePools.contains(rpcService)) {
         FK_SERVER_WARN("服务已初始化，请先关闭再重新初始化");
         return;
     }
-
-    FKConfigManager* configManager = FKConfigManager::getInstance();
     try {
-        switch (rpcService) {
-            GRPC_SERVICE_CASE(flicker::grpc::service::VerifyCode, "验证码")
-            GRPC_SERVICE_CASE(flicker::grpc::service::EncryptPassword, "加密密码")
-            GRPC_SERVICE_CASE(flicker::grpc::service::AuthenticatePwdReset, "验证密码重置")
-            default: throw std::runtime_error("未知的服务类型");
-        }
+        FKConfigManager* configManager = FKConfigManager::getInstance();
+
+        using service_type = ServiceTraits<rpcService>::Type;
+        std::unique_ptr<FKGrpcConnectionPool<service_type>> pool{ new FKGrpcConnectionPool<service_type>(configManager->getGrpcServiceConfig(rpcService)) };
+        auto rawPool = pool.release();
+        _pServicePools[rpcService] = {
+            .poolPtr = rawPool,
+            .shutdown = [rawPool] { rawPool->shutdown(); delete rawPool; },
+            .getStatus = [rawPool] { return rawPool->getStatus(); }
+        };
+        FK_SERVER_INFO(std::format("已初始化{}服务连接池", magic_enum::enum_name(rpcService)));
     }
     catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("初始化{}服务失败: {}", magic_enum::enum_name(rpcService), e.what()));
         throw;
     }
-#undef GRPC_SERVICE_CASE
 }
 
 void FKGrpcServicePoolManager::shutdownService(flicker::grpc::service rpcService) {

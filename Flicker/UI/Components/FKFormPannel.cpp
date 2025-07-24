@@ -9,6 +9,7 @@
 
 #include <NXTheme.h>
 #include <NXIcon.h>
+#include "FKLogger.h"
 #include "FKUtils.h"
 #include "FKConstant.h"
 #include "FKLauncherShell.h"
@@ -99,17 +100,12 @@ void FKFormPannel::toggleFormType()
     if (_pVerifyCodeTimer->isActive()) {
         _pVerifyCodeTimer->stop();
     }
-    _pVerifyCodeLineEdit->setButtonEnabled(false);
     _pVerifyCodeLineEdit->setButtonText("获取验证码");
+    _pVerifyCodeLineEdit->setButtonEnabled(false);
 
     QTimer::singleShot(200, this, [this]() { 
         _updateSwitchedUI();
         _updateConfirmButtonState(); 
-        _pUsernameLineEdit->setText("Re11a");
-        _pEmailLineEdit->setText("2634544095@qq.com");
-        _pPasswordLineEdit->setText("123456789");
-        _pConfirmPasswordLineEdit->setText("123456789");
-        _pVerifyCodeLineEdit->setText("123456");
     });
 }
 
@@ -252,7 +248,7 @@ void FKFormPannel::_initUI()
 void FKFormPannel::_initRegistryCallback()
 {
 #define SHOW_HTTP_RESPONSE_MESSAGE(SuccessPos, ErrorPos) \
-if (responseJsonObj["status"].toInt() != static_cast<int>(flicker::http::status::ok)) {\
+if (responseJsonObj["response_status_code"].toInt() != static_cast<int>(flicker::http::status::ok)) {\
     FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
     return;\
 }\
@@ -261,7 +257,20 @@ FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJ
 
     _pResponseCallbacks.insert(flicker::http::service::VerifyCode, [this](const QJsonObject& responseJsonObj) {
         if (_pFormType == Launcher::FormType::Register) {
-            SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
+            auto status = static_cast<flicker::http::status>(responseJsonObj["response_status_code"].toInt());
+            auto message = responseJsonObj["message"].toString();
+            if (status != flicker::http::status::ok) {
+                FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, NXMessageBarType::BottomRight);
+                if (status == flicker::http::status::conflict && message.contains("exist")) {
+                    if (_pVerifyCodeTimer->isActive()) {
+                        _pVerifyCodeTimer->stop();
+                    }
+                    _pVerifyCodeLineEdit->setButtonText("获取验证码");
+                    _pVerifyCodeLineEdit->setButtonEnabled(true);
+                }
+                return;
+            }
+            FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::TopRight);
         }
         else {
             SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomLeft);
@@ -278,7 +287,6 @@ FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJ
 
     _pResponseCallbacks.insert(flicker::http::service::Register, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
-        
         });
 
     _pResponseCallbacks.insert(flicker::http::service::ResetPassword, [this](const QJsonObject& responseJsonObj) {
@@ -669,30 +677,42 @@ void FKFormPannel::_onPasswordEditingFinished()
     // 检查确认密码长度是否符合8-20位要求
     QString passwordText = _pPasswordLineEdit->text();
     bool isLengthValid = _validatePasswordLength(passwordText);
-    if (isLengthValid) {
-        QString comfirmPasswordText = _pConfirmPasswordLineEdit->text();
-        // 如果确认密码也已输入且格式正确，检查两个密码是否匹配
-        if (!comfirmPasswordText.isEmpty() &&
-            _validatePassword(comfirmPasswordText) &&
-            _validatePasswordLength(comfirmPasswordText))
-        {
-            bool isMatch = _validateConfirmPassword(passwordText, comfirmPasswordText);
-            if (isMatch) {
-                _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
-                _pValidationFlags |= Launcher::InputValidationFlag::ConfirmPasswordValid;
-            } 
-            else {
-                _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
-                _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
-                FKLauncherShell::ShowMessage("ERROR", "两次输入的密码不一致！",  NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+    if (_pFormType == Launcher::FormType::Login) {
+        if (isLengthValid) {
+            _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
+        }
+        else {
+            _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+            _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
+            FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, NXMessageBarType::BottomLeft);
+        }
+    }
+    else {
+        if (isLengthValid) {
+            QString comfirmPasswordText = _pConfirmPasswordLineEdit->text();
+            // 如果确认密码也已输入且格式正确，检查两个密码是否匹配
+            if (!comfirmPasswordText.isEmpty() &&
+                _validatePassword(comfirmPasswordText) &&
+                _validatePasswordLength(comfirmPasswordText))
+            {
+                bool isMatch = _validateConfirmPassword(passwordText, comfirmPasswordText);
+                if (isMatch) {
+                    _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
+                    _pValidationFlags |= Launcher::InputValidationFlag::ConfirmPasswordValid;
+                }
+                else {
+                    _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+                    _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
+                    FKLauncherShell::ShowMessage("ERROR", "两次输入的密码不一致！", NXMessageBarType::Error, NXMessageBarType::BottomRight);
+                }
             }
         }
-    } 
-    else {
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
-        _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
-        if (!passwordText.isEmpty()) {
-            FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+        else {
+            _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+            _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
+            if (!passwordText.isEmpty()) {
+                FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+            }
         }
     }
     
@@ -769,8 +789,8 @@ void FKFormPannel::_updateVerifyCodeTimer()
     else {
         // 倒计时结束
         _pVerifyCodeTimer->stop();
-        _pVerifyCodeLineEdit->setButtonEnabled(true);
         _pVerifyCodeLineEdit->setButtonText("获取验证码");
+        _pVerifyCodeLineEdit->setButtonEnabled(true);
     }
 }
 
@@ -778,8 +798,8 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
 {
     // 定时器设置，防止用户多次点击
     _pRemainingSeconds = 60;
-    _pVerifyCodeLineEdit->setButtonEnabled(false);
     _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
+    _pVerifyCodeLineEdit->setButtonEnabled(false);
     _pVerifyCodeTimer->start();
 
     QJsonObject requestObj, dataObj;

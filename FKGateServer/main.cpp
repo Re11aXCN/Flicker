@@ -14,6 +14,8 @@ int main(int argc, char* argv[])
 {
     try
     {
+        FK_SERVER_TRACE("活动连接数: {}", 1);
+
         bool ok = FKLogger::getInstance().initialize("Flicker-Server", FKLogger::SingleFile, true);
         if (!ok)  return EXIT_FAILURE;
 
@@ -23,13 +25,13 @@ int main(int argc, char* argv[])
                 std::string createTableSQL = R"(
 CREATE TABLE IF NOT EXISTS
 users (
-id INT AUTO_INCREMENT PRIMARY KEY,
-uuid VARCHAR(36) NOT NULL UNIQUE,
+id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+uuid VARCHAR(36) NOT NULL UNIQUE DEFAULT (UUID()),
 username VARCHAR(30) NOT NULL UNIQUE,
 email VARCHAR(320) NOT NULL UNIQUE,
 password VARCHAR(60) NOT NULL, 
-create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-update_time TIMESTAMP DEFAULT NULL,
+create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
+update_time TIMESTAMP(3) DEFAULT NULL,
 INDEX idx_email (email),
 INDEX idx_username (username)
 )

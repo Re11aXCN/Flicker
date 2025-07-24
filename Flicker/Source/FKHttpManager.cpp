@@ -35,6 +35,9 @@ void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QS
     QNetworkReply* reply = _pNetworkAccessManager.post(request, data);
 
     QObject::connect(reply, &QNetworkReply::finished, [=, self = shared_from_this()]() {
+        /*
+        // Qt的reply->error() 和 flicker::http::status 不一致，统一采用标准的flicker::http::status,
+        // 这里不再处理reply->error()
         if (reply->error() != QNetworkReply::NoError) {
             reply->deleteLater();
 
@@ -45,6 +48,7 @@ void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QS
             Q_EMIT this->httpRequestFinished(serviceType, errorObj);
             return;
         }
+        */
         QByteArray responseData = reply->readAll();
         reply->deleteLater();
 
@@ -60,6 +64,8 @@ void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QS
             Q_EMIT this->httpRequestFinished(serviceType, errorObj);
             return;
         }
+        //switch (flicker::http::status::conflict == static_cast<flicker::http::status>(responseObj["response_status_code"].toInt())) {}
+
         Q_EMIT this->httpRequestFinished(serviceType, jsonDoc.object());
         });
 }

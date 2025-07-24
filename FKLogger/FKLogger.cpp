@@ -199,14 +199,10 @@ bool FKLogger::initialize(const std::string& fileName, GeneratePolicy generatePo
         // 完整调试格式（含线程、文件、函数、行号）
 #ifdef _RELEASE
         _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] [%l]: %v%$");
+        _logger->set_level(spdlog::level::info);
 #else
         _logger->set_pattern("%^[%Y-%m-%d %T.%e] [tid: %t] [%l]: %v {File: %s Func: %! Line: %#}%$");
-#endif
-
-#ifdef _DEBUG
-        _logger->set_level(spdlog::level::debug);
-#else
-        _logger->set_level(spdlog::level::info);
+        _logger->set_level(spdlog::level::trace);
 #endif
 
         // 设置刷新间隔（秒）

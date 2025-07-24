@@ -1,4 +1,4 @@
-#include "FKUserMapper.h"
+﻿#include "FKUserMapper.h"
 
 #include <chrono>
 #include <cstring>
@@ -6,6 +6,12 @@
 #include <sstream>
 
 #include "FKLogger.h"
+
+struct MetaGuard {
+    MYSQL_RES* res;
+    MetaGuard(MYSQL_RES* r) : res(r) {}
+    ~MetaGuard() { if (res) mysql_free_result(res); }
+};
 
 FKUserMapper::FKUserMapper() : FKBaseMapper<FKUserEntity, std::size_t>() {
 
@@ -45,8 +51,8 @@ constexpr std::string FKUserMapper::findByUsernameQuery() const {
 
 constexpr std::string FKUserMapper::insertQuery() const {
     return "INSERT INTO " + getTableName() + 
-           " (uuid, username, email, password, create_time) "
-           "VALUES (?, ?, ?, ?, ?)";
+           " (username, email, password) "
+           "VALUES (?, ?, ?)";
 }
 
 constexpr std::string FKUserMapper::deleteByIdQuery() const {
@@ -85,13 +91,13 @@ constexpr std::string FKUserMapper::_findPasswordByUsernameQuery()
     return "SELECT password FROM " + getTableName() + " WHERE username = ?";
 }
 
-void FKUserMapper::bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t id) const {
+void FKUserMapper::bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t* id) const {
     MYSQL_STMT* stmt = stmtPtr;
     MYSQL_BIND bind[1];
     memset(bind, 0, sizeof(bind));
     
     bind[0].buffer_type = MYSQL_TYPE_LONGLONG;
-    bind[0].buffer = const_cast<std::size_t*>(&id);
+    bind[0].buffer = const_cast<std::size_t*>(id);
     bind[0].is_unsigned = true;
     
     if (mysql_stmt_bind_param(stmt, bind)) {
@@ -102,44 +108,32 @@ void FKUserMapper::bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t id) const {
 
 void FKUserMapper::bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& entity) const {
     MYSQL_STMT* stmt = stmtPtr;
-    MYSQL_BIND bind[4];
+    MYSQL_BIND bind[3];
     memset(bind, 0, sizeof(bind));
-    
-    // UUID
-    std::string uuid = entity.getUuid();
-    unsigned long uuidLength = uuid.length();
-    
-    bind[0].buffer_type = MYSQL_TYPE_STRING;
-    bind[0].buffer = const_cast<char*>(uuid.c_str());
-    bind[0].buffer_length = uuidLength;
-    bind[0].length = &uuidLength;
-    
+
     // Username
-    std::string username = entity.getUsername();
-    unsigned long usernameLength = username.length();
-    
-    bind[1].buffer_type = MYSQL_TYPE_STRING;
-    bind[1].buffer = const_cast<char*>(username.c_str());
-    bind[1].buffer_length = usernameLength;
-    bind[1].length = &usernameLength;
+    auto* usernameLength = const_cast<unsigned long*>(entity.getUsernameLength());
+    const std::string& username = entity.getUsername();
+    bind[0].buffer_type = MYSQL_TYPE_VAR_STRING;
+    bind[0].buffer = const_cast<char*>(username.c_str());
+    bind[0].buffer_length = *usernameLength + 1;
+    bind[0].length = usernameLength;
     
     // Email
-    std::string email = entity.getEmail();
-    unsigned long emailLength = email.length();
-    
-    bind[2].buffer_type = MYSQL_TYPE_STRING;
-    bind[2].buffer = const_cast<char*>(email.c_str());
-    bind[2].buffer_length = emailLength;
-    bind[2].length = &emailLength;
-    
+    auto* emailLength = const_cast<unsigned long*>(entity.getEmailLength());
+    const std::string& email = entity.getEmail();
+    bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
+    bind[1].buffer = const_cast<char*>(entity.getEmail().c_str());
+    bind[1].buffer_length = *emailLength + 1;
+    bind[1].length = emailLength;
+
     // Password
-    std::string password = entity.getPassword();
-    unsigned long passwordLength = password.length();
-    
-    bind[3].buffer_type = MYSQL_TYPE_STRING;
-    bind[3].buffer = const_cast<char*>(password.c_str());
-    bind[3].buffer_length = passwordLength;
-    bind[3].length = &passwordLength;
+    auto* passwordLength = const_cast<unsigned long*>(entity.getPasswordLength());
+    const std::string& password = entity.getPassword();;
+    bind[2].buffer_type = MYSQL_TYPE_VAR_STRING;
+    bind[2].buffer = const_cast<char*>(entity.getPassword().c_str());
+    bind[2].buffer_length = *passwordLength;
+    bind[2].length = passwordLength;
     
 //     // Create Time
 //     MYSQL_TIME createTime;
@@ -179,17 +173,15 @@ void FKUserMapper::bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& e
     }
 }
 
-void FKUserMapper::bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email) const {
+void FKUserMapper::bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email, unsigned long* length) const {
     MYSQL_STMT* stmt = stmtPtr;
     MYSQL_BIND bind[1];
     memset(bind, 0, sizeof(bind));
     
-    unsigned long emailLength = email.length();
-    
-    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer_type = MYSQL_TYPE_VAR_STRING;
     bind[0].buffer = const_cast<char*>(email.c_str());
-    bind[0].buffer_length = emailLength;
-    bind[0].length = &emailLength;
+    bind[0].buffer_length = *length + 1;
+    bind[0].length = length;
     
     if (mysql_stmt_bind_param(stmt, bind)) {
         std::string error = mysql_stmt_error(stmt);
@@ -197,17 +189,15 @@ void FKUserMapper::bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& emai
     }
 }
 
-void FKUserMapper::bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username) const {
+void FKUserMapper::bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username, unsigned long* length) const {
     MYSQL_STMT* stmt = stmtPtr;
     MYSQL_BIND bind[1];
     memset(bind, 0, sizeof(bind));
     
-    unsigned long usernameLength = username.length();
-    
-    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer_type = MYSQL_TYPE_VAR_STRING;
     bind[0].buffer = const_cast<char*>(username.c_str());
-    bind[0].buffer_length = usernameLength;
-    bind[0].length = &usernameLength;
+    bind[0].buffer_length = *length + 1;
+    bind[0].length = length;
     
     if (mysql_stmt_bind_param(stmt, bind)) {
         std::string error = mysql_stmt_error(stmt);
@@ -216,19 +206,17 @@ void FKUserMapper::bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& u
 }
 
 void FKUserMapper::bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr, 
-                                             const std::string& password, 
-                                             const std::string& email) const {
+                                             const std::string& password, unsigned long* passwordLength,
+                                             const std::string& email, unsigned long* emailLength) const {
     MYSQL_STMT* stmt = stmtPtr;
     MYSQL_BIND bind[3];
     memset(bind, 0, sizeof(bind));
     
     // Password
-    unsigned long passwordLength = password.length();
-    
-    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer_type = MYSQL_TYPE_VAR_STRING;
     bind[0].buffer = const_cast<char*>(password.c_str());
-    bind[0].buffer_length = passwordLength;
-    bind[0].length = &passwordLength;
+    bind[0].buffer_length = *passwordLength + 1;
+    bind[0].length = passwordLength;
 
     // Update Time (current UTC time with milliseconds)
     MYSQL_TIME updateTime;
@@ -262,12 +250,10 @@ void FKUserMapper::bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr,
     bind[1].is_null = 0;
 
     // Email
-    unsigned long emailLength = email.length();
-    
-    bind[2].buffer_type = MYSQL_TYPE_STRING;
+    bind[2].buffer_type = MYSQL_TYPE_VAR_STRING;
     bind[2].buffer = const_cast<char*>(email.c_str());
-    bind[2].buffer_length = emailLength;
-    bind[2].length = &emailLength;
+    bind[2].buffer_length = *emailLength + 1;
+    bind[2].length = emailLength;
     
     if (mysql_stmt_bind_param(stmt, bind)) {
         std::string error = mysql_stmt_error(stmt);
@@ -279,66 +265,64 @@ FKUserEntity FKUserMapper::createEntityFromRow(MYSQL_ROW row, unsigned long* len
     if (!row) {
         throw DatabaseException("Invalid row data");
     }
-    
-    // 解析ID
+
     std::size_t id = 0;
     if (row[0]) {
-        id = std::stoull(std::string(row[0], lengths[0]));
+        id = FKUtils::load_le32(row[0]);
     }
     
-    // 解析UUID
     std::string uuid;
     if (row[1]) {
         uuid = std::string(row[1], lengths[1]);
     }
     
-    // 解析用户名
     std::string username;
     if (row[2]) {
         username = std::string(row[2], lengths[2]);
     }
     
-    // 解析邮箱
     std::string email;
     if (row[3]) {
         email = std::string(row[3], lengths[3]);
     }
     
-    // 解析密码
     std::string password;
     if (row[4]) {
         password = std::string(row[4], lengths[4]);
     }
     
-    // 解析创建时间
     std::chrono::system_clock::time_point createTime;
+    uint64_t createTimeMs = 0;
     if (row[5]) {
-        uint64_t ms = std::stoull(std::string(row[5], lengths[5]));
-        createTime = std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+        /*uint64_t milliSeconds;
+        std::memcpy(&milliSeconds, row[5], sizeof(uint64_t));
+        milliSeconds = (Swap64(milliSeconds));*/
+        createTimeMs = FKUtils::load_le64(row[5]);
     }
 
-    // 解析更新时间
-    std::optional<std::chrono::system_clock::time_point> updateTime = std::nullopt;
+    uint64_t updateTimeMs = 0;
     if (row[6]) {
-        uint64_t ms = std::stoull(std::string(row[6], lengths[6]));
-        updateTime = std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+        updateTimeMs = FKUtils::load_le64(row[5]);
     }
-
-    return FKUserEntity(id, uuid, username, email, password, createTime, updateTime);
+    
+    using sc = std::chrono::system_clock;
+    return FKUserEntity(id, std::move(uuid), std::move(username), std::move(email), std::move(password),
+        std::move(sc::time_point{std::chrono::milliseconds{createTimeMs}}),
+        std::move(updateTimeMs == 0 
+            ? std::optional<sc::time_point>{}
+            : std::optional<sc::time_point>{ sc::time_point{std::chrono::milliseconds{updateTimeMs}} })
+    );
 }
 
 std::optional<FKUserEntity> FKUserMapper::findByEmail(const std::string& email) {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(findByEmailQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(findByEmailQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for findByEmail");
         }
-        
-        // 绑定参数
-        bindEmailParam(stmtPtr, email);
-        
-        // 执行查询
+        unsigned long emailLength = static_cast<unsigned long>(email.length());
+        bindEmailParam(stmtPtr, email, &emailLength);
+
         executeQuery(stmtPtr);
         
         // 获取元数据并使用RAII守卫确保资源释放
@@ -348,26 +332,10 @@ std::optional<FKUserEntity> FKUserMapper::findByEmail(const std::string& email) 
         }
         
         // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
+        MetaGuard metaGuard(meta);
         
-        // 获取结果
-        std::optional<FKUserEntity> result;
-        try {
-            result = fetchSingleResult(stmtPtr, meta);
-        } catch (const DatabaseException& e) {
-            // 如果没有找到结果，返回空optional
-            if (std::string(e.what()).find("No results found") != std::string::npos) {
-                result = std::nullopt;
-            } else {
-                throw; // 重新抛出其他异常
-            }
-        }
+        return fetchSingleResult(stmtPtr, meta);
         
-        return result;
     } catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("findByEmail error: {}", e.what()));
         throw;
@@ -376,45 +344,23 @@ std::optional<FKUserEntity> FKUserMapper::findByEmail(const std::string& email) 
 
 std::optional<FKUserEntity> FKUserMapper::findByUsername(const std::string& username) {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(findByUsernameQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(findByUsernameQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for findByUsername");
         }
+        unsigned long usernameLength = static_cast<unsigned long>(username.length());
+        bindUsernameParam(stmtPtr, username, &usernameLength);
         
-        // 绑定参数
-        bindUsernameParam(stmtPtr, username);
-        
-        // 执行查询
         executeQuery(stmtPtr);
         
-        // 获取元数据并使用RAII守卫确保资源释放
         MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
         if (!meta) {
             throw DatabaseException("No metadata available for findByUsername query");
         }
         
-        // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
+        MetaGuard metaGuard(meta);
         
-        // 获取结果
-        std::optional<FKUserEntity> result;
-        try {
-            result = fetchSingleResult(stmtPtr, meta);
-        } catch (const DatabaseException& e) {
-            // 如果没有找到结果，返回空optional
-            if (std::string(e.what()).find("No results found") != std::string::npos) {
-                result = std::nullopt;
-            } else {
-                throw; // 重新抛出其他异常
-            }
-        }
-        
-        return result;
+        return fetchSingleResult(stmtPtr, meta);
     } catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("findByUsername error: {}", e.what()));
         throw;
@@ -424,21 +370,18 @@ std::optional<FKUserEntity> FKUserMapper::findByUsername(const std::string& user
 DbOperator::Status FKUserMapper::updatePasswordByEmail(const std::string& email, const std::string& password) 
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(updatePasswordByEmailQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(updatePasswordByEmailQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for updatePasswordByEmail");
         }
-        
-        // 绑定参数
-        bindPasswordAndEmailParams(stmtPtr, password, email);
-        
-        // 执行更新
+        unsigned long passwordLength = static_cast<unsigned long>(password.length());
+        unsigned long emailLength = static_cast<unsigned long>(email.length());
+        bindPasswordAndEmailParams(stmtPtr, password, &passwordLength, email, &emailLength);
+
         executeUpdate(stmtPtr);
         
         // 检查影响的行数
         my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-        
         if (affectedRows == 0) {
             return DbOperator::Status::DataNotExist;
         }
@@ -453,21 +396,16 @@ DbOperator::Status FKUserMapper::updatePasswordByEmail(const std::string& email,
 DbOperator::Status FKUserMapper::deleteByEmail(const std::string& email) 
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(deleteByEmailQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(deleteByEmailQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for deleteByEmail");
         }
+        unsigned long emailLength = static_cast<unsigned long>(email.length());
+        bindEmailParam(stmtPtr, email, &emailLength);
         
-        // 绑定参数
-        bindEmailParam(stmtPtr, email);
-        
-        // 执行更新
         executeUpdate(stmtPtr);
         
-        // 检查影响的行数
         my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-        
         if (affectedRows == 0) {
             return DbOperator::Status::DataNotExist;
         }
@@ -482,34 +420,22 @@ DbOperator::Status FKUserMapper::deleteByEmail(const std::string& email)
 bool FKUserMapper::isUsernameExists(const std::string& username)
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(_isUsernameExistsQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(_isUsernameExistsQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for isUsernameExists");
         }
 
-        bindUsernameParam(stmtPtr, username);
+        unsigned long usernameLength = static_cast<unsigned long>(username.length());
+        bindUsernameParam(stmtPtr, username, &usernameLength);
         executeQuery(stmtPtr);
         
-        // 获取元数据并使用RAII守卫确保资源释放
-        MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
-        if (!meta) {
-            throw DatabaseException("No metadata available for isUsernameExists query");
+        if (mysql_stmt_store_result(stmtPtr)) {
+            std::string error = mysql_stmt_error(stmtPtr);
+            throw DatabaseException("Store result failed: " + error);
         }
-        
-        // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
-        
-        bool result = false;
-        MYSQL_ROW row = mysql_fetch_row(meta);
-        if (row) {
-            result = true;
-        }
-        return result;
+
+        my_ulonglong row_count = mysql_stmt_num_rows(stmtPtr);
+        return (row_count > 0);
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("isUsernameExists error: {}", e.what()));
@@ -520,34 +446,22 @@ bool FKUserMapper::isUsernameExists(const std::string& username)
 bool FKUserMapper::isEmailExists(const std::string& email)
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(_isEmailExistsQuery().c_str());
+        MySQLStmtPtr stmtPtr = prepareStatement(_isEmailExistsQuery());
         if (!stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for isEmailExists");
         }
 
-        bindEmailParam(stmtPtr, email);
+        unsigned long emailLength = static_cast<unsigned long>(email.length());
+        bindEmailParam(stmtPtr, email, &emailLength);
         executeQuery(stmtPtr);
         
-        // 获取元数据并使用RAII守卫确保资源释放
-        MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
-        if (!meta) {
-            throw DatabaseException("No metadata available for isEmailExists query");
+        if (mysql_stmt_store_result(stmtPtr)) {
+            std::string error = mysql_stmt_error(stmtPtr);
+            throw DatabaseException("Store result failed: " + error);
         }
-        
-        // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
-        
-        bool result = false;
-        MYSQL_ROW row = mysql_fetch_row(meta);
-        if (row) {
-            result = true;
-        }
-        return result;
+
+        my_ulonglong row_count = mysql_stmt_num_rows(stmtPtr);
+        return (row_count > 0);
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("isEmailExists error: {}", e.what()));
@@ -558,34 +472,28 @@ bool FKUserMapper::isEmailExists(const std::string& email)
 std::optional<std::string> FKUserMapper::findPasswordByEmail(const std::string& email)
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(_findPasswordByEmailQuery().c_str());
-        if (!stmtPtr.isValid()) {
-            throw DatabaseException("Failed to prepare statement for findPasswordByEmail");
-        }
-
-        bindEmailParam(stmtPtr, email);
-        executeQuery(stmtPtr);
+        // 使用fetchFieldsByCondition方法获取密码字段
+        std::vector<std::string> fields = {"password"};
+        auto results = fetchFieldsByCondition<FKUserEntity>(
+            getTableName(),
+            fields,
+            "email",
+            email
+        );
         
-        // 获取元数据并使用RAII守卫确保资源释放
-        MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
-        if (!meta) {
-            throw DatabaseException("No metadata available for findPasswordByEmail query");
+        // 检查结果
+        if (results.empty()) {
+            return std::nullopt; // 未找到匹配的记录
         }
         
-        // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
-        
-        std::optional<std::string> result;
-        MYSQL_ROW row = mysql_fetch_row(meta);
-        if (row) {
-            result = std::string(row[0], mysql_fetch_lengths(meta)[0]);
+        // 返回密码
+        const auto& row = results[0];
+        auto it = row.find("password");
+        if (it != row.end() && it->second != "NULL") {
+            return it->second;
         }
-        return result;
+        
+        return std::nullopt;
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("findPasswordByEmail error: {}", e.what()));
@@ -596,34 +504,28 @@ std::optional<std::string> FKUserMapper::findPasswordByEmail(const std::string& 
 std::optional<std::string> FKUserMapper::findPasswordByUsername(const std::string& username)
 {
     try {
-        // 使用智能指针管理MYSQL_STMT资源
-        MySQLStmtPtr stmtPtr = prepareStatement(_findPasswordByUsernameQuery().c_str());
-        if (!stmtPtr.isValid()) {
-            throw DatabaseException("Failed to prepare statement for findPasswordByUsername");
-        }
-
-        bindUsernameParam(stmtPtr, username);
-        executeQuery(stmtPtr);
+        // 使用fetchFieldsByCondition方法获取密码字段
+        std::vector<std::string> fields = {"password"};
+        auto results = fetchFieldsByCondition<FKUserEntity>(
+            getTableName(),
+            fields,
+            "username",
+            username
+        );
         
-        // 获取元数据并使用RAII守卫确保资源释放
-        MYSQL_RES* meta = mysql_stmt_result_metadata(stmtPtr);
-        if (!meta) {
-            throw DatabaseException("No metadata available for findPasswordByUsername query");
+        // 检查结果
+        if (results.empty()) {
+            return std::nullopt; // 未找到匹配的记录
         }
         
-        // 创建RAII守卫确保meta资源释放
-        struct MetaGuard {
-            MYSQL_RES* res;
-            MetaGuard(MYSQL_RES* r) : res(r) {}
-            ~MetaGuard() { if(res) mysql_free_result(res); }
-        } metaGuard(meta);
-        
-        std::optional<std::string> result;
-        MYSQL_ROW row = mysql_fetch_row(meta);
-        if (row) {
-            result = std::string(row[0], mysql_fetch_lengths(meta)[0]);
+        // 返回密码
+        const auto& row = results[0];
+        auto it = row.find("password");
+        if (it != row.end() && it->second != "NULL") {
+            return it->second;
         }
-        return result;
+        
+        return std::nullopt;
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("findPasswordByUsername error: {}", e.what()));

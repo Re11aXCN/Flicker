@@ -6,12 +6,11 @@
 #include "Source/FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
+static const std::string read_default_file = FKUtils::concat(FKUtils::get_env_a<"MYSQL_HOME">(), FKUtils::local_separator(), "data", FKUtils::local_separator(), "my.ini");
+static const std::string read_default_group =  "mysqld";
 
-std::string my_ini_file;
 FKMySQLConnectionPool::FKMySQLConnectionPool() {
     try {
-        my_ini_file = FKUtils::concat(FKUtils::get_env<"MYSQL_HOME">(), FKUtils::local_separator(), "data", FKUtils::local_separator(), "my.ini");
-        // 从配置管理器获取MySQL配置
         auto& config = FKConfigManager::getInstance()->getMySQLConnectionString();
         _initialize(config);
     } catch (const std::exception& e) {
@@ -39,7 +38,6 @@ void FKMySQLConnectionPool::_initialize(const FKMySQLConfig& config) {
         return;
     }
     
-    // 创建初始连接
     for (size_t i = 0; i < _pConfig.PoolSize; ++i) {
         auto conn = _createConnection();
         if (conn) {
@@ -130,8 +128,8 @@ std::shared_ptr<FKMySQLConnection> FKMySQLConnectionPool::_createConnection() {
         ////char reconnect = 1;
         ////mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
-        mysql_options(mysql, MYSQL_READ_DEFAULT_FILE, my_ini_file.c_str());
-        mysql_options(mysql, MYSQL_READ_DEFAULT_GROUP, "mysqld");
+        mysql_options(mysql, MYSQL_READ_DEFAULT_FILE, read_default_file.c_str());
+        mysql_options(mysql, MYSQL_READ_DEFAULT_GROUP, read_default_group.c_str());
 
         // 建立连接
         if (!mysql_real_connect(

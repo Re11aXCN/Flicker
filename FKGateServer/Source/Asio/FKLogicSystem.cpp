@@ -60,10 +60,10 @@ FKLogicSystem::FKLogicSystem()
         flicker::http::service serviceType = static_cast<flicker::http::service>(requestRoot["data"]["verify_type"].asInt());
         try {
             FKUserMapper mapper;
-            std::optional<FKUserEntity> user = mapper.findByEmail(email);
+            bool isExists = mapper.isEmailExists(email);
             switch (serviceType) {
             case flicker::http::service::Register: {
-                if (user.has_value()) {
+                if (isExists) {
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
                     responseRoot["message"] = FKUtils::concat("The user '", email, "'already exist! Please choose another one!");
                     httpResponse.result(flicker::http::status::conflict);
@@ -73,7 +73,7 @@ FKLogicSystem::FKLogicSystem()
                 break;
             }
             case flicker::http::service::ResetPassword: {
-                if (!user.has_value()) {
+                if (!isExists) {
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
                     responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist!");
                     httpResponse.result(flicker::http::status::unauthorized);
@@ -186,8 +186,8 @@ FKLogicSystem::FKLogicSystem()
         try {
             // 1. 查询用户是否存在，关于邮箱查询已经在获取验证码时检查过了
             FKUserMapper mapper;
-            std::optional<FKUserEntity> user = mapper.findByUsername(username);
-            if (user.has_value()) {
+            bool isExists = mapper.isUsernameExists(username);
+            if (isExists) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
                 responseRoot["message"] = FKUtils::concat("The user '", username, "' already exist! Please choose another one!");
                 httpResponse.result(flicker::http::status::conflict);

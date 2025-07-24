@@ -1,4 +1,4 @@
-/*************************************************************************************
+﻿/*************************************************************************************
  *
  * @ Filename     : FKUserMapper.h
  * @ Description : 用户实体数据库映射器
@@ -46,7 +46,7 @@ protected:
     constexpr std::string insertQuery() const override;
     constexpr std::string deleteByIdQuery() const override;
     
-    void bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t id) const override;
+    void bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t* id) const override;
     void bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& entity) const override;
     
     FKUserEntity createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const override;
@@ -58,10 +58,10 @@ protected:
     constexpr std::string deleteByEmailQuery() const;
     
     // 自定义参数绑定方法
-    void bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email) const;
-    void bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username) const;
-    void bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr, const std::string& password, 
-                                   const std::string& email) const;
+    void bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email, unsigned long* length) const;
+    void bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username, unsigned long* length) const;
+    void bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr, const std::string& password, unsigned long* passwordLength,
+                                   const std::string& email, unsigned long* emailLength) const;
 
 private:
     constexpr std::string _isUsernameExistsQuery() const;

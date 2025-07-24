@@ -43,12 +43,31 @@ public:
 
     FKUserEntity(const std::string& username,
                 const std::string& email, const std::string& password)
-        : _username(username), _email(email), _password(password) {}
+        : _username(username), _email(email), _password(password)
+    {
+        _username_length = static_cast<unsigned long>(_username.length());
+        _email_length = static_cast<unsigned long>(_email.length());
+        _password_length = static_cast<unsigned long>(_password.length());
+    }
 
     FKUserEntity(size_t id, const std::string& uuid, const std::string& username,
         const std::string& email, const std::string& password,
         const std::chrono::system_clock::time_point& createTime, const std::optional<std::chrono::system_clock::time_point>& updateTime)
-        : _id(id), _uuid(uuid), _username(username), _email(email), _password(password), _createTime(createTime), _updateTime(updateTime) {
+        : _id(id), _uuid(uuid), _username(username), _email(email), _password(password), _createTime(createTime), _updateTime(updateTime) 
+    {
+        _username_length = static_cast<unsigned long>(_username.length());
+        _email_length = static_cast<unsigned long>(_email.length());
+        _password_length = static_cast<unsigned long>(_password.length());
+    }
+
+    FKUserEntity(size_t id, std::string&& uuid, std::string&& username,
+        std::string&& email, std::string&& password,
+        std::chrono::system_clock::time_point&& createTime, std::optional<std::chrono::system_clock::time_point>&& updateTime)
+        : _id(id), _uuid(std::move(uuid)), _username(std::move(username)), _email(std::move(email)), _password(std::move(password)), _createTime(std::move(createTime)), _updateTime(std::move(updateTime))
+    {
+        _username_length = static_cast<unsigned long>(_username.length());
+        _email_length = static_cast<unsigned long>(_email.length());
+        _password_length = static_cast<unsigned long>(_password.length());
     }
 
     FKUserEntity(const FKUserEntity& other) = default;
@@ -58,13 +77,17 @@ public:
     FKUserEntity& operator=(FKUserEntity&& other) = default;
 
     // Getters
-    std::size_t getId() const { return _id; }
+    const std::size_t& getId() const { return _id; }
     const std::string& getUuid() const { return _uuid; }
     const std::string& getUsername() const { return _username; }
     const std::string& getEmail() const { return _email; }
     const std::string& getPassword() const { return _password; }
     const std::chrono::system_clock::time_point& getCreateTime() const { return _createTime; }
     const std::optional<std::chrono::system_clock::time_point>& getUpdateTime() const { return _updateTime; }
+
+    const unsigned long* getUsernameLength() const { return &_username_length; }
+    const unsigned long* getEmailLength() const { return &_email_length; }
+    const unsigned long* getPasswordLength() const { return &_password_length; }
 
     // Setters
     void setId(std::size_t id) { _id = id; }
@@ -85,6 +108,10 @@ private:
     std::string _password;
     std::chrono::system_clock::time_point _createTime{};
     std::optional<std::chrono::system_clock::time_point> _updateTime{std::nullopt};
+
+    unsigned long _username_length{0};
+    unsigned long _email_length{0};
+    unsigned long _password_length{0};
 };
 
 

@@ -10,7 +10,7 @@
     },
     "request_timeout": 30,
     "rpc_services": {
-        "VERIFY_CODE": {
+        "VerifyCode": {
             "host": "localhost",
             "port": 50051,
             "pool_size": 10,
@@ -22,9 +22,20 @@
             "keep_alive_permit_without_calls": true,
             "http2_max_ping_without_data": false
         },
-        "ENCRYPT_PASSWORD": {
+        "EncryptPassword": {
             "host": "localhost",
             "port": 50052,
+            "pool_size": 10,
+            "use_ssl": false,
+            "keep_alive_time_ms": 30000,
+            "keep_alive_timeout_ms": 10000,
+            "max_reconnect_backoff_ms": 10000,
+            "keep_alive_permit_without_calls": true,
+            "http2_max_ping_without_data": false
+        },
+        "AuthenticatePwdReset": {
+            "host": "localhost",
+            "port": 50053,
             "pool_size": 10,
             "use_ssl": false,
             "keep_alive_time_ms": 30000,

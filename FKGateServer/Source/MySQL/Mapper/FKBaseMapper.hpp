@@ -3,10 +3,6 @@
  * @ Filename     : FKBaseMapper.hpp
  * @ Description : 基础数据库映射器模板类，提供通用的数据库操作
  * 
- * TODO:
- * —— updateFieldsByIdMap暂且未完全实现
- * —— bindUpdateParams需要支持更多的C++数据类型和SQL数据类型映射
- * 
  * @ Version     : V1.0
  * @ Author         : Re11a
  * @ Date Created: 2025/6/22
@@ -112,6 +108,20 @@ public:
 template<typename T, typename ID_TYPE>
 class FKBaseMapper {
 public:
+    // 辅助模板：检测是否为std::optional类型
+    template<typename T>
+    struct is_optional : std::false_type {};
+
+    template<typename T>
+    struct is_optional<std::optional<T>> : std::true_type {};
+
+    // 辅助模板：检测是否为std::vector类型
+    template<typename T>
+    struct is_vector : std::false_type {};
+
+    template<typename T, typename A>
+    struct is_vector<std::vector<T, A>> : std::true_type {};
+
     virtual ~FKBaseMapper() = default;
     
     // 获取字段映射
@@ -138,13 +148,13 @@ public:
     std::optional<T> findById(ID_TYPE id) {
         try {
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(findByIdQuery().c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(findByIdQuery());
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for findById");
             }
             
             // 绑定参数
-            bindIdParam(stmtPtr, id);
+            bindIdParam(stmtPtr, &id);
             
             // 执行查询
             executeQuery(stmtPtr);
@@ -161,21 +171,10 @@ public:
                 ~MetaGuard() { if(res) mysql_free_result(res); }
             } metaGuard{meta};
             
-            // 获取结果
-            std::optional<T> result;
-            try {
-                result = fetchSingleResult(stmtPtr, meta);
-            } catch (const DatabaseException& e) {
-                // 如果没有找到结果，返回空optional
-                if (std::string(e.what()).find("No results found") != std::string::npos) {
-                    result = std::nullopt;
-                } else {
-                    throw; // 重新抛出其他异常
-                }
-            }
+            // 直接使用返回std::optional的fetchSingleResult方法
+            return fetchSingleResult(stmtPtr, meta);
             
             // 不需要手动释放资源，智能指针和守卫会自动处理
-            return result;
         } catch (const std::exception& e) {
             FK_SERVER_ERROR(std::format("findById error: {}", e.what()));
             throw;
@@ -236,7 +235,7 @@ public:
     DbOperator::Status insert(const T& entity) {
         try {
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(insertQuery().c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(insertQuery());
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for insert");
             }
@@ -266,13 +265,13 @@ public:
     DbOperator::Status deleteById(ID_TYPE id) {
         try {
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(deleteByIdQuery().c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(deleteByIdQuery());
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for deleteById");
             }
             
             // 绑定参数
-            bindIdParam(stmtPtr, id);
+            bindIdParam(stmtPtr, &id);
             
             // 执行更新
             executeUpdate(stmtPtr);
@@ -315,7 +314,7 @@ public:
                                " WHERE id = ?");
             
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(query);
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsById");
             }
@@ -362,7 +361,7 @@ public:
                 " WHERE id = ?");
             
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(query);
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsByIdSafe");
             }
@@ -413,13 +412,12 @@ public:
                 " WHERE id = ?");
             
             // 使用智能指针管理MYSQL_STMT资源
-            MySQLStmtPtr stmtPtr = prepareStatement(query.c_str());
+            MySQLStmtPtr stmtPtr = prepareStatement(query);
             if (!stmtPtr.isValid()) {
                 throw DatabaseException("Failed to prepare statement for updateFieldsByIdMap");
             }
             
-            // 绑定参数 - 这里需要根据实际情况实现
-            // 这个示例假设有一个可以处理vector<ValueType>的bindMapValues方法
+            // 绑定参数
             bindMapValues(stmtPtr, values, id);
             
             // 执行更新
@@ -437,6 +435,187 @@ public:
         } catch (const std::exception& e) {
             FK_SERVER_ERROR(std::format("updateFieldsByIdMap error: {}", e.what()));
             return DbOperator::Status::DatabaseError;
+        }
+    }
+    
+    // 绑定字段值向量和ID到MySQL语句参数
+    template<typename ValueType>
+    void bindMapValues(MySQLStmtPtr& stmtPtr, const std::vector<ValueType>& values, ID_TYPE id) const {
+        MYSQL_STMT* stmt = stmtPtr.get();
+        // 计算参数总数：字段值数量 + 1 (ID)
+        size_t paramCount = values.size() + 1;
+        
+        // 创建MYSQL_BIND数组
+        std::vector<MYSQL_BIND> binds(paramCount);
+        memset(binds.data(), 0, sizeof(MYSQL_BIND) * paramCount);
+        
+        // 绑定字段值
+        for (size_t i = 0; i < values.size(); ++i) {
+            bindSingleValue(binds[i], values[i]);
+        }
+        
+        // 绑定ID参数（最后一个参数）
+        size_t idIndex = values.size();
+        ID_TYPE idCopy = id; // 创建副本避免const_cast
+        
+        if constexpr (std::is_same_v<ID_TYPE, int> || std::is_same_v<ID_TYPE, long>) {
+            binds[idIndex].buffer_type = MYSQL_TYPE_LONG;
+            binds[idIndex].is_unsigned = false;
+        } else if constexpr (std::is_same_v<ID_TYPE, unsigned int> || std::is_same_v<ID_TYPE, unsigned long> || std::is_same_v<ID_TYPE, std::size_t>) {
+            binds[idIndex].buffer_type = MYSQL_TYPE_LONGLONG;
+            binds[idIndex].is_unsigned = true;
+        } else if constexpr (std::is_same_v<ID_TYPE, std::string>) {
+            binds[idIndex].buffer_type = MYSQL_TYPE_VAR_STRING;
+            binds[idIndex].buffer = const_cast<char*>(idCopy.c_str());
+            binds[idIndex].buffer_length = static_cast<unsigned long>(idCopy.length()) + 1;
+            unsigned long length = static_cast<unsigned long>(idCopy.length());
+            binds[idIndex].length = &length;
+        } else {
+            throw std::runtime_error("Unsupported ID type in bindMapValues");
+        }
+        
+        if (!std::is_same_v<ID_TYPE, std::string>) {
+            binds[idIndex].buffer = &idCopy;
+            binds[idIndex].is_null = 0;
+            binds[idIndex].length = 0;
+        }
+        
+        // 绑定所有参数
+        if (mysql_stmt_bind_param(stmt, binds.data())) {
+            std::string error = mysql_stmt_error(stmt);
+            throw DatabaseException("Bind param failed: " + error);
+        }
+    }
+    
+    // 绑定字段值映射和ID到MySQL语句参数
+    template<typename ValueType>
+    void bindMapValues(MySQLStmtPtr& stmt, const std::map<std::string, ValueType>& fieldsMap, int id) const {
+        // 计算参数总数：字段数量 + 1 (ID)
+        size_t paramCount = fieldsMap.size() + 1;
+        
+        // 创建MYSQL_BIND数组
+        std::vector<MYSQL_BIND> binds(paramCount);
+        memset(binds.data(), 0, sizeof(MYSQL_BIND) * paramCount);
+        
+        // 绑定字段值
+        size_t index = 0;
+        for (const auto& [field, value] : fieldsMap) {
+            bindSingleValue(binds[index], value);
+            index++;
+        }
+        
+        // 绑定ID参数（最后一个参数）
+        binds[index].buffer_type = MYSQL_TYPE_LONG;
+        binds[index].buffer = const_cast<int*>(&id);
+        binds[index].is_null = 0;
+        binds[index].length = 0;
+        
+        // 将所有参数绑定到语句
+        if (mysql_stmt_bind_param(stmt.get(), binds.data()) != 0) {
+            throw DatabaseException("Failed to bind parameters in bindMapValues: " + 
+                                   std::string(mysql_stmt_error(stmt.get())));
+        }
+    }
+    
+    // 通用的按条件查询指定字段方法
+    template<typename Entity, typename ConditionType>
+    std::vector<std::map<std::string, std::string>> fetchFieldsByCondition(
+        const std::string& tableName,
+        const std::vector<std::string>& fields,
+        const std::string& conditionField,
+        const ConditionType& conditionValue) const {
+        
+        // 构建字段列表
+        std::string fieldList;
+        for (size_t i = 0; i < fields.size(); ++i) {
+            if (i > 0) fieldList += ", ";
+            fieldList += fields[i];
+        }
+        
+        // 构建SQL查询
+        std::string sql = "SELECT " + fieldList + " FROM " + tableName + 
+                         " WHERE " + conditionField + " = ?";
+        
+        try {
+            // 准备预处理语句
+            MySQLStmtPtr stmt = prepareStatement(sql);
+            if (!stmt) {
+                throw DatabaseException("Failed to prepare statement in fetchFieldsByCondition");
+            }
+            
+            // 绑定条件参数
+            MYSQL_BIND bind;
+            memset(&bind, 0, sizeof(bind));
+            bindSingleValue(bind, conditionValue);
+            
+            if (mysql_stmt_bind_param(stmt.get(), &bind) != 0) {
+                throw DatabaseException("Failed to bind parameter in fetchFieldsByCondition: " + 
+                                       std::string(mysql_stmt_error(stmt.get())));
+            }
+            
+            // 执行查询
+            if (mysql_stmt_execute(stmt.get()) != 0) {
+                throw DatabaseException("Failed to execute query in fetchFieldsByCondition: " + 
+                                       std::string(mysql_stmt_error(stmt.get())));
+            }
+            
+            // 准备结果绑定
+            std::vector<MYSQL_BIND> resultBinds(fields.size());
+            memset(resultBinds.data(), 0, sizeof(MYSQL_BIND) * fields.size());
+            
+            // 为每个字段分配缓冲区
+            const size_t bufferSize = 1024; // 假设每个字段最大1024字节
+            std::vector<std::vector<char>> buffers(fields.size(), std::vector<char>(bufferSize));
+            auto isNull = std::make_unique<char[]>(fields.size());
+            auto lengths = std::make_unique<unsigned long[]>(fields.size());
+            auto error = std::make_unique<char[]>(fields.size());
+
+            // 初始化数组
+            std::fill_n(isNull.get(), fields.size(), 0);
+            std::fill_n(error.get(), fields.size(), 0);
+            
+            // 设置结果绑定
+            for (size_t i = 0; i < fields.size(); ++i) {
+                resultBinds[i].buffer_type = MYSQL_TYPE_STRING;
+                resultBinds[i].buffer = buffers[i].data();
+                resultBinds[i].buffer_length = bufferSize - 1;
+                resultBinds[i].is_null = reinterpret_cast<bool*>(&isNull[i]);
+                resultBinds[i].length = &lengths[i];
+                resultBinds[i].error = reinterpret_cast<bool*>(&error[i]);
+            }
+            
+            // 绑定结果集
+            if (mysql_stmt_bind_result(stmt.get(), resultBinds.data()) != 0) {
+                throw DatabaseException("Failed to bind result in fetchFieldsByCondition: " + 
+                                       std::string(mysql_stmt_error(stmt.get())));
+            }
+            
+            // 存储结果
+            if (mysql_stmt_store_result(stmt.get()) != 0) {
+                throw DatabaseException("Failed to store result in fetchFieldsByCondition: " + 
+                                       std::string(mysql_stmt_error(stmt.get())));
+            }
+            
+            // 获取结果
+            std::vector<std::map<std::string, std::string>> results;
+            while (mysql_stmt_fetch(stmt.get()) == 0) {
+                std::map<std::string, std::string> row;
+                for (size_t i = 0; i < fields.size(); ++i) {
+                    if (isNull[i]) {
+                        row[fields[i]] = "NULL";
+                    } else {
+                        // 确保字符串以null结尾
+                        buffers[i][lengths[i]] = '\0';
+                        row[fields[i]] = std::string(buffers[i].data(), lengths[i]);
+                    }
+                }
+                results.push_back(row);
+            }
+            
+            return results;
+        } catch (const std::exception& e) {
+            FK_SERVER_ERROR(std::format("fetchFieldsByCondition error: {}", e.what()));
+            throw;
         }
     }
 
@@ -457,7 +636,7 @@ protected:
     virtual constexpr std::string deleteByIdQuery() const = 0;
     
     // 子类必须实现的参数绑定方法
-    virtual void bindIdParam(MySQLStmtPtr& stmtPtr, ID_TYPE id) const = 0;
+    virtual void bindIdParam(MySQLStmtPtr& stmtPtr, ID_TYPE* id) const = 0;
     virtual void bindInsertParams(MySQLStmtPtr& stmtPtr, const T& entity) const = 0;
     
     // 子类必须实现的结果处理方法
@@ -505,11 +684,244 @@ protected:
         }
     }
     
-    // 绑定字段映射值和ID - 子类需要实现此方法以支持updateFieldsByIdMap
+    // 绑定字段映射值和ID - 通用实现以支持updateFieldsByIdMap
     template<typename ValueType>
     void bindMapValues(MYSQL_STMT* stmt, const std::vector<ValueType>& values, ID_TYPE id) const {
-        throw DatabaseException("bindMapValues not implemented for this type");
+        // 计算参数总数（字段值 + ID）
+        size_t paramCount = values.size() + 1;
+        
+        // 创建绑定数组
+        std::vector<MYSQL_BIND> binds(paramCount);
+        memset(binds.data(), 0, sizeof(MYSQL_BIND) * paramCount);
+        
+        // 绑定字段值参数
+        for (size_t i = 0; i < values.size(); ++i) {
+            bindSingleValue(binds[i], values[i]);
+        }
+        
+        // 最后一个参数是ID
+        size_t idIndex = paramCount - 1;
+        ID_TYPE idCopy = id; // 创建副本避免const_cast
+        
+        if constexpr (std::is_same_v<ID_TYPE, int> || std::is_same_v<ID_TYPE, long>) {
+            binds[idIndex].buffer_type = MYSQL_TYPE_LONG;
+            binds[idIndex].is_unsigned = false;
+        } else if constexpr (std::is_same_v<ID_TYPE, unsigned int> || std::is_same_v<ID_TYPE, unsigned long> || std::is_same_v<ID_TYPE, std::size_t>) {
+            binds[idIndex].buffer_type = MYSQL_TYPE_LONGLONG;
+            binds[idIndex].is_unsigned = true;
+        } else if constexpr (std::is_same_v<ID_TYPE, std::string>) {
+            // 处理字符串ID
+            binds[idIndex].buffer_type = MYSQL_TYPE_VAR_STRING;
+            binds[idIndex].buffer = const_cast<char*>(idCopy.c_str());
+            binds[idIndex].buffer_length = static_cast<unsigned long>(idCopy.length()) + 1;
+            unsigned long length = static_cast<unsigned long>(idCopy.length());
+            binds[idIndex].length = &length;
+        } else {
+            throw std::runtime_error("Unsupported ID type in bindMapValues");
+        }
+        
+        if (!std::is_same_v<ID_TYPE, std::string>) {
+            binds[idIndex].buffer = &idCopy;
+            binds[idIndex].is_null = 0;
+            binds[idIndex].length = 0;
+        }
+        
+        // 绑定所有参数
+        if (mysql_stmt_bind_param(stmt, binds.data())) {
+            std::string error = mysql_stmt_error(stmt);
+            throw DatabaseException("Bind param failed: " + error);
+        }
     }
+
+    // 绑定单个值到MYSQL_BIND结构体
+    template<typename T>
+    void bindSingleValue(MYSQL_BIND& bind, const T& value) const {
+        if constexpr (std::is_integral_v<T>) {
+            // 整数类型
+            if constexpr (std::is_same_v<T, bool>) {
+                bind.buffer_type = MYSQL_TYPE_TINY;
+            }
+            else if constexpr (sizeof(T) <= 1) {
+                bind.buffer_type = MYSQL_TYPE_TINY;
+            }
+            else if constexpr (sizeof(T) <= 2) {
+                bind.buffer_type = MYSQL_TYPE_SHORT;
+            }
+            else if constexpr (sizeof(T) <= 4) {
+                bind.buffer_type = MYSQL_TYPE_LONG;
+            }
+            else {
+                bind.buffer_type = MYSQL_TYPE_LONGLONG;
+            }
+
+            bind.is_unsigned = std::is_unsigned_v<T>;
+            bind.buffer = const_cast<T*>(&value);
+            bind.is_null = 0;
+            bind.length = 0;
+        }
+        else if constexpr (std::is_floating_point_v<T>) {
+            // 浮点类型
+            if constexpr (std::is_same_v<T, float>) {
+                bind.buffer_type = MYSQL_TYPE_FLOAT;
+            }
+            else {
+                bind.buffer_type = MYSQL_TYPE_DOUBLE;
+            }
+
+            bind.buffer = const_cast<T*>(&value);
+            bind.is_null = 0;
+            bind.length = 0;
+        }
+        else if constexpr (std::is_convertible_v<T, std::string>) {
+            // 字符串类型
+            std::string* strValue = new std::string(value);
+            char* buffer = new char[strValue->length() + 1];
+            std::copy(strValue->begin(), strValue->end(), buffer);
+            buffer[strValue->length()] = '\0';
+
+            unsigned long* length = new unsigned long(static_cast<unsigned long>(strValue->length()));
+
+            bind.buffer_type = MYSQL_TYPE_VAR_STRING;
+            bind.buffer = buffer;
+            bind.buffer_length = *length + 1;
+            bind.length = length;
+            bind.is_null = 0;
+        }
+        else if constexpr (std::is_same_v<T, std::chrono::system_clock::time_point>) {
+            // 时间点类型
+            MYSQL_TIME* mysqlTime = new MYSQL_TIME();
+            memset(mysqlTime, 0, sizeof(MYSQL_TIME));
+
+            auto timeT = std::chrono::system_clock::to_time_t(value);
+            auto duration = value.time_since_epoch();
+            auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() % 1000;
+
+            // 线程安全的时间转换
+#if defined(_WIN32) || defined(_WIN64)
+            struct tm timeinfo;
+            localtime_s(&timeinfo, &timeT);
+#else
+            struct tm timeinfo;
+            localtime_r(&timeT, &timeinfo);
+#endif
+
+            mysqlTime->year = timeinfo.tm_year + 1900;
+            mysqlTime->month = timeinfo.tm_mon + 1;
+            mysqlTime->day = timeinfo.tm_mday;
+            mysqlTime->hour = timeinfo.tm_hour;
+            mysqlTime->minute = timeinfo.tm_min;
+            mysqlTime->second = timeinfo.tm_sec;
+            mysqlTime->second_part = millis * 1000;  // 毫秒转微秒
+            mysqlTime->time_type = MYSQL_TIMESTAMP_DATETIME;
+
+            bind.buffer_type = MYSQL_TYPE_DATETIME;
+            bind.buffer = mysqlTime;
+            bind.is_null = 0;
+            bind.length = 0;
+        }
+        else if constexpr (is_optional<T>::value) {
+            // std::optional类型
+            using ValueType = typename T::value_type;
+
+            if (value.has_value()) {
+                bindSingleValue(bind, *value);
+            }
+            else {
+                char* is_null = new char(1);
+                bind.buffer_type = MYSQL_TYPE_NULL;
+                bind.is_null = is_null;
+            }
+        }
+        else {
+            throw std::runtime_error("Unsupported value type in bindSingleValue");
+        }
+    }
+    
+    //template<typename T>
+    //void bindSingleValue(MYSQL_BIND& bind, const T& value) const {
+    //    using ValueType = std::remove_cv_t<std::remove_reference_t<T>>;
+    //    
+    //    if constexpr (std::is_same_v<ValueType, bool>) {
+    //        bool valueCopy = value;
+    //        bind.buffer_type = MYSQL_TYPE_TINY;
+    //        bind.buffer = &valueCopy;
+    //        bind.is_unsigned = true;
+    //    } 
+    //    else if constexpr (std::is_integral_v<ValueType>) {
+    //        ValueType valueCopy = value;
+    //        
+    //        if constexpr (sizeof(ValueType) <= 1) {
+    //            bind.buffer_type = MYSQL_TYPE_TINY;
+    //        } else if constexpr (sizeof(ValueType) <= 2) {
+    //            bind.buffer_type = MYSQL_TYPE_SHORT;
+    //        } else if constexpr (sizeof(ValueType) <= 4) {
+    //            bind.buffer_type = MYSQL_TYPE_LONG;
+    //        } else {
+    //            bind.buffer_type = MYSQL_TYPE_LONGLONG;
+    //        }
+    //        
+    //        bind.is_unsigned = std::is_unsigned_v<ValueType>;
+    //        bind.buffer = &valueCopy;
+    //    }
+    //    else if constexpr (std::is_floating_point_v<ValueType>) {
+    //        ValueType valueCopy = value;
+    //        
+    //        if constexpr (std::is_same_v<ValueType, float>) {
+    //            bind.buffer_type = MYSQL_TYPE_FLOAT;
+    //        } else {
+    //            bind.buffer_type = MYSQL_TYPE_DOUBLE;
+    //        }
+    //        
+    //        bind.buffer = &valueCopy;
+    //    }
+    //    else if constexpr (std::is_convertible_v<ValueType, std::string>) {
+    //        std::string strValue = value;
+    //        bind.buffer_type = MYSQL_TYPE_VAR_STRING;
+    //        bind.buffer = const_cast<char*>(strValue.c_str());
+    //        bind.buffer_length = static_cast<unsigned long>(strValue.length()) + 1;
+    //        unsigned long length = static_cast<unsigned long>(strValue.length());
+    //        bind.length = &length;
+    //    }
+    //    else if constexpr (std::is_same_v<ValueType, std::chrono::system_clock::time_point>) {
+    //        // 处理时间点类型
+    //        MYSQL_TIME mysqlTime;
+    //        memset(&mysqlTime, 0, sizeof(mysqlTime));
+    //        
+    //        auto timeT = std::chrono::system_clock::to_time_t(value);
+    //        auto duration = value.time_since_epoch();
+    //        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() % 1000;
+    //        
+    //        // 线程安全的时间转换
+    //        #if defined(_WIN32) || defined(_WIN64)
+    //            struct tm timeinfo;
+    //            localtime_s(&timeinfo, &timeT);
+    //        #else
+    //            struct tm timeinfo;
+    //            localtime_r(&timeT, &timeinfo);
+    //        #endif
+    //        
+    //        mysqlTime.year = timeinfo.tm_year + 1900;
+    //        mysqlTime.month = timeinfo.tm_mon + 1;
+    //        mysqlTime.day = timeinfo.tm_mday;
+    //        mysqlTime.hour = timeinfo.tm_hour;
+    //        mysqlTime.minute = timeinfo.tm_min;
+    //        mysqlTime.second = timeinfo.tm_sec;
+    //        mysqlTime.second_part = millis * 1000;  // 毫秒转微秒
+    //        mysqlTime.time_type = MYSQL_TIMESTAMP_DATETIME;
+    //        
+    //        bind.buffer_type = MYSQL_TYPE_DATETIME;
+    //        bind.buffer = &mysqlTime;
+    //    }
+    //    else {
+    //        throw std::runtime_error("Unsupported value type in bindSingleValue");
+    //    }
+    //    
+    //    if (!std::is_convertible_v<ValueType, std::string> && 
+    //        !std::is_same_v<ValueType, std::chrono::system_clock::time_point>) {
+    //        bind.is_null = 0;
+    //        bind.length = 0;
+    //    }
+    //}
     
     // 递归处理变参绑定（终止条件）
     void bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index) const {
@@ -571,23 +983,168 @@ protected:
     bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index, T&& value, Rest&&... rest) const {
         // 创建字符串副本以避免const_cast
         std::string strValue = value;
-        std::vector<char> buffer(strValue.begin(), strValue.end());
-        buffer.push_back('\0'); // 确保以null结尾
+        
+        // 使用动态分配的内存，确保在函数返回后仍然有效
+        char* buffer = new char[strValue.length() + 1];
+        std::copy(strValue.begin(), strValue.end(), buffer);
+        buffer[strValue.length()] = '\0'; // 确保以null结尾
         
         unsigned long length = static_cast<unsigned long>(strValue.length());
         
-        binds[index].buffer_type = MYSQL_TYPE_STRING;
-        binds[index].buffer = buffer.data();
-        binds[index].buffer_length = length;
+        binds[index].buffer_type = MYSQL_TYPE_VAR_STRING;
+        binds[index].buffer = buffer;
+        binds[index].buffer_length = length + 1;
         binds[index].length = &length;
         binds[index].is_null = 0;
         
         // 递归处理下一个参数
         bindUpdateParamsImpl(binds, index + 1, std::forward<Rest>(rest)...);
     }
+    
+    // 递归处理变参绑定（处理时间点类型）
+    template<typename T, typename... Rest>
+    typename std::enable_if_t<std::is_same_v<std::remove_reference_t<T>, std::chrono::system_clock::time_point>>
+    bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index, T&& value, Rest&&... rest) const {
+        // 处理时间点类型
+        auto timePoint = value;
+        MYSQL_TIME* mysqlTime = new MYSQL_TIME();
+        memset(mysqlTime, 0, sizeof(MYSQL_TIME));
+        
+        auto timeT = std::chrono::system_clock::to_time_t(timePoint);
+        auto duration = timePoint.time_since_epoch();
+        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() % 1000;
+        
+        // 线程安全的时间转换
+        #if defined(_WIN32) || defined(_WIN64)
+            struct tm timeinfo;
+            localtime_s(&timeinfo, &timeT);
+        #else
+            struct tm timeinfo;
+            localtime_r(&timeT, &timeinfo);
+        #endif
+        
+        mysqlTime->year = timeinfo.tm_year + 1900;
+        mysqlTime->month = timeinfo.tm_mon + 1;
+        mysqlTime->day = timeinfo.tm_mday;
+        mysqlTime->hour = timeinfo.tm_hour;
+        mysqlTime->minute = timeinfo.tm_min;
+        mysqlTime->second = timeinfo.tm_sec;
+        mysqlTime->second_part = millis * 1000;  // 毫秒转微秒
+        mysqlTime->time_type = MYSQL_TIMESTAMP_DATETIME;
+        
+        binds[index].buffer_type = MYSQL_TYPE_DATETIME;
+        binds[index].buffer = mysqlTime;
+        binds[index].is_null = 0;
+        binds[index].length = 0;
+        
+        // 递归处理下一个参数
+        bindUpdateParamsImpl(binds, index + 1, std::forward<Rest>(rest)...);
+    }
+    
+    // 递归处理变参绑定（处理std::optional类型）
+    template<typename T, typename... Rest>
+    typename std::enable_if_t<is_optional<std::remove_reference_t<T>>::value>
+    bindUpdateParamsImpl(std::vector<MYSQL_BIND>& binds, size_t index, T&& value, Rest&&... rest) const {
+        using OptionalType = std::remove_reference_t<T>;
+        using ValueType = typename OptionalType::value_type;
+        
+        if (value.has_value()) {
+            // 如果optional有值，则绑定实际值
+            if constexpr (std::is_integral_v<ValueType>) {
+                ValueType valueCopy = *value;
+                
+                if constexpr (std::is_same_v<ValueType, bool>) {
+                    binds[index].buffer_type = MYSQL_TYPE_TINY;
+                } else if constexpr (sizeof(ValueType) <= 1) {
+                    binds[index].buffer_type = MYSQL_TYPE_TINY;
+                } else if constexpr (sizeof(ValueType) <= 2) {
+                    binds[index].buffer_type = MYSQL_TYPE_SHORT;
+                } else if constexpr (sizeof(ValueType) <= 4) {
+                    binds[index].buffer_type = MYSQL_TYPE_LONG;
+                } else {
+                    binds[index].buffer_type = MYSQL_TYPE_LONGLONG;
+                }
+                
+                binds[index].is_unsigned = std::is_unsigned_v<ValueType>;
+                binds[index].buffer = &valueCopy;
+                binds[index].is_null = 0;
+                binds[index].length = 0;
+            } 
+            else if constexpr (std::is_floating_point_v<ValueType>) {
+                ValueType valueCopy = *value;
+                
+                if constexpr (std::is_same_v<ValueType, float>) {
+                    binds[index].buffer_type = MYSQL_TYPE_FLOAT;
+                } else {
+                    binds[index].buffer_type = MYSQL_TYPE_DOUBLE;
+                }
+                
+                binds[index].buffer = &valueCopy;
+                binds[index].is_null = 0;
+                binds[index].length = 0;
+            }
+            else if constexpr (std::is_convertible_v<ValueType, std::string>) {
+                std::string strValue = *value;
+                char* buffer = new char[strValue.length() + 1];
+                std::copy(strValue.begin(), strValue.end(), buffer);
+                buffer[strValue.length()] = '\0';
+                
+                unsigned long length = static_cast<unsigned long>(strValue.length());
+                
+                binds[index].buffer_type = MYSQL_TYPE_VAR_STRING;
+                binds[index].buffer = buffer;
+                binds[index].buffer_length = length + 1;
+                binds[index].length = &length;
+                binds[index].is_null = 0;
+            }
+            else if constexpr (std::is_same_v<ValueType, std::chrono::system_clock::time_point>) {
+                auto timePoint = *value;
+                MYSQL_TIME* mysqlTime = new MYSQL_TIME();
+                memset(mysqlTime, 0, sizeof(MYSQL_TIME));
+                
+                auto timeT = std::chrono::system_clock::to_time_t(timePoint);
+                auto duration = timePoint.time_since_epoch();
+                auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() % 1000;
+                
+                // 线程安全的时间转换
+                #if defined(_WIN32) || defined(_WIN64)
+                    struct tm timeinfo;
+                    localtime_s(&timeinfo, &timeT);
+                #else
+                    struct tm timeinfo;
+                    localtime_r(&timeT, &timeinfo);
+                #endif
+                
+                mysqlTime->year = timeinfo.tm_year + 1900;
+                mysqlTime->month = timeinfo.tm_mon + 1;
+                mysqlTime->day = timeinfo.tm_mday;
+                mysqlTime->hour = timeinfo.tm_hour;
+                mysqlTime->minute = timeinfo.tm_min;
+                mysqlTime->second = timeinfo.tm_sec;
+                mysqlTime->second_part = millis * 1000;  // 毫秒转微秒
+                mysqlTime->time_type = MYSQL_TIMESTAMP_DATETIME;
+                
+                binds[index].buffer_type = MYSQL_TYPE_DATETIME;
+                binds[index].buffer = mysqlTime;
+                binds[index].is_null = 0;
+                binds[index].length = 0;
+            }
+            else {
+                throw std::runtime_error("Unsupported optional value type in bindUpdateParamsImpl");
+            }
+        } else {
+            // 如果optional没有值，则绑定NULL
+            char is_null = 1;
+            binds[index].buffer_type = MYSQL_TYPE_NULL;
+            binds[index].is_null = &is_null;
+        }
+        
+        // 递归处理下一个参数
+        bindUpdateParamsImpl(binds, index + 1, std::forward<Rest>(rest)...);
+    }
 
     // 准备预处理语句
-    MySQLStmtPtr prepareStatement(const char* query) const {
+    MySQLStmtPtr prepareStatement(std::string query) const {
         return FKMySQLConnectionPool::getInstance()->executeWithConnection(
             [query](MYSQL* mysql) -> MySQLStmtPtr {
                 MYSQL_STMT* stmt = mysql_stmt_init(mysql);
@@ -597,7 +1154,7 @@ protected:
                 
                 MySQLStmtPtr stmtPtr(stmt);
                 
-                if (mysql_stmt_prepare(stmt, query, strlen(query))) {
+                if (mysql_stmt_prepare(stmt, query.c_str(), static_cast<unsigned long>(query.length()))) {
                     std::string error = mysql_error(mysql);
                     throw std::runtime_error("Prepare failed: " + error);
                 }
@@ -621,18 +1178,31 @@ protected:
         executeQuery(stmtPtr); // 执行逻辑相同
     }
     
-    // 获取单个结果
-    T fetchSingleResult(MySQLStmtPtr& stmtPtr, MYSQL_RES* meta) const {
+    // 获取查询结果，可能是单行或多行
+    // 返回std::vector<T>，如果没有结果则返回空向量
+    // 获取单个结果，使用std::optional避免异常
+    std::optional<T> fetchSingleResult(MySQLStmtPtr& stmtPtr, MYSQL_RES* meta) const {
+        auto results = fetchRows(stmtPtr, meta);
+        if (results.empty()) {
+            return std::nullopt;
+        }
+        return results[0];
+    }
+    
+    // 获取查询结果，可能是单行或多行
+    // 返回std::vector<T>，如果没有结果则返回空向量
+    std::vector<T> fetchRows(MySQLStmtPtr& stmtPtr, MYSQL_RES* meta) const {
         MYSQL_STMT* stmt = stmtPtr;
         if (mysql_stmt_store_result(stmt)) {
             std::string error = mysql_stmt_error(stmt);
             throw DatabaseException("Store result failed: " + error);
         }
         
-        // 检查是否有结果
-        if (mysql_stmt_num_rows(stmt) == 0) {
-            throw DatabaseException("No results found");
-        }
+        my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
+        if (rowCount == 0) return {};
+        
+        std::vector<T> results;
+        results.reserve(rowCount);
         
         // 获取字段数量
         int columnCount = mysql_num_fields(meta);
@@ -643,24 +1213,22 @@ protected:
         auto lengths = std::make_unique<unsigned long[]>(columnCount);
         auto error = std::make_unique<char[]>(columnCount);
         
-        // 初始化isNull数组
+        // 初始化数组
         std::fill_n(isNull.get(), columnCount, 0);
         std::fill_n(error.get(), columnCount, 0);
         
-        // 分配内存用于存储结果 - 使用shared_ptr确保生命周期
-        std::vector<std::shared_ptr<std::vector<char>>> buffers;
-        buffers.reserve(columnCount);
-        
+        // 分配内存用于存储结果 - 使用vector直接管理内存
+        std::vector<std::vector<char>> buffers(columnCount);
         for (int i = 0; i < columnCount; i++) {
             MYSQL_FIELD* field = mysql_fetch_field_direct(meta, i);
-            size_t bufferSize = field->max_length > 0 ? field->max_length : 8192; // 增大默认缓冲区大小
-            
-            auto buffer = std::make_shared<std::vector<char>>(bufferSize);
-            buffers.push_back(buffer);
+
+            unsigned long bufferSize = (field->type == MYSQL_TYPE_VAR_STRING || field->type == MYSQL_TYPE_STRING)
+                ? field->length >> 2 : field->length;
+            buffers[i].resize(bufferSize + 1);
             
             memset(&binds[i], 0, sizeof(MYSQL_BIND));
-            binds[i].buffer_type = field->type;
-            binds[i].buffer = buffer->data();
+            binds[i].buffer_type = mysql_fetch_field_direct(meta, i)->type;
+            binds[i].buffer = buffers[i].data();
             binds[i].buffer_length = bufferSize;
             binds[i].is_null = reinterpret_cast<bool*>(&isNull[i]);
             binds[i].length = &lengths[i];
@@ -673,47 +1241,46 @@ protected:
             throw DatabaseException("Bind result failed: " + error);
         }
         
-        // 获取结果
-        int fetch_result = mysql_stmt_fetch(stmt);
-        if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
-            throw DatabaseException("Fetch failed with error code: " + std::to_string(fetch_result));
-        }
-        
-        // 准备数据用于创建实体
-        std::vector<std::string> rowData(columnCount);
+        // 准备用于创建实体的临时数据
+        std::vector<const char*> rowData(columnCount);
         std::vector<unsigned long> rowLengths(columnCount);
         
-        for (int i = 0; i < columnCount; i++) {
-            if (isNull[i]) {
-                rowData[i] = ""; // NULL值处理为空字符串
-                rowLengths[i] = 0;
-            } else {
-                // 处理可能的数据截断
-                if (lengths[i] > binds[i].buffer_length) {
-                    // 重新分配更大的缓冲区
-                    buffers[i]->resize(lengths[i]);
-                    binds[i].buffer = buffers[i]->data();
-                    binds[i].buffer_length = lengths[i];
-                    
-                    // 重新获取字段数据
-                    mysql_stmt_fetch_column(stmt, &binds[i], i, 0);
-                }
-                
-                rowData[i] = std::string(static_cast<char*>(binds[i].buffer), lengths[i]);
-                rowLengths[i] = lengths[i];
+        // 获取所有行的结果
+        while (true) {
+            int fetch_result = mysql_stmt_fetch(stmt);
+            if (fetch_result == MYSQL_NO_DATA) {
+                break; // 没有更多数据
+            } else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
+                throw DatabaseException("Fetch failed with error code: " + std::to_string(fetch_result));
             }
+            
+            // 处理当前行的数据
+            for (int i = 0; i < columnCount; i++) {
+                if (isNull[i]) {
+                    rowData[i] = ""; // NULL值处理为空字符串
+                    rowLengths[i] = 0;
+                } else {
+                    // 处理可能的数据截断
+                    if (lengths[i] > buffers[i].size()) {
+                        // 重新分配更大的缓冲区
+                        buffers[i].resize(lengths[i]);
+                        binds[i].buffer = buffers[i].data();
+                        binds[i].buffer_length = lengths[i];
+                        
+                        // 重新获取字段数据
+                        mysql_stmt_fetch_column(stmt, &binds[i], i, 0);
+                    }
+                    
+                    rowData[i] = static_cast<char*>(binds[i].buffer);
+                    rowLengths[i] = lengths[i];
+                }
+            }
+            
+            // 使用子类实现的方法创建实体并添加到结果集
+            results.push_back(createEntityFromRow(const_cast<char**>(rowData.data()), rowLengths.data()));
         }
         
-        // 创建一个临时的MYSQL_ROW和lengths数组
-        std::vector<const char*> rowPtrs(columnCount);
-        for (int i = 0; i < columnCount; i++) {
-            rowPtrs[i] = rowData[i].c_str();
-        }
-        
-        // 使用子类实现的方法创建实体
-        T entity = createEntityFromRow(const_cast<char**>(rowPtrs.data()), rowLengths.data());
-        
-        return entity;
+        return results;
     }
     
     // 处理结果集

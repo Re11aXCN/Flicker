@@ -60,6 +60,15 @@ namespace FKUtils {
                    (((std::uint32_t)(A) & 0x0000ff00) <<  8) | \
                    (((std::uint32_t)(A) & 0x000000ff) << 24))
 
+#define Swap64(A) ((((std::uint64_t)(A) & 0xff00000000000000ULL) >> 56) | \
+                      (((std::uint64_t)(A) & 0x00ff000000000000ULL) >> 40) | \
+                      (((std::uint64_t)(A) & 0x0000ff0000000000ULL) >> 24) | \
+                      (((std::uint64_t)(A) & 0x000000ff00000000ULL) >> 8)  | \
+                      (((std::uint64_t)(A) & 0x00000000ff000000ULL) << 8)  | \
+                      (((std::uint64_t)(A) & 0x0000000000ff0000ULL) << 24) | \
+                      (((std::uint64_t)(A) & 0x000000000000ff00ULL) << 40) | \
+                      (((std::uint64_t)(A) & 0x00000000000000ffULL) << 56))
+
 /******************************************************************************
 ENDIANNESS返回结果
     l:小端模式
@@ -88,6 +97,20 @@ ENDIANNESS返回结果
         }
 
         // 编译期字符串视图（C++17起可用）
+        template<size_t N>
+        struct ConstexprWString {
+            wchar_t value[N];
+
+            constexpr ConstexprWString(const wchar_t(&str)[N]) {
+                for (size_t i = 0; i < N; ++i) {
+                    value[i] = str[i];
+                }
+            }
+
+            constexpr operator const wchar_t* () const { return value; }
+            constexpr const wchar_t* data() const { return value; }
+            constexpr size_t size() const { return N - 1; } // 减去空字符
+        };
         template<size_t N>
         struct ConstexprString {
             char value[N];
@@ -410,6 +433,11 @@ ENDIANNESS返回结果
         return (ENDIANNESS == 'l') ? Swap32(hl) : hl;
     }
 
+    inline std::uint64_t htonll(std::uint64_t hll)
+    {
+        return (ENDIANNESS == 'l') ? Swap64(hll) : hll;
+    }
+
     //将一个无符号短整形数从网络字节顺序转换为主机字节顺序
     inline std::uint16_t ntohs(std::uint16_t ns)
     {
@@ -421,6 +449,129 @@ ENDIANNESS返回结果
     {
         return (ENDIANNESS == 'l') ? Swap32(nl) : nl;
     }
+
+    inline std::uint64_t ntohll(std::uint64_t nll)
+    {
+        return (ENDIANNESS == 'l') ? Swap64(nll) : nll;
+    }
+
+    inline uint16_t byteswap16(uint16_t value) {
+#if defined(_MSC_VER)
+        return _byteswap_ushort(value);
+#elif defined(__GNUC__) || defined(__clang__)
+        return __builtin_bswap16(value);
+#else
+        return Swap16(value);
+#endif
+    }
+
+    inline uint32_t byteswap32(uint32_t value) {
+#if defined(_MSC_VER)
+        return _byteswap_ulong(value);
+#elif defined(__GNUC__) || defined(__clang__)
+        return __builtin_bswap32(value);
+#else
+        return Swap32(value);
+#endif
+    }
+
+    inline uint64_t byteswap64(uint64_t value) {
+#if defined(_MSC_VER)
+        return _byteswap_uint64(value);
+#elif defined(__GNUC__) || defined(__clang__)
+        return __builtin_bswap64(value);
+#else
+        return Swap64(value);
+#endif
+    }
+
+    inline uint16_t load_be16(const void* src) {
+        uint16_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+        // 检测系统字节序（编译时优化）
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        // 大端系统不需要字节交换
+        return value;
+#else
+        // 小端系统(Windows)直接返回值
+        return byteswap16(value);
+#endif
+    }
+
+    inline uint32_t load_be32(const void* src) {
+        uint32_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        return value;
+#else
+        return byteswap32(value);
+#endif
+    }
+
+    inline uint64_t load_be64(const void* src) {
+        uint64_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        return value;
+#else
+        return byteswap64(value);
+#endif
+    }
+
+    inline uint16_t load_le16(const void* src) {
+        uint16_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        return byteswap16(value);
+#else
+        return value;
+#endif
+    }
+
+    inline uint32_t load_le32(const void* src) {
+        uint32_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        return byteswap32(value);
+#else
+        return value;
+#endif
+    }
+
+    inline uint64_t load_le64(const void* src) {
+        uint64_t value;
+        std::memcpy(&value, src, sizeof(value));
+
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB) || \
+    defined(__MIPSEB__)
+        return byteswap64(value);
+#else
+        return value;
+#endif
+    }
+
     inline constexpr std::string local_separator() {
 #ifdef _WIN32
         return "\\";
@@ -430,25 +581,37 @@ ENDIANNESS返回结果
     }
 
     template<helper::ConstexprString Name>
-    std::string get_env_w() {
+    std::string get_env_a() {
 #if defined(_WIN32)
-        // 名称: UTF-8 → UTF-16 (动态缓冲区)
-        const int nameLen = MultiByteToWideChar(CP_UTF8, 0, Name, -1, nullptr, 0);
-        if (nameLen == 0) throw std::runtime_error("环境变量名转换失败");
-        std::wstring wideName(nameLen, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, Name, -1, wideName.data(), nameLen);
-
-        // 获取值: 动态适应长度
-        DWORD valueLen = GetEnvironmentVariableW(wideName.data(), nullptr, 0);
+        DWORD valueLen = GetEnvironmentVariableA(Name, nullptr, 0);
         if (valueLen == 0) {
             if (GetLastError() == ERROR_ENVVAR_NOT_FOUND)
                 throw std::runtime_error("环境变量不存在");
             throw std::runtime_error("获取环境变量失败");
         }
+        std::string wideValue(valueLen, L'\0');
+        valueLen = GetEnvironmentVariableA(Name, wideValue.data(), valueLen);
+        return wideValue;
+#else
+        const char* value = std::getenv(Name);
+        if (!value) {
+            throw std::runtime_error("环境变量不存在");
+        }
+        return std::string(value);
+#endif
+    }
 
+    template<helper::ConstexprWString Name>
+    std::string get_env_w() {
+#if defined(_WIN32)
+        DWORD valueLen = GetEnvironmentVariableW(Name, nullptr, 0);
+        if (valueLen == 0) {
+            if (GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+                throw std::runtime_error("环境变量不存在");
+            throw std::runtime_error("获取环境变量失败");
+        }
         std::wstring wideValue(valueLen, L'\0');
-        valueLen = GetEnvironmentVariableW(wideName.data(), wideValue.data(), valueLen);
-        if (valueLen == 0) throw std::runtime_error("获取环境变量失败");
+        valueLen = GetEnvironmentVariableW(Name, wideValue.data(), valueLen);
 
         // 值: UTF-16 → UTF-8 (动态缓冲区)
         const int resultLen = WideCharToMultiByte(CP_UTF8, 0,
