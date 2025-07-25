@@ -113,5 +113,8 @@
     <ClInclude Include="Source\MySQL\Mapper\FKFieldMapper.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper-inl.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

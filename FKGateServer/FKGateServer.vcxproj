@@ -39,6 +39,7 @@
     <ClInclude Include="Source\Grpc\FKGrpcService.pb.h" />
     <ClInclude Include="Source\Grpc\FKGrpcServiceClient.hpp" />
     <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h" />
+    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper-inl.hpp" />
     <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper.hpp" />
     <ClInclude Include="Source\MySQL\FKMySQLConnection.h" />
     <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h" />

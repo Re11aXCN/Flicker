@@ -46,7 +46,6 @@ protected:
     constexpr std::string insertQuery() const override;
     constexpr std::string deleteByIdQuery() const override;
     
-    void bindIdParam(MySQLStmtPtr& stmtPtr, std::size_t* id) const override;
     void bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& entity) const override;
     
     FKUserEntity createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const override;
