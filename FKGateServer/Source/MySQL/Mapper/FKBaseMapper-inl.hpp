@@ -49,15 +49,13 @@ template<typename Entity, typename ID_TYPE>
 inline std::optional<Entity> FKBaseMapper<Entity, ID_TYPE>::findById(ID_TYPE id)
 {
     try {
-        MySQLStmtPtr stmtPtr = prepareStatement(findByIdQuery());
-        if (!stmtPtr.isValid()) {
-            throw DatabaseException("Failed to prepare statement for findById");
+        auto results = queryEntities<>(findByIdQuery(), id);
+
+        if (results.empty()) {
+            return std::nullopt;
         }
 
-        bindValues(stmtPtr, id);
-        executeQuery(stmtPtr);
-
-        return fetchSingleResult(stmtPtr);
+        return results[0];
     }
     catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("findById error: {}", e.what()));
@@ -66,13 +64,13 @@ inline std::optional<Entity> FKBaseMapper<Entity, ID_TYPE>::findById(ID_TYPE id)
 }
 
 template<typename Entity, typename ID_TYPE>
-template <OrderBy orderBy, Pagination pagination>
+template <SortOrder Order, fixed_string FieldName, Pagination Pagination>
 inline std::vector<Entity> FKBaseMapper<Entity, ID_TYPE>::findAll()
 {
     try {
         std::string query = FKUtils::concat(findAllQuery(),
-            buildOrderByClause<orderBy>(),
-            buildLimitClause<pagination>());
+            _build_order_by_clause<Order, FieldName>(),
+            _build_limit_clause<Pagination>());
 
         return FKMySQLConnectionPool::getInstance()->executeWithConnection(
             [this](MYSQL* mysql) -> std::vector<Entity> {
@@ -139,7 +137,7 @@ inline DbOperator::Status FKBaseMapper<Entity, ID_TYPE>::deleteById(ID_TYPE id)
     try {
         MySQLStmtPtr stmtPtr = prepareStatement(deleteByIdQuery());
         if (!stmtPtr.isValid()) {
-            throw DatabaseException("Failed to prepare statement for deleteById");
+            throw DatabaseException("Failed to prepare statement for " __FUNCTION__ "");
         }
 
         bindValues(stmtPtr, id);
@@ -149,6 +147,9 @@ inline DbOperator::Status FKBaseMapper<Entity, ID_TYPE>::deleteById(ID_TYPE id)
 
         if (affectedRows == 0) {
             return DbOperator::Status::DataNotExist;
+        }
+        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
+            throw DatabaseException("Statement execution failed");
         }
 
         return DbOperator::Status::Success;
@@ -178,7 +179,7 @@ inline DbOperator::Status FKBaseMapper<Entity, ID_TYPE>::updateFieldsById(ID_TYP
         MySQLStmtPtr stmtPtr = prepareStatement(FKUtils::concat("UPDATE ", getTableName(), " SET ", setClause,
             " WHERE id = ?"));
         if (!stmtPtr.isValid()) {
-            throw DatabaseException("Failed to prepare statement for updateFieldsByIdSafe");
+            throw DatabaseException("Failed to prepare statement for " __FUNCTION__ "");
         }
 
         bindValues(stmtPtr, std::forward<Args>(args)..., id);
@@ -187,6 +188,9 @@ inline DbOperator::Status FKBaseMapper<Entity, ID_TYPE>::updateFieldsById(ID_TYP
         my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
         if (affectedRows == 0) {
             return DbOperator::Status::DataNotExist;
+        }
+        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
+            throw DatabaseException("Statement execution failed");
         }
 
         return DbOperator::Status::Success;
@@ -198,72 +202,28 @@ inline DbOperator::Status FKBaseMapper<Entity, ID_TYPE>::updateFieldsById(ID_TYP
 }
 
 template<typename Entity, typename ID_TYPE>
-template<typename ConditionType>
-inline std::vector<std::unordered_map<std::string, std::string>> FKBaseMapper<Entity, ID_TYPE>::fetchFieldsByCondition(
+template<typename ConditionType, SortOrder Order, fixed_string FieldName,
+    Pagination Pagination>
+inline std::vector<std::unordered_map<std::string, std::string>> FKBaseMapper<Entity, ID_TYPE>::queryFieldsByCondition(
     const std::string& tableName,
     const std::vector<std::string>& fieldNames,
     const std::string& conditionField,
     const ConditionType& conditionValue) const
 {
-    // 构建字段列表
-    std::string fieldList = fieldNames
-        | std::views::transform([](const std::string& s) { return s + " = ?"; })
-        | std::views::join_with(", ")
-        | std::ranges::to<std::string>();
-
     // 构建sql并绑定执行
-    MySQLStmtPtr stmtPtr = prepareStatement(FKUtils::concat("SELECT ", fieldList,
-        " FROM ", tableName, " WHERE ", conditionField, " = ?"));
-    if (!stmtPtr) throw DatabaseException("Failed to prepare statement in fetchFieldsByCondition");
-    MYSQL_STMT* stmt = stmtPtr.get();
+    MySQLStmtPtr stmtPtr = prepareStatement(FKUtils::concat(FKUtils::concat("SELECT ", FKUtils::plain_join_range(", ", fieldNames),
+        " FROM ", tableName, " WHERE ", conditionField, " = ?"),
+        _build_order_by_clause<Order, FieldName>(),
+        _build_limit_clause<Pagination>()));
 
+    if (!stmtPtr) throw DatabaseException("Failed to prepare statement in " __FUNCTION__ "");
     bindValues(stmtPtr, conditionValue);
     executeQuery(stmtPtr);
 
-    // 检查结果集是否为空
-    my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
-    if (rowCount == 0) return {};
-
-    // 获取结果集元数据
-    ResultGuard resultGuard(mysql_stmt_result_metadata(stmt));
-    if (!resultGuard.res)  throw DatabaseException("No metadata available for fetchFieldsByCondition query");
-
-    // 获取字段数量
-    std::size_t columnCount = mysql_num_fields(resultGuard.res); // fieldNames.size()
-    auto binds = std::make_unique<MYSQL_BIND[]>(columnCount);
-    auto isNull = std::make_unique<char[]>(columnCount);
-    auto lengths = std::make_unique<unsigned long[]>(columnCount);
-    auto error = std::make_unique<char[]>(columnCount);
-    std::fill_n(isNull.get(), columnCount, 0);
-    std::fill_n(error.get(), columnCount, 0);
-
-    // 绑定结果集
-    std::vector<std::vector<char>> buffers(columnCount);
-    for (int i = 0; i < columnCount; i++) {
-        MYSQL_FIELD* field = mysql_fetch_field_direct(resultGuard.res, i);
-
-        unsigned long bufferSize = (field->type == MYSQL_TYPE_VAR_STRING || field->type == MYSQL_TYPE_STRING)
-            ? field->length >> 2 : field->length;
-        buffers[i].resize(bufferSize + 1);
-
-        memset(&binds[i], 0, sizeof(MYSQL_BIND));
-        binds[i].buffer_type = mysql_fetch_field_direct(resultGuard.res, i)->type;
-        binds[i].buffer = buffers[i].data();
-        binds[i].buffer_length = bufferSize;
-        binds[i].is_null = reinterpret_cast<bool*>(&isNull[i]);
-        binds[i].length = &lengths[i];
-        binds[i].error = reinterpret_cast<bool*>(&error[i]);
-    }
-    if (mysql_stmt_bind_result(stmt, binds.get())) {
-        throw DatabaseException("Failed to bind result in fetchFieldsByCondition: " +
-            std::string(mysql_stmt_error(stmt)));
-    }
-
-    // 存储结果
-    if (mysql_stmt_store_result(stmt)) {
-        throw DatabaseException("Failed to store result in fetchFieldsByCondition: " +
-            std::string(mysql_stmt_error(stmt)));
-    }
+    MYSQL_STMT* stmt = stmtPtr.get();
+    StmtOutputRes output;
+    _process_stmt_result(stmt, output);
+    if (output.rowCount == 0)  return {};
 
     // 获取所有行的结果
     std::vector<std::unordered_map<std::string, std::string>> results;
@@ -279,11 +239,11 @@ inline std::vector<std::unordered_map<std::string, std::string>> FKBaseMapper<En
         // 处理当前行的数据
         std::unordered_map<std::string, std::string> rowData;
         for (size_t i = 0; i < fieldNames.size(); ++i) {
-            if (isNull[i]) {
+            if (output.isNull[i]) {
                 rowData[fieldNames[i]] = {};
             }
             else {
-                rowData[fieldNames[i]] = std::string(buffers[i].data(), lengths[i]);
+                rowData[fieldNames[i]] = std::string(output.buffers[i].data(), output.lengths[i]);
             }
         }
         results.push_back(std::move(rowData));
@@ -293,90 +253,50 @@ inline std::vector<std::unordered_map<std::string, std::string>> FKBaseMapper<En
 }
 
 template<typename Entity, typename ID_TYPE>
-template<typename... Args>
-inline void FKBaseMapper<Entity, ID_TYPE>::bindValues(MySQLStmtPtr& stmtPtr, const Args&... args) const
+template<SortOrder Order, fixed_string FieldName, Pagination Pagination,
+    typename... Args >
+inline std::vector<Entity> FKBaseMapper<Entity, ID_TYPE>::queryEntities(std::string&& sql, Args && ...args) const
 {
-    MYSQL_STMT* stmt = stmtPtr;
-    constexpr size_t count = sizeof...(Args);
-    std::vector<MYSQL_BIND> binds(count, MYSQL_BIND{});
-
-    // 逐个绑定参数
-    bindParams(binds.data(), args...);
-
-    if (mysql_stmt_bind_param(stmt, binds.data())) {
-        std::string error = mysql_stmt_error(stmt);
-        throw DatabaseException("Bind param failed: " + error);
+    MySQLStmtPtr stmtPtr = prepareStatement(FKUtils::concat(std::move(sql),
+        _build_order_by_clause<Order, FieldName>(),
+        _build_limit_clause<Pagination>()));
+    if (!stmtPtr.isValid()) {
+        throw DatabaseException("Failed to prepare statement for " __FUNCTION__ "");
     }
-}
+    bindValues(stmtPtr, std::forward<Args>(args)...);
+    executeQuery(stmtPtr);
 
-template<typename Entity, typename ID_TYPE>
-template<typename ValueType>
-void FKBaseMapper<Entity, ID_TYPE>::bindSingleValue(MYSQL_BIND& bind, const ValueType& value) const
-{
-    using Type = std::remove_cv_t<std::remove_reference_t<ValueType>>;
-    //using Type = std::decay_t<ValueType>; // 类型退化、数组→指针转换、函数→函数指针
-    if constexpr (std::is_integral_v<Type>) {
-        if constexpr (std::is_same_v<Type, bool>) {
-            bind.buffer_type = MYSQL_TYPE_TINY;
+    MYSQL_STMT* stmt = stmtPtr.get();
+    StmtOutputRes output;
+    _process_stmt_result(stmt, output);
+    if (output.rowCount == 0)  return {};
+
+    std::vector<const char*> rowData(output.columnCount);
+    std::vector<Entity> results;
+    results.reserve(output.rowCount);
+
+    while (true) {
+        int fetch_result = mysql_stmt_fetch(stmt);
+        if (fetch_result == MYSQL_NO_DATA) {
+            break;
         }
-        else if constexpr (sizeof(Type) <= 1) {
-            bind.buffer_type = MYSQL_TYPE_TINY;
-        }
-        else if constexpr (sizeof(Type) <= 2) {
-            bind.buffer_type = MYSQL_TYPE_SHORT;
-        }
-        else if constexpr (sizeof(Type) <= 4) {
-            bind.buffer_type = MYSQL_TYPE_LONG;
-        }
-        else {
-            bind.buffer_type = MYSQL_TYPE_LONGLONG;
+        else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
+            throw DatabaseException("Fetch failed in queryEntities with error code: " + std::to_string(fetch_result));
         }
 
-        bind.is_unsigned = std::is_unsigned_v<Type>;
-        bind.buffer = const_cast<Type*>(&value);
-        bind.buffer_length = sizeof(value);
-        bind.is_null = 0;
-        bind.length = 0;
-    }
-    else if constexpr (std::is_floating_point_v<Type>) {
-        if constexpr (std::is_same_v<Type, float>) {
-            bind.buffer_type = MYSQL_TYPE_FLOAT;
-        }
-        else {
-            bind.buffer_type = MYSQL_TYPE_DOUBLE;
+        for (size_t i = 0; i < output.columnCount; i++) {
+            if (output.isNull[i]) {
+                rowData[i] = {};
+            }
+            else {
+                rowData[i] = static_cast<char*>(output.buffers[i].data());
+            }
         }
 
-        bind.buffer = const_cast<Type*>(&value);
-        bind.buffer_length = sizeof(value);
-        bind.is_null = 0;
-        bind.length = 0;
+        results.push_back(createEntityFromRow(const_cast<char**>(rowData.data()), output.lengths.get()));
     }
-    else if constexpr (is_varchar_type_v<Type>) {
-        bind.buffer_type = MYSQL_TYPE_VAR_STRING;
-        bind.buffer = const_cast<char*>(value.val.c_str());
-        bind.buffer_length = value.len;
-        bind.length = &value.len;
-        bind.is_null = 0;
-    }
-    else if constexpr (std::is_same_v<Type, MYSQL_TIME>) {
-        bind.buffer_type = MYSQL_TYPE_TIMESTAMP;
-        bind.buffer = (void*)&value;
-        bind.buffer_length = sizeof(value);
-        bind.is_null = 0;
-        bind.length = 0;
-    }
-    else if constexpr (is_optional_type_v<Type>) {
-        if (value.has_value()) {
-            bindSingleValue(bind, *value);
-        }
-        else {
-            bind.buffer_type = MYSQL_TYPE_NULL;
-            bind.is_null = 1;
-        }
-    }
-    else {
-        throw DatabaseException("Unsupported value type in bindSingleValue");
-    }
+
+    return results;
 }
 
 template<typename Entity, typename ID_TYPE>
@@ -408,5 +328,168 @@ inline void FKBaseMapper<Entity, ID_TYPE>::executeQuery(MySQLStmtPtr& stmtPtr) c
     if (mysql_stmt_execute(stmt)) {
         std::string error = mysql_stmt_error(stmt);
         throw DatabaseException("Execute failed: " + error);
+    }
+}
+
+template<typename Entity, typename ID_TYPE>
+template<typename... Args>
+inline void FKBaseMapper<Entity, ID_TYPE>::bindValues(MySQLStmtPtr& stmtPtr, Args&&... args) const
+{
+    MYSQL_STMT* stmt = stmtPtr;
+    constexpr size_t count = sizeof...(Args);
+    if (count == 0) return;
+
+    std::vector<MYSQL_BIND> binds(count);
+    std::memset(binds.data(), 0, sizeof(MYSQL_BIND) * count);  // 安全初始化
+
+    // 使用折叠表达式绑定所有参数
+    bindParams(binds.data(), std::forward<Args>(args)...);
+
+    if (mysql_stmt_bind_param(stmt, binds.data())) {
+        std::string error = mysql_stmt_error(stmt);
+        throw DatabaseException("Bind param failed: " + error);
+    }
+}
+
+template<typename Entity, typename ID_TYPE>
+template<typename ValueType>
+void FKBaseMapper<Entity, ID_TYPE>::bindSingleValue(MYSQL_BIND& bind, ValueType&& value) const
+{
+    using RawType = std::remove_cv_t<std::remove_reference_t<ValueType>>;
+    //using Type = std::decay_t<ValueType>; // 类型退化、数组→指针转换、函数→函数指针
+    if constexpr (std::is_integral_v<RawType>) {
+        if constexpr (std::is_same_v<RawType, bool>) {
+            bind.buffer_type = MYSQL_TYPE_TINY;
+        }
+        else if constexpr (sizeof(RawType) <= 1) {
+            bind.buffer_type = MYSQL_TYPE_TINY;
+        }
+        else if constexpr (sizeof(RawType) <= 2) {
+            bind.buffer_type = MYSQL_TYPE_SHORT;
+        }
+        else if constexpr (sizeof(RawType) <= 4) {
+            bind.buffer_type = MYSQL_TYPE_LONG;
+        }
+        else {
+            bind.buffer_type = MYSQL_TYPE_LONGLONG;
+        }
+
+        bind.is_unsigned = std::is_unsigned_v<RawType>;
+        bind.buffer = const_cast<RawType*>(&value);
+        bind.buffer_length = sizeof(value);
+        bind.is_null = 0;
+        bind.length = 0;
+    }
+    else if constexpr (std::is_floating_point_v<RawType>) {
+        if constexpr (std::is_same_v<RawType, float>) {
+            bind.buffer_type = MYSQL_TYPE_FLOAT;
+        }
+        else {
+            bind.buffer_type = MYSQL_TYPE_DOUBLE;
+        }
+
+        bind.buffer = const_cast<RawType*>(&value);
+        bind.buffer_length = sizeof(value);
+        bind.is_null = 0;
+        bind.length = 0;
+    }
+    else if constexpr (is_varchar_type_v<RawType>) {
+        bind.buffer_type = MYSQL_TYPE_VAR_STRING;
+        bind.buffer = const_cast<char*>(value.val);
+        bind.buffer_length = value.len + 1;
+        bind.length = &value.len;
+        bind.is_null = 0;
+    }
+    else if constexpr (std::is_same_v<RawType, MYSQL_TIME>) {
+        bind.buffer_type = MYSQL_TYPE_TIMESTAMP;
+        bind.buffer = const_cast<MYSQL_TIME*>(&value);
+        bind.buffer_length = sizeof(value);
+        bind.is_null = 0;
+        bind.length = 0;
+    }
+    else if constexpr (is_optional_type_v<RawType>) {
+        if (value.has_value()) {
+            bindSingleValue(bind, *value);
+        }
+        else {
+            bind.buffer_type = MYSQL_TYPE_NULL;
+            bind.is_null = 1;
+        }
+    }
+    else {
+        throw DatabaseException("Unsupported value type in bindSingleValue");
+    }
+}
+
+template<typename Entity, typename ID_TYPE>
+template<SortOrder Order, fixed_string FieldName>
+inline constexpr auto FKBaseMapper<Entity, ID_TYPE>::_build_order_by_clause()
+{
+    constexpr auto direction = (Order == SortOrder::Ascending) ? " ASC" : " DESC";
+
+    return FKUtils::concat(" ORDER BY ", FieldName, direction);
+}
+
+template<typename Entity, typename ID_TYPE>
+template<Pagination pagination>
+inline constexpr auto FKBaseMapper<Entity, ID_TYPE>::_build_limit_clause()
+{
+    if constexpr (pagination.limit == 0 && pagination.offset == 0) {
+        return "";  // 无分页
+    }
+    else if constexpr (pagination.limit == 0) {
+        // 只有 OFFSET
+        return FKUtils::concat(" LIMIT ", std::to_string(MAX_ROW_SIZE), " OFFSET ", std::to_string(pagination.offset));
+    }
+    else {
+        // LIMIT 和 OFFSET
+        return FKUtils::concat(" LIMIT ", std::to_string(pagination.limit),
+            " OFFSET ", std::to_string(pagination.offset));
+    }
+}
+
+template<typename Entity, typename ID_TYPE>
+inline void FKBaseMapper<Entity, ID_TYPE>::_process_stmt_result(MYSQL_STMT* stmt, StmtOutputRes& output) const
+{
+    if (mysql_stmt_store_result(stmt)) {
+        throw DatabaseException("Failed to store result in " __FUNCTION__ ": " +
+            std::string(mysql_stmt_error(stmt)));
+    }
+    // 检查结果集是否为空
+    if (!(output.rowCount = mysql_stmt_num_rows(stmt))) return;
+
+    // 获取结果集元数据
+    ResultGuard resultGuard(mysql_stmt_result_metadata(stmt));
+    if (!resultGuard.res)  throw DatabaseException("No metadata available for fetchFieldsByCondition query");
+
+    // 获取字段数量
+    output.columnCount = mysql_num_fields(resultGuard.res); // fieldNames.size()
+    output.binds = std::make_unique<MYSQL_BIND[]>(output.columnCount);
+    output.isNull = std::make_unique<char[]>(output.columnCount);
+    output.lengths = std::make_unique<unsigned long[]>(output.columnCount);
+    output.error = std::make_unique<char[]>(output.columnCount);
+    std::fill_n(output.isNull.get(), output.columnCount, 0);
+    std::fill_n(output.error.get(), output.columnCount, 0);
+
+    // 绑定结果集
+    output.buffers = std::vector<std::vector<char>>(output.columnCount);
+    for (int i = 0; i < output.columnCount; i++) {
+        MYSQL_FIELD* field = mysql_fetch_field_direct(resultGuard.res, i);
+
+        unsigned long bufferSize = (field->type == MYSQL_TYPE_VAR_STRING || field->type == MYSQL_TYPE_STRING)
+            ? field->length >> 2 : field->length;
+        output.buffers[i].resize(bufferSize + 1);
+
+        memset(&output.binds[i], 0, sizeof(MYSQL_BIND));
+        output.binds[i].buffer_type = mysql_fetch_field_direct(resultGuard.res, i)->type;
+        output.binds[i].buffer = output.buffers[i].data();
+        output.binds[i].buffer_length = bufferSize;
+        output.binds[i].is_null = reinterpret_cast<bool*>(&output.isNull[i]);
+        output.binds[i].length = &output.lengths[i];
+        output.binds[i].error = reinterpret_cast<bool*>(&output.error[i]);
+    }
+    if (mysql_stmt_bind_result(stmt, output.binds.get())) {
+        throw DatabaseException("Failed to bind result in " __FUNCTION__ ": " +
+            std::string(mysql_stmt_error(stmt)));
     }
 }

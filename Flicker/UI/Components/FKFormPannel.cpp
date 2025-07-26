@@ -65,18 +65,20 @@ void FKFormPannel::toggleFormType()
     // 登录和注册切换时，需要重置状态
     // 登录和重置密码——邮箱验证码 切换时，需要重置状态
     // 重置密码——邮箱验证码 到 重置密码——输入新的密码 切换不需要重置状态，因为需要发送验证码和邮箱给Gate
-    // 重置密码——输入新的密码 到  重置密码——邮箱验证码，需要重置状态
+    // 重置密码——输入新的密码 到 登录，需要重置状态
     _pIsSwitchStackedWidget = false;
     // 重置验证状态
     _pValidationFlags = Launcher::InputValidationFlag::None;
-    
+
     // 清空所有输入框（可能当前输入LineEdit有信息，切换后要清空）
     _pUsernameLineEdit->clear();
     _pPasswordLineEdit->clear();
-    _pEmailLineEdit->clear();
+    if (_pFormType != Launcher::FormType::Authentication) {
+        _pEmailLineEdit->clear();
+    }
     _pConfirmPasswordLineEdit->clear();
     _pVerifyCodeLineEdit->clear();
-    
+
     // 重置样式（可能当前输入LineEdit内容错误，切换后要重置样式）
     _pUsernameLineEdit->setStyleSheet(_pNormalStyleSheet);
     _pPasswordLineEdit->setStyleSheet(_pNormalStyleSheet);
@@ -256,25 +258,20 @@ FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJ
 
 
     _pResponseCallbacks.insert(flicker::http::service::VerifyCode, [this](const QJsonObject& responseJsonObj) {
-        if (_pFormType == Launcher::FormType::Register) {
-            auto status = static_cast<flicker::http::status>(responseJsonObj["response_status_code"].toInt());
-            auto message = responseJsonObj["message"].toString();
-            if (status != flicker::http::status::ok) {
-                FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, NXMessageBarType::BottomRight);
-                if (status == flicker::http::status::conflict && message.contains("exist")) {
-                    if (_pVerifyCodeTimer->isActive()) {
-                        _pVerifyCodeTimer->stop();
-                    }
-                    _pVerifyCodeLineEdit->setButtonText("获取验证码");
-                    _pVerifyCodeLineEdit->setButtonEnabled(true);
+        auto status = static_cast<flicker::http::status>(responseJsonObj["response_status_code"].toInt());
+        auto message = responseJsonObj["message"].toString();
+        if (status != flicker::http::status::ok) {
+            FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, _pFormType == Launcher::FormType::Register ? NXMessageBarType::BottomRight : NXMessageBarType::BottomLeft);
+            if (message.contains("exist")) {
+                if (_pVerifyCodeTimer->isActive()) {
+                    _pVerifyCodeTimer->stop();
                 }
-                return;
+                _pVerifyCodeLineEdit->setButtonText("获取验证码");
+                _pVerifyCodeLineEdit->setButtonEnabled(true);
             }
-            FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::TopRight);
+            return;
         }
-        else {
-            SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomLeft);
-        }
+        FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Success, _pFormType == Launcher::FormType::Register ? NXMessageBarType::TopRight : NXMessageBarType::TopLeft);
         QJsonObject data = responseJsonObj["data"].toObject();
         if (data["verify_type"].toInt() == static_cast<int>(flicker::http::service::ResetPassword)) {
             _pConfirmButton->setEnabled(true);
@@ -290,8 +287,14 @@ FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJ
         });
 
     _pResponseCallbacks.insert(flicker::http::service::ResetPassword, [this](const QJsonObject& responseJsonObj) {
-        SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
+        SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomRight);
+        Q_EMIT this->switchClicked();
+        QTimer::singleShot(550, [this]() { _onSwitchSigninOrResetTextClicked(); });
+        });
 
+    _pResponseCallbacks.insert(flicker::http::service::AuthenticateUser, [this](const QJsonObject& responseJsonObj) {
+        SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomLeft);
+        Q_EMIT this->switchClicked();
         });
 }
 
@@ -564,7 +567,7 @@ void FKFormPannel::_updateConfirmButtonState()
         break;
     }
     case Launcher::FormType::ResetPassword: {
-        //isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllResetPasswordValid) == Launcher::InputValidationFlag::AllResetPasswordValid;
+        _pConfirmButton->setEnabled((_pValidationFlags & Launcher::InputValidationFlag::AllResetPasswordValid) == Launcher::InputValidationFlag::AllResetPasswordValid);
         break;
     }
     default: throw std::invalid_argument("Invalid form type");
@@ -803,7 +806,7 @@ void FKFormPannel::_onGetVerifyCodeButtonClicked()
     _pVerifyCodeTimer->start();
 
     QJsonObject requestObj, dataObj;
-    dataObj["email"] = _pEmailLineEdit->text().trimmed();
+    dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
     dataObj["verify_type"] = _pFormType == Launcher::FormType::Register
         ? static_cast<int>(flicker::http::service::Register)
         : static_cast<int>(flicker::http::service::ResetPassword);
@@ -834,7 +837,7 @@ void FKFormPannel::_onComfirmButtonClicked()
     }
     case Launcher::FormType::Register: {
         dataObj["username"] = _pUsernameLineEdit->text().trimmed();
-        dataObj["email"] = _pEmailLineEdit->text().trimmed();
+        dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
         dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
         requestObj["request_service_type"] = static_cast<int>(flicker::http::service::Register);
@@ -846,7 +849,7 @@ void FKFormPannel::_onComfirmButtonClicked()
         break;
     }
     case Launcher::FormType::Authentication: {
-        dataObj["email"] = _pEmailLineEdit->text().trimmed();
+        dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
         requestObj["request_service_type"] = static_cast<int>(flicker::http::service::AuthenticateUser);
         requestObj["data"] = dataObj;
@@ -854,11 +857,10 @@ void FKFormPannel::_onComfirmButtonClicked()
         FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::AuthenticateUser,
             "http://localhost:8080/authenticate_user",
             requestObj);
-        Q_EMIT this->switchClicked();
         break;
     }
     case Launcher::FormType::ResetPassword: {
-        dataObj["email"] = _pEmailLineEdit->text().trimmed();
+        dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
         requestObj["request_service_type"] = static_cast<int>(flicker::http::service::ResetPassword);
         requestObj["data"] = dataObj;
@@ -866,9 +868,6 @@ void FKFormPannel::_onComfirmButtonClicked()
         FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::ResetPassword,
             "http://localhost:8080/reset_password",
             requestObj);
-
-        Q_EMIT this->switchClicked();
-        _onSwitchSigninOrResetTextClicked();
         break;
     }
     default: throw std::invalid_argument("Invalid form type");

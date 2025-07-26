@@ -112,8 +112,18 @@ struct ResultGuard {
     ~ResultGuard() { if (res) mysql_free_result(res); }
 };
 
+struct StmtOutputRes {
+    my_ulonglong rowCount{ 0 };
+    my_ulonglong columnCount{ 0 };
+    std::unique_ptr<MYSQL_BIND[]> binds{ nullptr };
+    std::unique_ptr<char[]> isNull{ nullptr };
+    std::unique_ptr<unsigned long[]> lengths{ nullptr };
+    std::unique_ptr<char[]> error{ nullptr };
+    std::vector<std::vector<char>> buffers{};
+};
+
 struct varchar {
-    std::string val;
+    const char* val;
     unsigned long len;
 };
 template<typename Type>
@@ -135,9 +145,31 @@ enum class SortOrder {
     Descending  // 降序
 };
 
+// 一个能在编译期构造的、固定长度的字符串类
+template<size_t N>
+struct fixed_string {
+    std::array<char, N> data{};
+
+    consteval fixed_string(const char(&str)[N]) {
+        std::copy_n(str, N, data.begin());
+    }
+
+    auto operator<=>(const fixed_string&) const = default;
+
+    constexpr size_t size() const { return N - 1; }
+    constexpr const char* c_str() const { return data.data(); }
+    constexpr operator std::string_view() const { return { data.data(), size() }; }
+};
+
+template<size_t N>
+fixed_string(const char(&)[N]) -> fixed_string<N>;
+
+template<size_t N>
 struct OrderBy {
     SortOrder order;
-    const char* fieldName;
+    fixed_string<N + 1> fieldName; // +1 是为了包含'\0' 结尾符
+
+    auto operator<=>(const OrderBy&) const = default;
 };
 
 struct Pagination {
@@ -148,10 +180,8 @@ struct Pagination {
 // 基础数据库映射器模板类
 template<typename Entity, typename ID_TYPE>
 class FKBaseMapper {
-public:
-
     typename IntrospectiveFieldMapper<Entity>::VariantMap _fieldMappings;
-
+public:
     FKBaseMapper() {
         IntrospectiveFieldMapper<Entity> mapper;
         mapper.populateMap(_fieldMappings);
@@ -171,7 +201,7 @@ public:
     MYSQL_TIME mysqlCurrentTime() const;
 
     std::optional<Entity> findById(ID_TYPE id);
-    template <OrderBy orderBy = OrderBy{ SortOrder::Ascending, "id" },
+    template <SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 } >
     std::vector<Entity> findAll();
     DbOperator::Status insert(const Entity& entity);
@@ -182,13 +212,22 @@ public:
     template<typename... Args>
     DbOperator::Status updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
 
-    // 通用的按条件查询指定字段方法
-    template<typename ConditionType>
-    std::vector<std::unordered_map<std::string, std::string>> fetchFieldsByCondition(
+    // 通用的按条件查询指定字段方法，支持排序和分页
+    template<typename ConditionType,
+        SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
+        Pagination pagination = Pagination{ 0, 0 } >
+    std::vector<std::unordered_map<std::string, std::string>> queryFieldsByCondition(
         const std::string& tableName,
         const std::vector<std::string>& fieldNames,
         const std::string& conditionField,
         const ConditionType& conditionValue) const;
+
+    // 通用的查询实体方法，支持排序和分页
+    template<SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
+        Pagination pagination = Pagination{ 0, 0 },
+        typename... Args>
+    std::vector<Entity> queryEntities(std::string&& sql, Args&&... args) const;
+
 protected:
     // 子类必须实现的查询方法
     virtual constexpr std::string getTableName() const = 0;
@@ -208,113 +247,25 @@ protected:
 
     // 整形、浮点型、varchar、MYSQL_TIME、std::optional参数绑定方法
     template<typename... Args>
-    void bindValues(MySQLStmtPtr& stmtPtr, const Args&... args) const;
-    // 递归终止条件
-    void bindParams(MYSQL_BIND*) const {}
-    // 递归绑定参数
-    template<typename ValueType, typename... Rest>
-    void bindParams(MYSQL_BIND* binds, const ValueType& arg, const Rest&... rest) const {
-        bindSingleValue(*binds, arg);
-        bindParams(binds + 1, rest...);
+    void bindValues(MySQLStmtPtr& stmtPtr, Args&&... args) const;
+    // 使用折叠表达式替代递归
+    template<typename... Args>
+    void bindParams(MYSQL_BIND* binds, Args&&... args) const {
+        size_t index = 0;
+        (bindSingleValue(binds[index++], std::forward<Args>(args)), ...);
     }
     // 单个值绑定
     template<typename ValueType>
-    void bindSingleValue(MYSQL_BIND& bind, const ValueType& value) const;
-    
-    std::vector<Entity> fetchRows(MySQLStmtPtr& stmtPtr) const {
-        MYSQL_STMT* stmt = stmtPtr;
-        
-        my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
-        if (rowCount == 0) return {};
+    void bindSingleValue(MYSQL_BIND& bind, ValueType&& value) const;
 
-        ResultGuard resultGuard(mysql_stmt_result_metadata(stmt));
-        if (!resultGuard.res) throw DatabaseException("No metadata available for fetchRows query");
-
-        std::size_t columnCount = mysql_num_fields(resultGuard.res);
-        auto binds = std::make_unique<MYSQL_BIND[]>(columnCount);
-        auto isNull = std::make_unique<char[]>(columnCount);
-        auto lengths = std::make_unique<unsigned long[]>(columnCount);
-        auto error = std::make_unique<char[]>(columnCount);
-        std::fill_n(isNull.get(), columnCount, 0);
-        std::fill_n(error.get(), columnCount, 0);
-        
-        std::vector<std::vector<char>> buffers(columnCount);
-        for (int i = 0; i < columnCount; i++) {
-            MYSQL_FIELD* field = mysql_fetch_field_direct(resultGuard.res, i);
-
-            unsigned long bufferSize = (field->type == MYSQL_TYPE_VAR_STRING || field->type == MYSQL_TYPE_STRING)
-                ? field->length >> 2 : field->length;
-            buffers[i].resize(bufferSize + 1);
-            
-            memset(&binds[i], 0, sizeof(MYSQL_BIND));
-            binds[i].buffer_type = mysql_fetch_field_direct(resultGuard.res, i)->type;
-            binds[i].buffer = buffers[i].data();
-            binds[i].buffer_length = bufferSize;
-            binds[i].is_null = reinterpret_cast<bool*>(&isNull[i]);
-            binds[i].length = &lengths[i];
-            binds[i].error = reinterpret_cast<bool*>(&error[i]);
-        }
-        if (mysql_stmt_bind_result(stmt, binds.get())) {
-            throw DatabaseException("Failed to bind result in fetchRows: " +
-                std::string(mysql_stmt_error(stmt)));
-        }
-
-        if (mysql_stmt_store_result(stmt)) {
-            throw DatabaseException("Failed to store result in fetchRows: " +
-                std::string(mysql_stmt_error(stmt)));
-        }
-        
-        // 准备用于创建实体的临时数据
-        std::vector<const char*> rowData(columnCount);
-        std::vector<Entity> results;
-        results.reserve(rowCount);
-        // 获取所有行的结果
-        while (true) {
-            int fetch_result = mysql_stmt_fetch(stmt);
-            if (fetch_result == MYSQL_NO_DATA) {
-                break; // 没有更多数据
-            } else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {// 数据截断
-                throw DatabaseException("Fetch failed in fetchRows with error code: " + std::to_string(fetch_result));
-            }
-            
-            // 处理当前行的数据
-            for (size_t i = 0; i < columnCount; i++) {
-                if (isNull[i]) {
-                    rowData[i] = {};
-                } else {
-                    rowData[i] = static_cast<char*>(buffers[i].data());
-                }
-            }
-            
-            // 使用子类实现的方法创建实体并添加到结果集
-            results.push_back(createEntityFromRow(const_cast<char**>(rowData.data()), lengths.get()));
-        }
-        
-        return results;
-    }
 private:
-    template <OrderBy orderBy>
-    static constexpr auto buildOrderByClause() {
-        constexpr auto field = orderBy.fieldName;
-        constexpr auto direction = (orderBy.order == SortOrder::Ascending) ? " ASC" : " DESC";
-
-        return FKUtils::concat(" ORDER BY ", field, direction);
-    }
+    template <SortOrder Order, fixed_string FieldName>
+    static constexpr auto _build_order_by_clause();
     template <Pagination pagination>
-    static constexpr auto buildLimitClause() {
-        if constexpr (pagination.limit == 0 && pagination.offset == 0) {
-            return "";  // 无分页
-        }
-        else if constexpr (pagination.limit == 0) {
-            // 只有 OFFSET
-            return FKUtils::concat(" LIMIT ", std::to_string(MAX_ROW_SIZE), " OFFSET ", std::to_string(pagination.offset));
-        }
-        else {
-            // LIMIT 和 OFFSET
-            return FKUtils::concat(" LIMIT ", std::to_string(pagination.limit), 
-                    " OFFSET ", std::to_string(pagination.offset));
-        }
-    }
+    static constexpr auto _build_limit_clause();
+
+    void _process_stmt_result(MYSQL_STMT* stmt, StmtOutputRes& output) const;
+
 };
 
 #include "FKBaseMapper-inl.hpp"

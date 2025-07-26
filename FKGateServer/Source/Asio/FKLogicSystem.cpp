@@ -44,11 +44,14 @@ FKLogicSystem::FKLogicSystem()
             return;
         }
 
+        std::string email = requestRoot["data"]["email"].asString();
+        flicker::http::service serviceType = static_cast<flicker::http::service>(requestRoot["data"]["verify_type"].asInt());
+        bool is_unknow_service = !(serviceType == flicker::http::service::Register || serviceType == flicker::http::service::ResetPassword);
         // 验证必需字段
         if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::VerifyCode) ||
             !requestRoot.isMember("data") ||
-            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-            !requestRoot["data"].isMember("verify_type") || requestRoot["data"]["verify_type"].empty())
+            !requestRoot["data"].isMember("email") || email.empty() ||
+            !requestRoot["data"].isMember("verify_type") || is_unknow_service)
         {
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
             responseRoot["message"] = "The user does not have access permissions!";
@@ -56,8 +59,7 @@ FKLogicSystem::FKLogicSystem()
             flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
             return;
         }
-        std::string email = requestRoot["data"]["email"].asString();
-        flicker::http::service serviceType = static_cast<flicker::http::service>(requestRoot["data"]["verify_type"].asInt());
+        
         try {
             FKUserMapper mapper;
             bool isExists = mapper.isEmailExists(email);
@@ -75,7 +77,7 @@ FKLogicSystem::FKLogicSystem()
             case flicker::http::service::ResetPassword: {
                 if (!isExists) {
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
-                    responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist!");
+                    responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist! Please check the email address!");
                     httpResponse.result(flicker::http::status::unauthorized);
                     flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
                     return;
@@ -161,12 +163,16 @@ FKLogicSystem::FKLogicSystem()
             return;
         }
 
+        std::string username = requestRoot["data"]["username"].asString();
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
+        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
         if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::Register) ||
             !requestRoot.isMember("data") ||
-            !requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() ||
-            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty() ||
-            !requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty())
+            !requestRoot["data"].isMember("username") || username.empty() ||
+            !requestRoot["data"].isMember("email") || email.empty() ||
+            !requestRoot["data"].isMember("hashed_password") || hashedPassword.empty() ||
+            !requestRoot["data"].isMember("verify_code") || verifyCode.empty())
         {
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
             responseRoot["message"] = "Lack of necessary registration information!";
@@ -174,11 +180,6 @@ FKLogicSystem::FKLogicSystem()
             flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
             return;
         }
-
-        std::string username = requestRoot["data"]["username"].asString();
-        std::string email = requestRoot["data"]["email"].asString();
-        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
-        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
 
         // 验证码前缀（与JavaScript端constants.js中定义一致）
         const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
@@ -206,7 +207,7 @@ FKLogicSystem::FKLogicSystem()
                 if (!optionalValue) {
                     FK_SERVER_ERROR(std::format("验证码已过期或不存在: {}", email));
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::forbidden);
-                    responseRoot["message"] = "The verification code has expired, please get it again";
+                    responseRoot["message"] = "The verification code has expired! Please get it again!";
                     httpResponse.result(flicker::http::status::forbidden);
                     return false;
                 }
@@ -305,10 +306,12 @@ FKLogicSystem::FKLogicSystem()
             return;
         }
 
+        std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
         if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::Login) ||
             !requestRoot.isMember("data") || 
-            !requestRoot["data"].isMember("username") || requestRoot["data"]["username"].empty() || 
-            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty())
+            !requestRoot["data"].isMember("username") || username.empty() ||
+            !requestRoot["data"].isMember("hashed_password") || hashedPassword.empty())
         {
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
             responseRoot["message"] = "Lack of necessary login information!";
@@ -316,9 +319,6 @@ FKLogicSystem::FKLogicSystem()
             flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
             return;
         }
-
-        std::string username = requestRoot["data"].isMember("username") ? requestRoot["data"]["username"].asString() : "";
-        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
 
         try {
             // 1. 查询用户
@@ -329,7 +329,7 @@ FKLogicSystem::FKLogicSystem()
             
             if (!bcryptPassword.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
-                responseRoot["message"] = FKUtils::concat("The user '", username, "' does not exist!");
+                responseRoot["message"] = FKUtils::concat("The user '", username, "' does not exist! Please register first!");
                 httpResponse.result(flicker::http::status::unauthorized);
                 flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
                 return;
@@ -409,10 +409,12 @@ FKLogicSystem::FKLogicSystem()
             return;
         }
 
-        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::ResetPassword) ||
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
+        if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::AuthenticateUser) ||
             !requestRoot.isMember("data") ||
-            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-            !requestRoot["data"].isMember("verify_code") || requestRoot["data"]["verify_code"].empty())
+            !requestRoot["data"].isMember("email") || email.empty() ||
+            !requestRoot["data"].isMember("verify_code") || verifyCode.empty())
         {
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
             responseRoot["message"] = "Lack of necessary authenticate password reset information!";
@@ -420,9 +422,6 @@ FKLogicSystem::FKLogicSystem()
             flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
             return;
         }
-
-        std::string email = requestRoot["data"]["email"].asString();
-        std::string verifyCode = requestRoot["data"]["verify_code"].asString();
         const std::string VERIFICATION_CODE_PREFIX = "verification_code_";
 
         try {
@@ -430,7 +429,7 @@ FKLogicSystem::FKLogicSystem()
             std::optional<FKUserEntity> user = mapper.findByEmail(email);
             if (!user.has_value()) {
                 responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::conflict);
-                responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist, please register first!");
+                responseRoot["message"] = FKUtils::concat("The user '", email, "' does not exist! Please register first!");
                 httpResponse.result(flicker::http::status::conflict);
                 flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
                 return;
@@ -444,7 +443,7 @@ FKLogicSystem::FKLogicSystem()
                 if (!optionalValue) {
                     FK_SERVER_ERROR(std::format("验证码已过期或不存在: {}", email));
                     responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::forbidden);
-                    responseRoot["message"] = "The verification code has expired, please get it again";
+                    responseRoot["message"] = "The verification code has expired! Please get it again!";
                     httpResponse.result(flicker::http::status::forbidden);
                     return false;
                 }
@@ -509,10 +508,12 @@ FKLogicSystem::FKLogicSystem()
             return;
         }
 
+        std::string email = requestRoot["data"]["email"].asString();
+        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
         if (!requestRoot.isMember("request_service_type") || requestRoot["request_service_type"] != static_cast<int>(flicker::http::service::ResetPassword) ||
             !requestRoot.isMember("data") ||
-            !requestRoot["data"].isMember("email") || requestRoot["data"]["email"].empty() ||
-            !requestRoot["data"].isMember("hashed_password") || requestRoot["data"]["hashed_password"].empty())
+            !requestRoot["data"].isMember("email") || email.empty() ||
+            !requestRoot["data"].isMember("hashed_password") || hashedPassword.empty())
         {
             responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::unauthorized);
             responseRoot["message"] = "Lack of necessary reset password information!";
@@ -520,9 +521,6 @@ FKLogicSystem::FKLogicSystem()
             flicker::ostream(httpResponse.body()) << Json::writeString(Json::StreamWriterBuilder(), responseRoot);
             return;
         }
-
-        std::string email = requestRoot["data"]["email"].asString();
-        std::string hashedPassword = requestRoot["data"]["hashed_password"].asString();
 
         try {
             FKGrpcServiceClient<flicker::grpc::service::EncryptPassword> client;

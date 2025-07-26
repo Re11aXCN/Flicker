@@ -13,10 +13,10 @@ std::string FKUserEntity::toString() const {
     oss << "email='" << _email << "', ";
     oss << "password='******', "; // 不显示实际密码
     
-    oss << "createTime='" << FKUtils::format_time_point(_createTime) << "'";
+    oss << "createTime='" << FKUtils::time_point_to_str(_createTime) << "'";
     
     if (_updateTime) {
-        oss << ", updateTime='" << FKUtils::format_time_point(*_updateTime) << "'";
+        oss << ", updateTime='" << FKUtils::time_point_to_str(*_updateTime) << "'";
     }
     
     oss << "}";

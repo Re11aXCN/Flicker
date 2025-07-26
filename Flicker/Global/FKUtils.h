@@ -28,6 +28,7 @@
 #include <vector>
 #include <chrono>
 #include <cstdlib>
+#include <numeric>
 #ifdef QT_CORE_LIB
 #include <QString>
 #include <QColor>
@@ -36,6 +37,9 @@
 #include <Windows.h>
 #endif
 namespace FKUtils {
+    enum class TimeZone { Local, UTC };
+    enum class TimePrecision { WithMilliseconds, WithoutMilliseconds };
+
     namespace helper {
         // 字符串长度计算辅助函数
         inline size_t string_length(const char* str) { return std::strlen(str); }
@@ -52,6 +56,16 @@ namespace FKUtils {
             typename std::enable_if_t<std::is_arithmetic_v<T>, void> {
             result.append(std::to_string(value));
         }
+
+        template<typename Sep, typename T, std::size_t... I>
+        std::string join_vector_impl(Sep&& separator,
+            const std::vector<T>& vec,
+            std::index_sequence<I...>)
+        {
+            // 展开 vector 元素作为参数包
+            return join(std::forward<Sep>(separator), vec[I]...);
+        }
+
 //短整形高低字节交换
 #define Swap16(A) ((((std::uint16_t)(A) & 0xff00) >> 8) | (((std::uint16_t)(A) & 0x00ff) << 8))
 //长整形高低字节交换
@@ -240,6 +254,77 @@ ENDIANNESS返回结果
         
         return result;
     }
+
+    // 主函数：调用 join 并处理空 vector 情况
+    template<size_t Idx, typename Sep, typename T>
+    inline std::string join_vector(Sep&& separator, const std::vector<T>& vec)
+    {
+        if (vec.empty()) return FKUtils::join(std::forward<Sep>(separator));
+
+        return helper::join_vector_impl(
+            std::forward<Sep>(separator),
+            vec,
+            std::make_index_sequence<Idx>{}
+        );
+    }
+
+    template<typename Sep, typename Range>
+    std::string join_range(Sep&& separator, const Range& range)
+    {
+        if (std::empty(range)) return std::string();
+
+        auto it = std::begin(range);
+        auto end = std::end(range);
+
+        // 计算总长度
+        size_t totalSize = std::accumulate(
+            it, end, size_t(0),
+            [](size_t acc, const auto& item) {
+                return acc + helper::string_length(item);
+            }
+        ) + /*std::distance(it, end)*/(std::size(range) - 1) * helper::string_length(separator);
+        /*size_t count = 0;
+        for (const auto& item : range) {
+            totalSize += helper::string_length(item);
+            count++;
+        }
+        totalSize += (count - 1) * helper::string_length(separator);*/
+
+        std::string result;
+        result.reserve(totalSize);
+
+        // 添加第一个元素
+        helper::append_to_string(result, *it);
+        ++it;
+
+        // 添加后续元素
+        for (; it != end; ++it) {
+            helper::append_to_string(result, separator);
+            helper::append_to_string(result, *it);
+        }
+
+        return result;
+    }
+
+    template<typename Sep, typename Range>
+    std::string plain_join_range(Sep&& separator, const Range& range)
+    {
+        if (std::empty(range)) return std::string();
+
+        auto it = std::begin(range);
+        auto end = std::end(range);
+
+        std::string result;
+        helper::append_to_string(result, *it);
+        ++it;
+
+        for (; it != end; ++it) {
+            helper::append_to_string(result, separator);
+            helper::append_to_string(result, *it);
+        }
+
+        return result;
+    }
     
     /**
      * @brief URL 编码（类似 Qt 的 toPercentEncoding）
@@ -384,18 +469,41 @@ ENDIANNESS返回结果
         return params;
     }
 
-    // 静态方法：将时间点转换为格式化字符串
-    inline std::string format_time_point(const std::chrono::system_clock::time_point& timePoint) {
+    // 将时间点转换为格式化字符串
+    template <TimeZone Zone = TimeZone::Local, TimePrecision Precision = TimePrecision::WithMilliseconds>
+    inline std::string time_point_to_str(
+        const std::chrono::system_clock::time_point& timePoint)
+    {
         auto time = std::chrono::system_clock::to_time_t(timePoint);
-        std::stringstream ss;
-        // 使用线程安全的方式格式化时间
         std::tm tmBuf{};
+
+        // 选择时区转换函数
+        if constexpr (Zone == TimeZone::Local) {
 #ifdef _WIN32
-        localtime_s(&tmBuf, &time);
+            localtime_s(&tmBuf, &time);
 #else
-        localtime_r(&time, &tmBuf);
+            localtime_r(&time, &tmBuf);
 #endif
+        }
+        else {
+#ifdef _WIN32
+            gmtime_s(&tmBuf, &time);
+#else
+            gmtime_r(&time, &tmBuf);
+#endif
+        }
+
+        std::ostringstream ss;
         ss << std::put_time(&tmBuf, "%Y-%m-%d %H:%M:%S");
+
+        // 添加毫秒精度（如果启用）
+        if constexpr (Precision == TimePrecision::WithMilliseconds) {
+            auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+                timePoint.time_since_epoch()
+            ) % 1000;
+            ss << '.' << std::setfill('0') << std::setw(3) << milliseconds.count();
+        }
+
         return ss.str();
     }
 

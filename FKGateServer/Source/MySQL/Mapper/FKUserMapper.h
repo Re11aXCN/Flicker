@@ -57,10 +57,10 @@ protected:
     constexpr std::string deleteByEmailQuery() const;
     
     // 自定义参数绑定方法
-    void bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email, unsigned long* length) const;
+    /*void bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email, unsigned long* length) const;
     void bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username, unsigned long* length) const;
     void bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr, const std::string& password, unsigned long* passwordLength,
-                                   const std::string& email, unsigned long* emailLength) const;
+                                   const std::string& email, unsigned long* emailLength) const;*/
 
 private:
     constexpr std::string _isUsernameExistsQuery() const;
