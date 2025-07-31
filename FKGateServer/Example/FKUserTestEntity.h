@@ -1,32 +1,26 @@
 ﻿/*************************************************************************************
  *
- * @ Filename     : FKUserEntity.h
- * @ Description : 
+ * @ Filename     : FKUserTestEntity.h
+ * @ Description : 测试实体类，用于测试查询条件功能
  * 
  * @ Version     : V1.0
- * @ Author         : Re11a
- * @ Date Created: 2025/6/22
+ * @ Author      : Re11a
+ * @ Date Created: 2025/7/28
  * ======================================
  * HISTORICAL UPDATE HISTORY
  * Version: V          Modify Time:         Modified By: 
  * Modifications: 
  * ======================================
 *************************************************************************************/
-#ifndef FK_USER_ENTITY_H_
-#define FK_USER_ENTITY_H_
-
-#include <array>
-#include <string>
-#include <chrono>
-#include <optional>
+#ifndef FK_USER_TEST_ENTITY_H_
+#define FK_USER_TEST_ENTITY_H_
 
 #include "FKUtils.h"
-#include "TabularPrintable.h"
 #include "MySQL/Mapper/FKFieldMapper.hpp"
-
-class FKUserMapper;
-class FKUserEntity : public TabularPrintable {
-    friend class FKUserMapper;
+#include "MySQL/Entity/TabularPrintable.h"
+class FKUserTestMapper;
+class FKUserTestEntity : public TabularPrintable {
+    friend class FKUserTestMapper;
 public:
     using FieldTypeList = TypeList<
         std::uint32_t,                                       // id
@@ -41,10 +35,10 @@ public:
        "id", "uuid", "username", "email", "password", "create_time", "update_time"
     };
 
-    explicit FKUserEntity() = default;
-    ~FKUserEntity() = default;
+    explicit FKUserTestEntity() = default;
+    ~FKUserTestEntity() = default;
 
-    FKUserEntity(const std::string& username,
+    FKUserTestEntity(const std::string& username,
                 const std::string& email, const std::string& password)
         : _username(username), _email(email), _password(password)
     {
@@ -53,7 +47,7 @@ public:
         _password_length = static_cast<unsigned long>(_password.length());
     }
 
-    FKUserEntity(std::uint32_t id, const std::string& uuid, const std::string& username,
+    FKUserTestEntity(std::uint32_t id, const std::string& uuid, const std::string& username,
         const std::string& email, const std::string& password,
         const std::chrono::system_clock::time_point& createTime, const std::optional<std::chrono::system_clock::time_point>& updateTime)
         : _id(id), _uuid(uuid), _username(username), _email(email), _password(password), _createTime(createTime), _updateTime(updateTime) 
@@ -63,7 +57,7 @@ public:
         _password_length = static_cast<unsigned long>(_password.length());
     }
 
-    FKUserEntity(std::uint32_t id, std::string&& uuid, std::string&& username,
+    FKUserTestEntity(std::uint32_t id, std::string&& uuid, std::string&& username,
         std::string&& email, std::string&& password,
         std::chrono::system_clock::time_point&& createTime, std::optional<std::chrono::system_clock::time_point>&& updateTime)
         : _id(id), _uuid(std::move(uuid)), _username(std::move(username)), _email(std::move(email)), _password(std::move(password)), _createTime(std::move(createTime)), _updateTime(std::move(updateTime))
@@ -73,11 +67,11 @@ public:
         _password_length = static_cast<unsigned long>(_password.length());
     }
 
-    FKUserEntity(const FKUserEntity& other) = default;
-    FKUserEntity& operator=(const FKUserEntity& other) = default;
+    FKUserTestEntity(const FKUserTestEntity& other) = default;
+    FKUserTestEntity& operator=(const FKUserTestEntity& other) = default;
 
-    FKUserEntity(FKUserEntity&& other) = default;
-    FKUserEntity& operator=(FKUserEntity&& other) = default;
+    FKUserTestEntity(FKUserTestEntity&& other) = default;
+    FKUserTestEntity& operator=(FKUserTestEntity&& other) = default;
 
     // Getters
     const std::uint32_t& getId() const { return _id; }
@@ -101,16 +95,18 @@ public:
     void setCreateTime(const std::chrono::system_clock::time_point& createTime) { _createTime = createTime; }
     void setUpdateTime(const std::optional<std::chrono::system_clock::time_point>& updateTime) { _updateTime = updateTime; }
 
+    // 转换为字符串表示
     std::vector<std::string> getFieldNames() const override {
         return { FIELD_NAMES.begin(), FIELD_NAMES.end() };
     }
 
     std::vector<std::string> getFieldValues() const override {
-        return {std::to_string(_id), _uuid, _username, _email, _password,
+        return { std::to_string(_id), _uuid, _username, _email, _password,
             FKUtils::time_point_to_str(_createTime),
             _updateTime ? FKUtils::time_point_to_str(*_updateTime) : "NULL"
         };
     }
+
 private:
     std::uint32_t _id{0};
     std::string _uuid{};
@@ -126,4 +122,4 @@ private:
 };
 
 
-#endif // !FK_USER_ENTITY_H_
+#endif // !FK_USER_TEST_ENTITY_H_

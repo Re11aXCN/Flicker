@@ -15,15 +15,9 @@
 #ifndef FK_USER_MAPPER_H_
 #define FK_USER_MAPPER_H_
 
-#include <string>
-#include <vector>
-#include <optional>
-#include <memory>
-#include <mysql.h>
-
-#include "../Entity/FKUserEntity.h"
-#include "FKBaseMapper.hpp"
-class FKUserMapper : public FKBaseMapper<FKUserEntity, std::size_t> {
+#include "MySQL/Entity/FKUserEntity.h"
+#include "MySQL/Mapper/FKBaseMapper.hpp"
+class FKUserMapper final : public FKBaseMapper<FKUserEntity, std::uint32_t> {
 public:
     FKUserMapper();
     ~FKUserMapper() override = default;
@@ -38,6 +32,12 @@ public:
     std::optional<std::string> findPasswordByEmail(const std::string& email);
     std::optional<std::string> findPasswordByUsername(const std::string& username);
     
+    // 使用查询条件策略的新方法
+    //std::vector<FKUserEntity> findByCondition(const std::shared_ptr<IQueryCondition>& condition);
+    //std::optional<FKUserEntity> findOneByCondition(const std::shared_ptr<IQueryCondition>& condition);
+    //bool existsByCondition(const std::shared_ptr<IQueryCondition>& condition);
+    //DbOperator::Status updatePasswordByCondition(const std::shared_ptr<IQueryCondition>& condition, const std::string& password);
+    
 protected:
     // 实现基类的虚函数
     constexpr std::string getTableName() const override;
@@ -48,20 +48,17 @@ protected:
     
     void bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& entity) const override;
     
-    FKUserEntity createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const override;
-    
+    FKUserEntity createEntityFromBinds(MYSQL_BIND* binds, MYSQL_FIELD* fields, unsigned long* lengths,
+        char* isNulls, size_t columnCount) const override;
+    FKUserEntity createEntityFromRow(MYSQL_ROW row, MYSQL_FIELD* fields,
+        unsigned long* lengths, size_t columnCount) const override;
+
     // 自定义查询方法
     constexpr std::string findByEmailQuery() const;
     constexpr std::string findByUsernameQuery() const;
     constexpr std::string updatePasswordByEmailQuery() const;
     constexpr std::string deleteByEmailQuery() const;
     
-    // 自定义参数绑定方法
-    /*void bindEmailParam(MySQLStmtPtr& stmtPtr, const std::string& email, unsigned long* length) const;
-    void bindUsernameParam(MySQLStmtPtr& stmtPtr, const std::string& username, unsigned long* length) const;
-    void bindPasswordAndEmailParams(MySQLStmtPtr& stmtPtr, const std::string& password, unsigned long* passwordLength,
-                                   const std::string& email, unsigned long* emailLength) const;*/
-
 private:
     constexpr std::string _isUsernameExistsQuery() const;
     constexpr std::string _isEmailExistsQuery() const;

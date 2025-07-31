@@ -39,9 +39,6 @@
     <ClCompile Include="Source\Asio\FKServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\Entity\FKUserEntity.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -55,6 +52,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Example\FKUserTestMapper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Example\Test.h">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MySQL\Entity\TabularPrintable.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Example\FKTimeTestMapper.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -113,7 +122,40 @@
     <ClInclude Include="Source\MySQL\Mapper\FKFieldMapper.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper-inl.hpp">
+    <ClInclude Include="Source\MySQL\Mapper\Impl-FKBaseMapper.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\Inl-QueryCondition.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Example\FKUserTestEntity.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Example\FKUserTestMapper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\Inl-CoreStructDef.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\Inl-ValueBinder.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\Inl-QuerySort.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Mapper\Inl-TimeUtils.ipp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MySQL\Entity\TabularPrintable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FKLogger-Defend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Example\FKTimeTestMapper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Example\FKTimeTestEntity.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,7 +1,8 @@
 ﻿#include "FKAsioThreadPool.h"
 
-#include "FKLogger.h"
-#include "Source/FKConfigManager.h"
+#include "FKConfigManager.h"
+#include "FKLogger-Defend.h"
+
 SINGLETON_CREATE_CPP(FKAsioThreadPool)
 FKAsioThreadPool::FKAsioThreadPool()
     : _pIsRunning(false)

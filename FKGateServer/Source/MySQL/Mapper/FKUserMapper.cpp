@@ -1,13 +1,8 @@
 ﻿#include "FKUserMapper.h"
 
-#include <chrono>
-#include <cstring>
-#include <iomanip>
-#include <sstream>
+#
 
-#include "FKLogger.h"
-
-FKUserMapper::FKUserMapper() : FKBaseMapper<FKUserEntity, std::size_t>() {
+FKUserMapper::FKUserMapper() : FKBaseMapper<FKUserEntity, std::uint32_t>() {
 
 }
 
@@ -120,54 +115,40 @@ void FKUserMapper::bindInsertParams(MySQLStmtPtr& stmtPtr, const FKUserEntity& e
     }
 }
 
-FKUserEntity FKUserMapper::createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const {
-    if (!row) {
-        throw DatabaseException("Invalid row data");
+FKUserEntity FKUserMapper::createEntityFromBinds(MYSQL_BIND* binds, MYSQL_FIELD* fields, unsigned long* lengths,
+    char* isNulls, size_t columnCount) const 
+{
+    using tp = std::chrono::system_clock::time_point;
+    if (columnCount < 7) {
+        throw DatabaseException("Insufficient columns in result set");
     }
+    return FKUserEntity{
+        _parser.getValue<std::uint32_t>(&binds[0], lengths[0], isNulls[0], fields[0].type).value(),
+        _parser.getValue<std::string>(&binds[1], lengths[1], isNulls[1], fields[1].type).value(),
+        _parser.getValue<std::string>(&binds[2], lengths[2], isNulls[2], fields[2].type).value(),
+        _parser.getValue<std::string>(&binds[3], lengths[3], isNulls[3], fields[3].type).value(),
+        _parser.getValue<std::string>(&binds[4], lengths[4], isNulls[4], fields[4].type).value(),
+        _parser.getValue<tp>(&binds[5], lengths[5], isNulls[5], fields[5].type).value(),
+        _parser.getValue<tp>(&binds[6], lengths[6], isNulls[6], fields[6].type)
+    };
+}
 
-    std::size_t id = 0;
-    if (row[0]) {
-        id = std::atoll(std::string_view(row[0], lengths[0]).data()); //FKUtils::load_le32(row[0]);
+FKUserEntity FKUserMapper::createEntityFromRow(MYSQL_ROW row, MYSQL_FIELD* fields,
+    unsigned long* lengths, size_t columnCount) const
+{
+    using tp = std::chrono::system_clock::time_point;
+    if (columnCount < 7) {
+        throw DatabaseException("Insufficient columns in result set");
     }
-    
-    std::string uuid;
-    if (row[1]) {
-        uuid = std::string(row[1], lengths[1]);
-    }
-    
-    std::string username;
-    if (row[2]) {
-        username = std::string(row[2], lengths[2]);
-    }
-    
-    std::string email;
-    if (row[3]) {
-        email = std::string(row[3], lengths[3]);
-    }
-    
-    std::string password;
-    if (row[4]) {
-        password = std::string(row[4], lengths[4]);
-    }
-    
-    std::chrono::system_clock::time_point createTime;
-    uint64_t createTimeMs = 0;
-    if (row[5]) {
-        createTimeMs = (uint64_t)std::atof(std::string_view(row[5], lengths[5]).data()); //FKUtils::load_le64(row[5]);
-    }
-
-    uint64_t updateTimeMs = 0;
-    if (row[6]) {
-        updateTimeMs = (uint64_t)std::atof(std::string_view(row[6], lengths[6]).data());
-    }
-    
-    using sc = std::chrono::system_clock;
-    return FKUserEntity(id, std::move(uuid), std::move(username), std::move(email), std::move(password),
-        std::move(sc::time_point{std::chrono::milliseconds{createTimeMs}}),
-        std::move(updateTimeMs == 0 
-            ? std::optional<sc::time_point>{}
-            : std::optional<sc::time_point>{ sc::time_point{std::chrono::milliseconds{updateTimeMs}} })
-    );
+    return FKUserEntity{
+        _parser.getValue<std::uint32_t>(row, 0, lengths, false, fields[0].type).value(),
+        _parser.getValue<std::string>(row, 1, lengths, false, fields[1].type).value(),
+        _parser.getValue<std::string>(row, 2, lengths, false, fields[2].type).value(),
+        _parser.getValue<std::string>(row, 3, lengths, false, fields[3].type).value(),
+        _parser.getValue<std::string>(row, 4, lengths, false, fields[4].type).value(),
+        _parser.getValue<tp>(row, 5, lengths, false, fields[5].type).value(),
+        _parser.getValue<tp>(row, 6, lengths, ResultSetParser::isFieldNull(row, 6), fields[6].type)
+    };
 }
 
 std::optional<FKUserEntity> FKUserMapper::findByEmail(const std::string& email) {
@@ -178,7 +159,7 @@ std::optional<FKUserEntity> FKUserMapper::findByEmail(const std::string& email) 
             return std::nullopt;
         }
         
-        return results[0];
+        return results.front();
     } catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("findByEmail error: {}", e.what()));
         throw;
@@ -193,7 +174,7 @@ std::optional<FKUserEntity> FKUserMapper::findByUsername(const std::string& user
             return std::nullopt;
         }
         
-        return results[0];
+        return results.front();
     } catch (const std::exception& e) {
         FK_SERVER_ERROR(std::format("findByUsername error: {}", e.what()));
         throw;
@@ -203,14 +184,15 @@ std::optional<FKUserEntity> FKUserMapper::findByUsername(const std::string& user
 DbOperator::Status FKUserMapper::updatePasswordByEmail(const std::string& email, const std::string& password) 
 {
     try {
-        MySQLStmtPtr stmtPtr = prepareStatement(updatePasswordByEmailQuery());
-        if (!stmtPtr.isValid()) {
+        std::string query = updatePasswordByEmailQuery();
+        MySQLStmtPtr stmtPtr = prepareStatement(query);
+        if (!stmtPtr && !stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for updatePasswordByEmail");
         }
 
         bindValues(stmtPtr, 
             varchar{ password.data(), static_cast<unsigned long>(password.length()) },
-            mysqlCurrentTime(),
+            MysqlTimeUtils::mysqlCurrentTime(),
             varchar{ email.data(), static_cast<unsigned long>(email.length()) }
         );
         executeQuery(stmtPtr);
@@ -231,8 +213,9 @@ DbOperator::Status FKUserMapper::updatePasswordByEmail(const std::string& email,
 DbOperator::Status FKUserMapper::deleteByEmail(const std::string& email) 
 {
     try {
-        MySQLStmtPtr stmtPtr = prepareStatement(deleteByEmailQuery());
-        if (!stmtPtr.isValid()) {
+        std::string query = deleteByEmailQuery();
+        MySQLStmtPtr stmtPtr = prepareStatement(query);
+        if (!stmtPtr && !stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for deleteByEmail");
         }
         bindValues(stmtPtr, varchar{ email.data(), static_cast<unsigned long>(email.length()) });
@@ -253,8 +236,9 @@ DbOperator::Status FKUserMapper::deleteByEmail(const std::string& email)
 bool FKUserMapper::isUsernameExists(const std::string& username)
 {
     try {
-        MySQLStmtPtr stmtPtr = prepareStatement(_isUsernameExistsQuery());
-        if (!stmtPtr.isValid()) {
+        std::string query = _isUsernameExistsQuery();
+        MySQLStmtPtr stmtPtr = prepareStatement(query);
+        if (!stmtPtr && !stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for isUsernameExists");
         }
 
@@ -278,8 +262,9 @@ bool FKUserMapper::isUsernameExists(const std::string& username)
 bool FKUserMapper::isEmailExists(const std::string& email)
 {
     try {
-        MySQLStmtPtr stmtPtr = prepareStatement(_isEmailExistsQuery());
-        if (!stmtPtr.isValid()) {
+        std::string query = _isEmailExistsQuery();
+        MySQLStmtPtr stmtPtr = prepareStatement(query);
+        if (!stmtPtr && !stmtPtr.isValid()) {
             throw DatabaseException("Failed to prepare statement for isEmailExists");
         }
 
@@ -303,26 +288,17 @@ bool FKUserMapper::isEmailExists(const std::string& email)
 std::optional<std::string> FKUserMapper::findPasswordByEmail(const std::string& email)
 {
     try {
-        std::vector<std::string> fields = {"password"};
-        std::vector<std::string> values = {email};
-        auto results = queryFieldsByCondition<>(
-            getTableName(),
-            fields,
-            "email = ?",
-            values
-        );
+        std::vector<std::string> fields{"password"};
+        auto bindCondition = QueryConditionBuilder::eq_("email", varchar{ email.data(), (unsigned long)email.length() });
+        auto results = queryFieldsByCondition<>(bindCondition, fields);
         
         if (results.empty()) {
             return std::nullopt;
         }
         
-        const auto& row = results[0];
-        auto it = row.find("password");
-        if (it != row.end() && !it->second.empty()) {
-            return it->second;
-        }
-        
-        return std::nullopt;
+        const auto& row = results.front();
+        auto [passwordOpt, status] = getFieldMapValue<std::string>(row, "password");
+        return passwordOpt;
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("findPasswordByEmail error: {}", e.what()));
@@ -333,27 +309,17 @@ std::optional<std::string> FKUserMapper::findPasswordByEmail(const std::string& 
 std::optional<std::string> FKUserMapper::findPasswordByUsername(const std::string& username)
 {
     try {
-        std::vector<std::string> fields = {"password"};
-        std::vector<std::string> values = {username};
-
-        auto results = queryFieldsByCondition<>(
-            getTableName(),
-            fields,
-            "username = ?",
-            values
-        );
+        std::vector<std::string> fields = { "password" };
+        auto bindCondition = QueryConditionBuilder::eq_("username", varchar{ username.data(), (unsigned long)username.length() });
+        auto results = queryFieldsByCondition<>(bindCondition, fields);
         
         if (results.empty()) {
             return std::nullopt;
         }
         
-        const auto& row = results[0];
-        auto it = row.find("password");
-        if (it != row.end() && !it->second.empty()) {
-            return it->second;
-        }
-        
-        return std::nullopt;
+        const auto& row = results.front();
+        auto [passwordOpt, status] = getFieldMapValue<std::string>(row, "password");
+        return passwordOpt;
     }
     catch (const DatabaseException& e) {
         FK_SERVER_ERROR(std::format("findPasswordByUsername error: {}", e.what()));

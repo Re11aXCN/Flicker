@@ -21,6 +21,11 @@
 #ifndef FK_HTTPCONNECTION_H_
 #define FK_HTTPCONNECTION_H_
 
+#include <string>
+#include <unordered_map>
+#include <atomic>
+#include <functional>
+
 #include <boost/beast/http.hpp>
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>

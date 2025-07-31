@@ -1,8 +1,9 @@
 ﻿#include "FKHttpConnection.h"
 
-#include "FKLogger.h"
-#include "FKUtils.h"
 #include "Asio/FKLogicSystem.h"
+#include "FKUtils.h"
+#include "FKLogger-Defend.h"
+
 FKHttpConnection::FKHttpConnection(boost::asio::io_context& ioc)
     : _pSocket(ioc)
     , _pBuffer{ 8192 }

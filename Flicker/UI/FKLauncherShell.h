@@ -3,11 +3,11 @@
 
 #include <NXWidget.h>
 #include <NXMessageButton.h>
+#include <NXShadowWidget.h>
 class QPropertyAnimation;
 class QParallelAnimationGroup;
 class FKFormPannel;
 class FKSwitchPannel;
-class FKShadowWidget;
 class FKLauncherShell : public NXWidget
 {
     Q_OBJECT
@@ -31,7 +31,7 @@ private:
     // 面板
     FKFormPannel* _pFormPannel{ nullptr };
     FKSwitchPannel* _pSwitchPannel{ nullptr };
-    FKShadowWidget* _pShadowWidget{ nullptr };
+    NXShadowWidget* _pShadowWidget{ nullptr };
     // 动画
     QParallelAnimationGroup* _pAnimationGroup{ nullptr };
     QPropertyAnimation* _pSwitchPannelAnimation{ nullptr };

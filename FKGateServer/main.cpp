@@ -1,17 +1,25 @@
-﻿
+﻿#pragma warning(push)
+#pragma warning(disable:4251)
 #include <functional>
 #include <iostream>
 #include <json/json.h>
 
+#include "FKLogger-Defend.h"
 //WinSock has defined an error that triggers boost if the mysql header file is in front
 #include "Asio/FKServer.h"
 #include <mysql.h>
 
 #include "Source/FKConfigManager.h"
-#include "FKLogger.h"
 #include "MySQL/FKMySQLConnectionPool.h"
+#define _TEST_
+#ifdef _TEST_
+#include "Example/Test.h"
+#endif
 int main(int argc, char* argv[])
 {
+#ifdef _TEST_
+    return TEST_MAPPER_FUNC();
+#else
     try
     {
         FK_SERVER_TRACE("活动连接数: {}", 1);
@@ -82,4 +90,6 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
+#endif
 }
+#pragma warning(pop)

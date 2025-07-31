@@ -16,20 +16,21 @@
 #define FK_MYSQL_CONNECTION_POOL_H_
 
 #include <string>
-#include <vector>
+#include <format>
 #include <queue>
-#include <mutex>
 #include <memory>
-#include <chrono>
-#include <functional>
+#include <mutex>
 #include <thread>
 #include <atomic>
 #include <condition_variable>
 
+#include <mysql.h>
+
 #include "FKMacro.h"
-#include "FKLogger.h"
-#include "Source/FKStructConfig.h"
+#include "FKLogger-Defend.h"
+#include "FKStructConfig.h"
 #include "FKMySQLConnection.h"
+
 class FKMySQLConnectionPool {
     SINGLETON_CREATE_H(FKMySQLConnectionPool)
         

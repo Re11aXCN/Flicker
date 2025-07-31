@@ -16,19 +16,22 @@
 #define FK_GRPC_SERVICE_POOL_MANAGER_H_
 
 #include <string>
-#include <memory>
 #include <unordered_map>
-#include <chrono>
+#include <functional>
+#include <memory>
 #include <mutex>
-
 
 #include "FKDef.h"
 #include "FKMacro.h"
+#include "FKStructConfig.h"
 #include "FKGrpcConnectionPool.hpp"
-#include "Source/FKStructConfig.h"
 
 #pragma region SERVICE_TRAITS_TEMPLATE
+#pragma warning(push)
+#pragma warning(disable:4251)
+#pragma warning(disable:4267)
 #include "FKGrpcService.grpc.pb.h"
+#pragma warning(pop)
 
 // 服务特性模板
 template <flicker::grpc::service T> struct ServiceTraits;

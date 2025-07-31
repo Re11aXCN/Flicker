@@ -1,8 +1,10 @@
 ﻿#include "FKGrpcServicePoolManager.h"
+
+#include <sstream>
 #include <magic_enum/magic_enum.hpp>
 
-#include "FKLogger.h"
-#include "Source/FKConfigManager.h"
+#include "FKConfigManager.h"
+#include "FKLogger-Defend.h"
 
 SINGLETON_CREATE_SHARED_CPP(FKGrpcServicePoolManager)
 

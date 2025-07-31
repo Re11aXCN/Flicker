@@ -507,6 +507,56 @@ ENDIANNESS返回结果
         return ss.str();
     }
 
+    template <TimeZone Zone = TimeZone::Local,
+        TimePrecision Precision = TimePrecision::WithMilliseconds>
+    inline std::chrono::system_clock::time_point str_to_time_point(
+        const std::string& str)
+    {
+        std::tm tm = {};
+        std::istringstream ss(str);
+        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+
+        if (ss.fail()) {
+            throw std::runtime_error("Failed to parse time string");
+        }
+
+        // 解析毫秒部分（如果启用）
+        int milliseconds = 0;
+        if constexpr (Precision == TimePrecision::WithMilliseconds) {
+            if (ss.peek() == '.') {
+                ss.ignore();
+                ss >> milliseconds;
+                if (milliseconds < 0 || milliseconds > 999) {
+                    throw std::runtime_error("Invalid milliseconds value");
+                }
+            }
+            else {
+                throw std::runtime_error("Expected milliseconds component");
+            }
+        }
+
+        // 转换为 time_t（根据时区选择函数）
+        std::time_t time;
+        if constexpr (Zone == TimeZone::Local) {
+            time = std::mktime(&tm);
+        }
+        else { // UTC 处理
+#ifdef _WIN32
+            time = _mkgmtime(&tm);
+#else
+            time = timegm(&tm);
+#endif
+        }
+
+        if (time == -1) {
+            throw std::runtime_error("Invalid time structure");
+        }
+
+        // 转换为 time_point 并添加毫秒
+        auto tp = std::chrono::system_clock::from_time_t(time);
+        return tp + std::chrono::milliseconds(milliseconds);
+    }
+
     // 获取HTTP日期格式的当前时间
     inline std::string get_gmtime() {
         // 获取当前时间点

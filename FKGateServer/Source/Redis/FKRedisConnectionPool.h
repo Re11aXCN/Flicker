@@ -16,18 +16,20 @@
 #define FK_REDIS_CONNECTION_POOL_H_
 
 #include <string>
-#include <vector>
 #include <queue>
+#include <chrono>
+#include <functional>
 #include <mutex>
 #include <memory>
-#include <chrono>
 
-#include <functional>
+#pragma warning(push)
+#pragma warning(disable:4200)
 #include <sw/redis++/redis++.h>
-#include "FKMacro.h"
-#include "FKLogger.h"
-#include "Source/FKStructConfig.h"
+#pragma warning(pop)
 
+#include "FKMacro.h"
+#include "FKStructConfig.h"
+#include "FKLogger-Defend.h"
 // Redis连接池类，使用单例模式
 class FKRedisConnectionPool {
     SINGLETON_CREATE_SHARED_H(FKRedisConnectionPool)

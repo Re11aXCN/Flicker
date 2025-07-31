@@ -16,20 +16,23 @@
 #ifndef FK_GRPC_CONNECTION_POOL_H_
 #define FK_GRPC_CONNECTION_POOL_H_
 
-#include <grpcpp/grpcpp.h>
 #include <string>
-#include <string_view>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <memory>
 #include <atomic>
 #include <chrono>
-#include <functional>
 
+#pragma warning(push)
+#pragma warning(disable:4251)
+#pragma warning(disable:4267)
+#include <grpcpp/grpcpp.h>
+#pragma warning(pop)
 
-#include "FKLogger.h"
-#include "Source/FKStructConfig.h"
+#include "FKStructConfig.h"
+#include "FKLogger-Defend.h"
+
 struct FKGrpcServiceConfig;
 template <typename ServiceType>
 class FKGrpcConnectionPool {

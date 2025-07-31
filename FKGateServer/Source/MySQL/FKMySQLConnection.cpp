@@ -1,6 +1,6 @@
 ﻿#include "FKMySQLConnection.h"
 
-#include "FKLogger.h"
+#include "FKLogger-Defend.h"
 
 FKMySQLConnection::FKMySQLConnection(MYSQL* mysql)
     : _mysql(mysql), _lastActiveTime(std::chrono::steady_clock::now()) {

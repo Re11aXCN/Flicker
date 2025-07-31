@@ -9,7 +9,6 @@
 #include "FKConstant.h"
 #include "Components/FKFormPannel.h"
 #include "Components/FKSwitchPannel.h"
-#include "Components/FKShadowWidget.h"
 
 FKLauncherShell::FKLauncherShell(QWidget* parent /*= nullptr*/)
     : NXWidget(parent)
@@ -64,7 +63,7 @@ void FKLauncherShell::_initUi()
     _pMessageButton = new NXMessageButton(this);
     _pFormPannel = new FKFormPannel(this);
     _pSwitchPannel = new FKSwitchPannel(this);
-    _pShadowWidget = new FKShadowWidget(this);
+    _pShadowWidget = new NXShadowWidget(this);
 
     _pMessageButton->setFixedSize(1, 1);
     _pMessageButton->setVisible(false);

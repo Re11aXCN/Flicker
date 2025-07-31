@@ -1,17 +1,16 @@
 ﻿#include "FKLogicSystem.h"
 
-#include <random>
-#include <string>
-#include <vector>
 #include <json/json.h>
+#include <magic_enum/magic_enum.hpp>
 
-#include "FKLogger.h"
-#include "FKUtils.h"
 #include "Asio/FKHttpConnection.h"
 #include "Redis/FKRedisConnectionPool.h"
 #include "MySQL/Entity/FKUserEntity.h"
 #include "MySQL/Mapper/FKUserMapper.h"
 #include "Grpc/FKGrpcServiceClient.hpp"
+
+#include "FKUtils.h"
+#include "FKLogger-Defend.h"
 
 using namespace FKGrpcService;
 SINGLETON_CREATE_SHARED_CPP(FKLogicSystem)
@@ -251,8 +250,8 @@ FKLogicSystem::FKLogicSystem()
                 if (grpcStatus.ok()) {
                     FKUserMapper mapper;
                     // 插入用户
-                    auto result = mapper.insert(FKUserEntity{ username, email, grpcResponse.encrypted_password() });
-                    if (result == DbOperator::Status::Success) [[likely]] {
+                    auto [status, affectedRows] = mapper.insert(FKUserEntity{ username, email, grpcResponse.encrypted_password() });
+                    if (status == DbOperator::Status::Success) [[likely]] {
                         Json::Value dataObj;
                         dataObj["request_service_type"] = requestRoot["request_service_type"];
                         responseRoot["response_status_code"] = static_cast<int>(flicker::http::status::ok);

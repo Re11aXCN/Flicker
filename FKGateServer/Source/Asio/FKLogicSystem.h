@@ -15,19 +15,14 @@
 #ifndef FK_LOGICSYSTEM_H_
 #define FK_LOGICSYSTEM_H_
 
-#include <functional>
+#include <string>
 #include <unordered_map>
-#include <mutex>
-#include <queue>
-#include <condition_variable>
-#include <thread>
-#include <atomic>
+#include <functional>
 #include <memory>
 
 #include <boost/beast/http.hpp>
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
-#include <json/json.h>
 
 #include "FKDef.h"
 #include "FKMacro.h"

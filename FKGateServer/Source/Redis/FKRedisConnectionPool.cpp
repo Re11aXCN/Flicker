@@ -1,8 +1,9 @@
 ﻿#include "FKRedisConnectionPool.h"
+
 #include <sstream>
 
-#include "FKLogger.h"
-#include "Source/FKConfigManager.h"
+#include "FKConfigManager.h"
+#include "FKLogger-Defend.h"
 
 SINGLETON_CREATE_SHARED_CPP(FKRedisConnectionPool)
 

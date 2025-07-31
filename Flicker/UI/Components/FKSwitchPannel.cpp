@@ -15,8 +15,6 @@
 #include "FKUtils.h"
 
 #include "Components/FKPushButton.h"
-#include "Components/NXBoxShadowEffect.h"
-#include "Components/FKShadowWidget.h"
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
     : QWidget(parent)
     , _pLoginOpacity{ 1.0 }

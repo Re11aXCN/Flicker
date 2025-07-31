@@ -1,9 +1,7 @@
 ﻿#include "FKMySQLConnectionPool.h"
 
-#include <sstream>
 #include "FKUtils.h"
-#include "FKLogger.h"
-#include "Source/FKConfigManager.h"
+#include "FKConfigManager.h"
 
 SINGLETON_CREATE_CPP(FKMySQLConnectionPool)
 static const std::string read_default_file = FKUtils::concat(FKUtils::get_env_a<"MYSQL_HOME">(), FKUtils::local_separator(), "data", FKUtils::local_separator(), "my.ini");

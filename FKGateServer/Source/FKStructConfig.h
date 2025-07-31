@@ -1,8 +1,9 @@
 ﻿#ifndef FK_STRUCT_CONFIG_H_
 #define FK_STRUCT_CONFIG_H_
-#include <string>
+
 #include <chrono>
-#include <thread>
+#include <string>
+
 struct FKAsioThreadPoolConfig {
     uint16_t ThreadCount{ static_cast<uint16_t>(std::thread::hardware_concurrency() / 2) }; // 默认为系统核心数的一半
     uint16_t ChannelCapacity{ 1024 }; // 默认为1024

@@ -17,121 +17,25 @@
 
 #include <string>
 #include <vector>
-#include <ranges>
-#include <chrono>
+#include <any>
 #include <unordered_map>
+#include <ranges>
 #include <optional>
+#include <chrono>
+
 #include <memory>
-#include <mutex>
 #include <utility>
 #include <stdexcept>
 #include <algorithm>
+
 #include <mysql.h>
 
-#include "../FKMySQLConnectionPool.h"
 #include "FKDef.h"
-#include "FKLogger.h"
 #include "FKUtils.h"
 #include "FKFieldMapper.hpp"
-#define MAX_ROW_SIZE 18446744073709551615  
-// 数据库异常类
-class DatabaseException : public std::runtime_error {
-public:
-    explicit DatabaseException(const std::string& message) : std::runtime_error(message) {}
-};
-// MySQL语句智能指针，用于自动管理MYSQL_STMT资源
-class MySQLStmtPtr {
-private:
-    MYSQL_STMT* _stmt;
-    bool _released;
+#include "MySQL/FKMySQLConnectionPool.h"
 
-public:
-    explicit MySQLStmtPtr(MYSQL_STMT* stmt) : _stmt(stmt), _released(false) {}
-
-    ~MySQLStmtPtr() {
-        release();
-    }
-
-    // 禁止复制
-    MySQLStmtPtr(const MySQLStmtPtr&) = delete;
-    MySQLStmtPtr& operator=(const MySQLStmtPtr&) = delete;
-
-    // 允许移动
-    MySQLStmtPtr(MySQLStmtPtr&& other) noexcept : _stmt(other._stmt), _released(other._released) {
-        other._stmt = nullptr;
-        other._released = true;
-    }
-
-    MySQLStmtPtr& operator=(MySQLStmtPtr&& other) noexcept {
-        if (this != &other) {
-            release();
-            _stmt = other._stmt;
-            _released = other._released;
-            other._stmt = nullptr;
-            other._released = true;
-        }
-        return *this;
-    }
-
-    // 获取原始指针
-    MYSQL_STMT* get() const {
-        return _stmt;
-    }
-
-    // 释放资源
-    void release() {
-        if (_stmt && !_released) {
-            mysql_stmt_close(_stmt);
-            _released = true;
-        }
-        _stmt = nullptr;
-    }
-
-    // 转换为原始指针
-    operator MYSQL_STMT* () const {
-        return _stmt;
-    }
-
-    // 检查是否有效
-    bool isValid() const {
-        return _stmt != nullptr && !_released;
-    }
-
-    // 释放所有权（不关闭语句）
-    MYSQL_STMT* release_ownership() {
-        MYSQL_STMT* temp = _stmt;
-        _stmt = nullptr;
-        _released = true;
-        return temp;
-    }
-};
-
-struct ResultGuard {
-    MYSQL_RES* res;
-    ResultGuard(MYSQL_RES* r) : res(r) {}
-    ~ResultGuard() { if (res) mysql_free_result(res); }
-};
-
-struct StmtOutputRes {
-    my_ulonglong rowCount{ 0 };
-    my_ulonglong columnCount{ 0 };
-    std::unique_ptr<MYSQL_BIND[]> binds{ nullptr };
-    std::unique_ptr<char[]> isNull{ nullptr };
-    std::unique_ptr<unsigned long[]> lengths{ nullptr };
-    std::unique_ptr<char[]> error{ nullptr };
-    std::vector<std::vector<char>> buffers{};
-};
-
-struct varchar {
-    const char* val;
-    unsigned long len;
-};
-template<typename Type>
-struct is_varchar_type : std::false_type {};
-template<>
-struct is_varchar_type<varchar> : std::true_type {};
-template<typename Type>
-inline constexpr bool is_varchar_type_v = is_varchar_type<Type>::value;
+#define MAX_ROW_SIZE_U64 18446744073709551615  
 
 template<typename Type>
 struct is_optional_type : std::false_type {};
@@ -140,48 +44,73 @@ struct is_optional_type<std::optional<Type>> : std::true_type {};
 template<typename Type>
 inline constexpr bool is_optional_type_v = is_optional_type<Type>::value;
 
-enum class SortOrder {
-    Ascending,  // 升序
-    Descending  // 降序
-};
+//< Use std::chrono::to convert the current time to the MYSQL_TIME type
+// 
+//< Convert MYSQL_TIME to std::chrono::system_clock::time_point,
+//  only MYSQL_TIMESTAMP_DATETIME and MYSQL_TIMESTAMP_DATE conversions are supported
+//  other types will throw std::runtime_error , /*Future maybe support convert to std::string?*/
+#include "Inl-TimeUtils.ipp"
 
-// 一个能在编译期构造的、固定长度的字符串类
-template<size_t N>
-struct fixed_string {
-    std::array<char, N> data{};
+//< {MYSQL_STMT}:
+//   MySQL statement intelligent pointers<like std::unique_ptr<MYSQL_STMT>> for automatic management of MYSQL_STMT resources
+//   destructors will automatically call "mysql_stmt_close"
+//
+//< {DatabaseException}:
+//   DatabaseException is std::runtime_error with additional information of the error
+//
+//< {ResultSetParser}:
+//   ResultSetParser will parse the data in memory after the output MYSQL_BIND or
+//   fetch MYSQL_ROW after the mysql_query execution or mysql_stmt_execute execution,
+//   and then parse the data in memory to obtain the C++ data type
+//
+//< {ResultGuard}:
+//   ResultGuard is a RAII class for automatic management of MYSQL_RES resources
+//   destructors will automatically call "mysql_free_result"
+// 
+//< {BindableParam}、{ExpressionParam}、{Separator}:
+//   Used to updateFieldsByCondition parameter package limit
+// 
+// 
+//   For details, please read the function of document browsing
+#include "Inl-CoreStructDef.ipp"
 
-    consteval fixed_string(const char(&str)[N]) {
-        std::copy_n(str, N, data.begin());
-    }
+//< Mysql query result set sorting and pagination,
+//  {SortOrder} enum       : ascending and descending,
+//  {Pagination} pagination: limit, offset,
+//  {fixed_string}         : sorting according to defined string targets
+// 
+//  "SELECT * FROM table_name ORDER BY <fixed_string> <SortOrder.Ascending/Descending> LIMIT <Pagination.limit> OFFSET <Pagination.offset>";
+//  "SELECT * FROM table_name ORDER BY field_name ASC/DESC LIMIT offset, limit";
+#include "Inl-QuerySort.ipp"
 
-    auto operator<=>(const fixed_string&) const = default;
+//< MYSQL_STMT preprocess the binding, and use {ValueBinder} - the collapsed expression
+//  to expand the specific <SET/WHERE> condition parameter type of the binding
+// 
+//< If the query field type is a string, use the {varchar} struct 
+//  as a parameter pass instead of std::string
+#include "Inl-ValueBinder.ipp"
 
-    constexpr size_t size() const { return N - 1; }
-    constexpr const char* c_str() const { return data.data(); }
-    constexpr operator std::string_view() const { return { data.data(), size() }; }
-};
+//< Provide value query conditions, such as =, <>, >=, >, <, <=,
+//  provide range conditions, BETWEEN AND,
+//  provide multi - conditional combinations, AND, OR, NOT,
+//  provide collection operations, IN, NOT IN,
+//  provide fuzzy queries, LIKE, REGEXP,
+//  provide null value check, IS NULL, IS NOT NULL,
+//  provide the extension of native SQL fragment queries
+//
+//< You can use {QueryConditionBuilder} for quick construction
+#include "Inl-QueryCondition.ipp"
 
-template<size_t N>
-fixed_string(const char(&)[N]) -> fixed_string<N>;
-
-template<size_t N>
-struct OrderBy {
-    SortOrder order;
-    fixed_string<N + 1> fieldName; // +1 是为了包含'\0' 结尾符
-
-    auto operator<=>(const OrderBy&) const = default;
-};
-
-struct Pagination {
-    size_t limit;
-    size_t offset;
-};
-
-// 基础数据库映射器模板类
 template<typename Entity, typename ID_TYPE>
 class FKBaseMapper {
+protected:
     typename IntrospectiveFieldMapper<Entity>::VariantMap _fieldMappings;
+    ResultSetParser _parser; // 结果集解析器
 public:
+    using EntityRows = std::vector<Entity>;
+    using FieldMap = std::unordered_map<std::string, std::any>;
+    using FieldMapRows = std::vector<FieldMap>;
+    using StatusWithAffectedRows = std::pair<DbOperator::Status, std::size_t>;
     FKBaseMapper() {
         IntrospectiveFieldMapper<Entity> mapper;
         mapper.populateMap(_fieldMappings);
@@ -198,36 +127,58 @@ public:
     template<typename ValueType>
     std::optional<ValueType> getFieldValue(const std::string& fieldName) const;
 
-    MYSQL_TIME mysqlCurrentTime() const;
-
     std::optional<Entity> findById(ID_TYPE id);
     template <SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 } >
-    std::vector<Entity> findAll();
-    DbOperator::Status insert(const Entity& entity);
-    DbOperator::Status deleteById(ID_TYPE id);
+    EntityRows findAll();
+    StatusWithAffectedRows insert(const Entity& entity);
+    StatusWithAffectedRows deleteById(ID_TYPE id);
 
     // 安全的字段更新方法 - 使用字段名称列表和对应的值来防止SQL注入
     // 示例用法: updateFieldsByIdSafe(id, {"field1", "field2"}, value1, value2);
     template<typename... Args>
-    DbOperator::Status updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
-
-    // 通用的按条件查询指定字段方法，支持排序和分页
-    template<typename ConditionType,
-        SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
-        Pagination pagination = Pagination{ 0, 0 } >
-    std::vector<std::unordered_map<std::string, std::string>> queryFieldsByCondition(
-        const std::string& tableName,
-        const std::vector<std::string>& fieldNames,
-        const std::string& conditionField,
-        const ConditionType& conditionValue) const;
+    StatusWithAffectedRows updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
 
     // 通用的查询实体方法，支持排序和分页
     template<SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 },
-        typename... Args>
-    std::vector<Entity> queryEntities(std::string&& sql, Args&&... args) const;
+        typename... Args >
+    EntityRows queryEntities(std::string&& sql, Args&&... args) const;
 
+    // 使用查询条件策略的实体查询方法
+    template<SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
+        Pagination pagination = Pagination{ 0, 0 } >
+    EntityRows queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+
+    // 使用查询条件策略的更新方法
+    template<typename... Args>
+    StatusWithAffectedRows updateFieldsByCondition(const std::unique_ptr<IQueryCondition>& condition,
+        const std::vector<std::string>& fieldNames,
+        Args&&... args) const;
+    // 使用查询条件策略的通用查询方法
+    template<SortOrder Order = SortOrder::Ascending, fixed_string FieldName = "id",
+        Pagination pagination = Pagination{ 0, 0 }>
+    FieldMapRows queryFieldsByCondition(
+        const std::unique_ptr<IQueryCondition>& condition,
+        const std::vector<std::string>& fieldNames) const;
+
+    // 使用查询条件策略的计数方法
+    size_t countByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+
+    // 使用查询条件策略的删除方法
+    StatusWithAffectedRows deleteByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+    StatusWithAffectedRows deleteAll() const;
+
+    enum class GetFieldMapResStatus {
+        Success,
+        BadCast,
+        NotFound//OutOfRange,
+    };
+    template<typename ValueType>
+    auto getFieldMapValue(const FieldMap& fieldMap, const std::string& fieldName) const -> std::pair<std::optional<ValueType>, GetFieldMapResStatus>;
+    template<typename ValueType>
+    ValueType getFieldMapValueOrDefault(const FieldMap& fieldMap, const std::string& fieldName,
+        ValueType defaultValue) const;
 protected:
     // 子类必须实现的查询方法
     virtual constexpr std::string getTableName() const = 0;
@@ -240,34 +191,39 @@ protected:
     virtual void bindInsertParams(MySQLStmtPtr& stmtPtr, const Entity& entity) const = 0;
 
     // 子类必须实现的结果处理方法
-    virtual Entity createEntityFromRow(MYSQL_ROW row, unsigned long* lengths) const = 0;
-
-    MySQLStmtPtr prepareStatement(std::string query) const;
-    void executeQuery(MySQLStmtPtr& stmtPtr) const;
-
+    virtual Entity createEntityFromBinds(MYSQL_BIND* binds, MYSQL_FIELD* fields, unsigned long* lengths,
+        char* isNulls, size_t columnCount) const = 0;
+    virtual Entity createEntityFromRow(MYSQL_ROW row, MYSQL_FIELD* fields, 
+        unsigned long* lengths, size_t columnCount) const = 0;
+    
     // 整形、浮点型、varchar、MYSQL_TIME、std::optional参数绑定方法
     template<typename... Args>
     void bindValues(MySQLStmtPtr& stmtPtr, Args&&... args) const;
-    // 使用折叠表达式替代递归
     template<typename... Args>
-    void bindParams(MYSQL_BIND* binds, Args&&... args) const {
-        size_t index = 0;
-        (bindSingleValue(binds[index++], std::forward<Args>(args)), ...);
-    }
-    // 单个值绑定
-    template<typename ValueType>
-    void bindSingleValue(MYSQL_BIND& bind, ValueType&& value) const;
+    void bindValues(MySQLStmtPtr& stmtPtr, MYSQL_BIND* existingBinds, size_t& startIndex, Args&&... args) const;
+    void bindConditionValues(MySQLStmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition) const;
+    void bindConditionValues(MySQLStmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition, MYSQL_BIND* existingBinds, size_t& startIndex) const;
 
-private:
+    MySQLStmtPtr prepareStatement(const std::string& query) const;
+    void executeQuery(MySQLStmtPtr& stmtPtr) const;
+
+    // 编译时构建UPDATE SET子句和绑定值tuple,使用BindableParam/ExpressionParam, 详细见"Inl-CoreStructDef.ipp"
+    template<typename... Args, size_t... Is>
+    auto buildSetClauseAndBindTuple(const std::vector<std::string>& fieldNames,
+        std::index_sequence<Is...>,
+        Args&&... args) const;
+
     template <SortOrder Order, fixed_string FieldName>
-    static constexpr auto _build_order_by_clause();
-    template <Pagination pagination>
-    static constexpr auto _build_limit_clause();
-
-    void _process_stmt_result(MYSQL_STMT* stmt, StmtOutputRes& output) const;
-
+    static constexpr auto buildOrderClause();
+    template <Pagination Pagination>
+    static constexpr auto buildLimitClause();
+private:
+    EntityRows _find_all_impl(const std::string& query) const;
+    FieldMapRows _query_fields_impl(const std::string& query) const;
+    std::size_t _count_all_impl(const std::string& query) const;
+    StatusWithAffectedRows _delete_all_impl(const std::string& query) const;
 };
 
-#include "FKBaseMapper-inl.hpp"
+#include "Impl-FKBaseMapper.ipp"
 
 #endif // !FK_BASE_MAPPER_HPP_

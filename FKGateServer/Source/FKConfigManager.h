@@ -21,14 +21,13 @@
 #define FK_SERVER_CONFIG_H_
 
 #include <string>
-#include <unordered_map>
 #include <chrono>
-#include <memory>
 #include <mutex>
-#include <json/json.h>
+#include <unordered_map>
+
 #include "FKMacro.h"
 #include "FKDef.h"
-#include "Source/FKStructConfig.h"
+#include "FKStructConfig.h"
 
 struct FKConfigManager {
     SINGLETON_CREATE_H(FKConfigManager)
