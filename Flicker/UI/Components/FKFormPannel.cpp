@@ -9,9 +9,10 @@
 
 #include <NXTheme.h>
 #include <NXIcon.h>
-#include "FKLogger.h"
-#include "FKUtils.h"
-#include "FKConstant.h"
+#include "Common/logger/logger_defend.h"
+#include "Common/utils/utils.h"
+
+#include "Self/FKDef.h"
 #include "FKLauncherShell.h"
 #include "Components/FKPushButton.h"
 #include "Components/FKLineEdit.h"
@@ -152,7 +153,7 @@ void FKFormPannel::_initUI()
 
     _pTitleText->setText("登 录 账 号");
     _pTitleText->setFont(QFont{"华文宋体"});
-    _pTitleText->setStyleSheet(FKUtils::qconcat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
+    _pTitleText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
     _pTitleText->setTextStyle(NXTextType::CustomStyle, 32, QFont::Weight::Black);
     _pQQIconLabel->setFixedSize(32, 32);
     _pWechatIconLabel->setFixedSize(32, 32);
@@ -161,7 +162,7 @@ void FKFormPannel::_initUI()
     _pDescriptionText->setText("选择登录方式或输入用户名/邮箱登录");
     _pDescriptionText->setFixedSize(300, 14);
     _pDescriptionText->setAlignment(Qt::AlignCenter);
-    _pDescriptionText->setStyleSheet(FKUtils::qconcat("color: ", FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR), ";"));
+    _pDescriptionText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR), ";"));
     _pDescriptionText->setTextStyle(NXTextType::CustomStyle, 13, QFont::Weight::Light);
 
     _pUsernameLineEdit->setPlaceholderText("用户名/邮箱");
@@ -180,7 +181,7 @@ void FKFormPannel::_initUI()
     _pSwitchSigninOrResetText->setFixedSize(70, 17);
     _pSwitchSigninOrResetText->setIsAllowClick(true);
     _pSwitchSigninOrResetText->setAlignment(Qt::AlignCenter);
-    _pSwitchSigninOrResetText->setStyleSheet(FKUtils::qconcat("color: ", FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
+    _pSwitchSigninOrResetText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
     _pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetType::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
     _pSwitchSigninOrResetText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Light);
     _pConfirmButton->setEnabled(false);
@@ -251,17 +252,17 @@ void FKFormPannel::_initRegistryCallback()
 {
 #define SHOW_HTTP_RESPONSE_MESSAGE(SuccessPos, ErrorPos) \
 if (responseJsonObj["response_status_code"].toInt() != static_cast<int>(flicker::http::status::ok)) {\
-    FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
+    FKLauncherShell::ShowMessage(utils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
     return;\
 }\
-FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::##SuccessPos)
+FKLauncherShell::ShowMessage(utils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::##SuccessPos)
 
 
     _pResponseCallbacks.insert(flicker::http::service::VerifyCode, [this](const QJsonObject& responseJsonObj) {
         auto status = static_cast<flicker::http::status>(responseJsonObj["response_status_code"].toInt());
         auto message = responseJsonObj["message"].toString();
         if (status != flicker::http::status::ok) {
-            FKLauncherShell::ShowMessage(FKUtils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, _pFormType == Launcher::FormType::Register ? NXMessageBarType::BottomRight : NXMessageBarType::BottomLeft);
+            FKLauncherShell::ShowMessage(utils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, _pFormType == Launcher::FormType::Register ? NXMessageBarType::BottomRight : NXMessageBarType::BottomLeft);
             if (message.contains("exist")) {
                 if (_pVerifyCodeTimer->isActive()) {
                     _pVerifyCodeTimer->stop();
@@ -271,7 +272,7 @@ FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJ
             }
             return;
         }
-        FKLauncherShell::ShowMessage(FKUtils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Success, _pFormType == Launcher::FormType::Register ? NXMessageBarType::TopRight : NXMessageBarType::TopLeft);
+        FKLauncherShell::ShowMessage(utils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Success, _pFormType == Launcher::FormType::Register ? NXMessageBarType::TopRight : NXMessageBarType::TopLeft);
         QJsonObject data = responseJsonObj["data"].toObject();
         if (data["verify_type"].toInt() == static_cast<int>(flicker::http::service::ResetPassword)) {
             _pConfirmButton->setEnabled(true);

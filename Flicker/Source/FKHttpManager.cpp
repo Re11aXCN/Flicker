@@ -16,8 +16,8 @@
 #include <QJsonDocument>
 #include <QNetworkReply>
 
-#include "FKUtils.h"
-#include "FKLogger.h"
+#include "Common/utils/utils.h"
+#include "Common/logger/logger_defend.h"
 SINGLETON_CREATE_SHARED_CPP(FKHttpManager)
 FKHttpManager::FKHttpManager(QObject* parent /*= nullptr*/)
     : QObject(parent)
@@ -41,10 +41,10 @@ void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QS
         if (reply->error() != QNetworkReply::NoError) {
             reply->deleteLater();
 
-            FK_CLIENT_ERROR("The client has no network!");
+            LOGGER_ERROR("The client has no network!");
             QJsonObject errorObj;
             errorObj.insert("response_status_code", reply->error());
-            errorObj.insert("message", FKUtils::qconcat("Client: ", reply->errorString()));
+            errorObj.insert("message", utils::qconcat("Client: ", reply->errorString()));
             Q_EMIT this->httpRequestFinished(serviceType, errorObj);
             return;
         }
@@ -60,7 +60,7 @@ void FKHttpManager::sendHttpRequest(flicker::http::service serviceType, const QS
             QJsonObject errorObj;
             // cast uint16_t向上转换int（隐式转换）  ok，uint32_t向下转换int（可能丢失数据）  error
             errorObj.insert("response_status_code", static_cast<int>(flicker::http::status::internal_server_error));
-            errorObj.insert("message", FKUtils::qconcat("Server: ", QString::fromUtf8(magic_enum::enum_name(flicker::http::status::internal_server_error))));
+            errorObj.insert("message", utils::qconcat("Server: ", QString::fromUtf8(magic_enum::enum_name(flicker::http::status::internal_server_error))));
             Q_EMIT this->httpRequestFinished(serviceType, errorObj);
             return;
         }

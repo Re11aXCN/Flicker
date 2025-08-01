@@ -6,7 +6,7 @@
 #include <QRegion>
 
 #include <NXTheme.h>
-#include "FKConstant.h"
+#include "Self/FKDef.h"
 
 FKLineEdit::FKLineEdit(const ButtonConfig& buttonConfig, QWidget* parent)
     : NXLineEdit(parent)

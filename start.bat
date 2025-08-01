@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 :: 定义路径变量（方便后续修改）
 set REDIS_DIR=E:\Development\Redis
-set PROJECT_DIR=E:\Development\Project\my\Flicker\FKGateServer\Source\Grpc\JavaScript
+set PROJECT_DIR=E:\Development\Project\my\Flicker\FKGrpcServer
 
 :: 检查 MySQL 服务状态
 sc query mysql | findstr /i "RUNNING" > nul

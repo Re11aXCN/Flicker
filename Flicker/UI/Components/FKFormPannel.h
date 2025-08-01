@@ -23,8 +23,9 @@
 #include <QHBoxLayout>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
+#include "Common/global/define_enum.h"
 
-#include "FKDef.h"
+#include "Self/FKDef.h"
 class FKPushButton;
 class FKLineEdit;
 class FKIconLabel;

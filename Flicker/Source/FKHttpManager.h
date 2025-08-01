@@ -16,8 +16,9 @@
 #define FK_HTTPMANAGER_H_
 #include <QNetworkAccessManager>
 #include <QJsonObject>
-#include "FKDef.h"
-#include "FKMacro.h"
+
+#include "Common/global/define_enum.h"
+#include "Common/global/macro.h"
 class FKHttpManager : public QObject, public std::enable_shared_from_this<FKHttpManager>
 {
     Q_OBJECT

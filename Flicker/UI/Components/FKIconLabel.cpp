@@ -3,7 +3,7 @@
 #include <QEvent>
 #include <QStyleOption>
 
-#include "FKConstant.h"
+#include "Self/FKDef.h"
 FKIconLabel::FKIconLabel(const QString& iconString, QWidget* parent /*= nullptr*/)
     : NXText(parent)
     , _pIconString(iconString)

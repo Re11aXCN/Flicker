@@ -5,8 +5,9 @@
 #include <QParallelAnimationGroup>
 
 #include <NXIcon.h>
-#include "FKUtils.h"
-#include "FKConstant.h"
+#include "Common/utils/utils.h"
+
+#include "Self/FKDef.h"
 #include "Components/FKFormPannel.h"
 #include "Components/FKSwitchPannel.h"
 

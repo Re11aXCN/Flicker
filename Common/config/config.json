@@ -1,0 +1,79 @@
+﻿{
+    "server": {
+        "host": "localhost",
+        "port": 8080,
+        "use_ssl": false
+    },
+    "asio_thread_pool": {
+        "thread_count": 8,
+        "channel_capacity": 1024
+    },
+    "request_timeout": 30,
+    "rpc_services": {
+        "VerifyCode": {
+            "host": "localhost",
+            "port": 50051,
+            "pool_size": 10,
+            "use_ssl": false,
+            "keep_alive_time_ms": 30000,
+            "keep_alive_timeout_ms": 10000,
+            "max_reconnect_backoff_ms": 10000,
+            "grpclb_call_timeout_ms": 2000,
+            "keep_alive_permit_without_calls": true,
+            "http2_max_ping_without_data": false
+        },
+        "EncryptPassword": {
+            "host": "localhost",
+            "port": 50052,
+            "pool_size": 10,
+            "use_ssl": false,
+            "keep_alive_time_ms": 30000,
+            "keep_alive_timeout_ms": 10000,
+            "max_reconnect_backoff_ms": 10000,
+            "keep_alive_permit_without_calls": true,
+            "http2_max_ping_without_data": false
+        },
+        "AuthenticatePwdReset": {
+            "host": "localhost",
+            "port": 50053,
+            "pool_size": 10,
+            "use_ssl": false,
+            "keep_alive_time_ms": 30000,
+            "keep_alive_timeout_ms": 10000,
+            "max_reconnect_backoff_ms": 10000,
+            "keep_alive_permit_without_calls": true,
+            "http2_max_ping_without_data": false
+        },
+        "GetChatServerAddress": {
+            "host": "localhost",
+            "port": 50054,
+            "pool_size": 10,
+            "use_ssl": false,
+            "keep_alive_time_ms": 30000,
+            "keep_alive_timeout_ms": 10000,
+            "max_reconnect_backoff_ms": 10000,
+            "keep_alive_permit_without_calls": true,
+            "http2_max_ping_without_data": false
+        }
+    },
+    "mysql": {
+        "host": "localhost",
+        "port": 3306,
+        "username": "root",
+        "password": "123456",
+        "schema": "flicker",
+        "pool_size": 20,
+        "connection_timeout_ms": 500,
+        "idle_timeout_ms": 1800000,
+        "monitor_interval_ms": 300000
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "password": "123456",
+        "pool_size": 10,
+        "connection_timeout_ms": 200,
+        "socket_timeout_ms": 100,
+        "db_index": 0
+    }
+}

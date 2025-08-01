@@ -11,9 +11,9 @@
 #include <QStyleOption>
 #include <NXTheme.h>
 
-#include "FKConstant.h"
-#include "FKUtils.h"
+#include "Common/utils/utils.h"
 
+#include "Self/FKDef.h"
 #include "Components/FKPushButton.h"
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
     : QWidget(parent)
@@ -120,25 +120,25 @@ void FKSwitchPannel::_initUI()
     _pRegisterDescriptionEffect = new QGraphicsOpacityEffect(this);
     _pSwitchBtnEffect = new QGraphicsOpacityEffect(this);
 
-    _pLoginTitleText = new NXText(FKUtils::qconcat(
+    _pLoginTitleText = new NXText(utils::qconcat(
         "<font color='",
-        FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
+        utils::colorToCssString(Constant::DARK_TEXT_COLOR),
         "'>Hello Friend！</font>"
     ), this);
-    _pLoginDescriptionText = new NXText(FKUtils::qconcat(
+    _pLoginDescriptionText = new NXText(utils::qconcat(
         "<font color='",
-        FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+        utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
         "'>去注册一个账号，成为尊贵的粉丝会员，让我们踏入奇妙的旅途！</font>"
     ), this);
 
-    _pRegisterTitleText = new NXText(FKUtils::qconcat(
+    _pRegisterTitleText = new NXText(utils::qconcat(
         "<font color='",
-        FKUtils::colorToCssString(Constant::DARK_TEXT_COLOR),
+        utils::colorToCssString(Constant::DARK_TEXT_COLOR),
         "'>Welcome Back！</font>"
     ), this);
-    _pRegisterDescriptionText = new NXText(FKUtils::qconcat(
+    _pRegisterDescriptionText = new NXText(utils::qconcat(
         "<font color='",
-        FKUtils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+        utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
         "'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
     ), this);
 

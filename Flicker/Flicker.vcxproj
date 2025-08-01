@@ -103,7 +103,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;$(SolutionDir)FKLogger;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir);$(SolutionDir)NexUs\Source\include;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -124,13 +124,13 @@
       <QtUicDir>.\GeneratedFiles</QtUicDir>
     </QtUic>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>fkloggerd.lib;nexusd.lib;fmtd.lib;jsoncpp.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(VCPKG_INS_PACKAGE_DIR)\debug\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>loggerd.lib;nexusd.lib;fmtd.lib;jsoncpp.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;$(SolutionDir)FKLogger;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir);$(SolutionDir)NexUs\Source\include;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <Optimization>MaxSpeed</Optimization>
@@ -146,13 +146,13 @@
       <QtRccDir>.\GeneratedFiles</QtRccDir>
     </QtRcc>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>fklogger.lib;nexus.lib;fmt.lib;jsoncpp.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(VCPKG_INS_PACKAGE_DIR)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>logger.lib;nexus.lib;fmt.lib;jsoncpp.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Global;$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir)NexUs\Source\include;$(SolutionDir)FKLogger;E:\Development\boost_1_87_0\build\include\boost-1_87;D:\Development\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Source;$(ProjectDir)UI;$(SolutionDir);$(SolutionDir)NexUs\Source\include;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <Optimization>Disabled</Optimization>
@@ -168,8 +168,8 @@
       <QtRccDir>.\GeneratedFiles</QtRccDir>
     </QtRcc>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);E:\Development\boost_1_87_0\build\lib;D:\Development\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>fklogger.lib;nexus.lib;fmt.lib;jsoncpp.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(VCPKG_INS_PACKAGE_DIR)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>logger.lib;nexus.lib;fmt.lib;jsoncpp.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -224,31 +224,22 @@
     <QtMoc Include="UI\Components\FKPushButton.h" />
     <QtMoc Include="UI\Components\FKSwitchPannel.h" />
     <QtMoc Include="UI\Components\FKLineEdit.h" />
-    <ClInclude Include="Global\FKConstant.h" />
-    <ClInclude Include="Global\FKMacro.h" />
-    <ClInclude Include="Global\FKDef.h">
-      <!-- <Generator>QtMoc</Generator> -->
-      <!-- <CustomToolNamespace>Launcher</CustomToolNamespace> -->
-      <!-- <SubType>moc</SubType> -->
-      <!-- <QtMocEnabled>true</QtMocEnabled> -->
-      <!-- <MocOutputFile>moc_%(Filename).cpp</MocOutputFile> -->
-    </ClInclude>
-    <ClInclude Include="Global\FKUtils.h" />
+    <QtMoc Include="Source\FKTcpManager.h" />
     <QtMoc Include="UI\Components\FKFormPannel.h" />
     <QtMoc Include="UI\FKLauncherShell.h" />
     <QtMoc Include="Source\FKHttpManager.h" />
     <Image Include="Resource\ico\Weixin_IDI_ICON1.ico" />
     <ResourceCompile Include="Resource\ico\Flicker.rc" />
-    <ClInclude Include="Global\SnowflakeGenerator.hpp" />
+    <ClInclude Include="Self\FKDef.h" />
     <ClInclude Include="Resource\ico\resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\FKTcpManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="UI\Components\FKIconLabel.cpp" />
     <ClCompile Include="UI\Components\FKLineEdit.cpp" />
     <ClCompile Include="UI\Components\FKPushButton.cpp" />
     <ClCompile Include="UI\Components\FKSwitchPannel.cpp" />
-    <ClCompile Include="Global\FKUtils.cpp" />
     <ClCompile Include="Source\FKHttpManager.cpp" />
     <ClCompile Include="UI\Components\FKFormPannel.cpp" />
     <ClCompile Include="UI\FKLauncherShell.cpp" />

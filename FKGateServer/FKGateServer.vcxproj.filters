@@ -15,147 +15,57 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="Core\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\FKGrpcServicePoolManager.cpp">
+    <ClCompile Include="Core\FKHttpConnection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Redis\FKRedisConnectionPool.cpp">
+    <ClCompile Include="Core\FKLogicSystem.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\FKConfigManager.cpp">
+    <ClCompile Include="Core\FKGateServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Asio\FKAsioThreadPool.cpp">
+    <ClCompile Include="..\Common\server\asio_thread_pool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Asio\FKHttpConnection.cpp">
+    <ClCompile Include="..\Common\redis\redis_connection_pool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Asio\FKLogicSystem.cpp">
+    <ClCompile Include="..\Common\mysql\mysql_connection_pool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Asio\FKServer.cpp">
+    <ClCompile Include="..\Common\mysql\mysql_connection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\FKMySQLConnectionPool.cpp">
+    <ClCompile Include="..\Common\mysql\mapper\user_mapper.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\FKMySQLConnection.cpp">
+    <ClCompile Include="..\Common\mysql\entity\base_entity.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\FKGrpcService.grpc.pb.cc">
+    <ClCompile Include="..\Common\config\config_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Grpc\FKGrpcService.pb.cc">
+    <ClCompile Include="..\Common\grpc\grpc_service.grpc.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MySQL\Mapper\FKUserMapper.cpp">
+    <ClCompile Include="..\Common\grpc\grpc_service.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Example\FKUserTestMapper.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Example\Test.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\MySQL\Entity\TabularPrintable.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Example\FKTimeTestMapper.cpp">
+    <ClCompile Include="..\Common\grpc\grpc_service_pool_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Grpc\FKGrpcConnectionPool.hpp">
+    <ClInclude Include="Core\FKHttpConnection.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Grpc\FKGrpcServicePoolManager.h">
+    <ClInclude Include="Core\FKLogicSystem.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Redis\FKRedisConnectionPool.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FKConfigManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Asio\FKAsioThreadPool.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Asio\FKHttpConnection.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Asio\FKLogicSystem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Asio\FKServer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Entity\FKUserEntity.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FKStructConfig.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\FKMySQLConnectionPool.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\FKMySQLConnection.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Grpc\FKGrpcServiceClient.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Grpc\FKGrpcService.grpc.pb.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Grpc\FKGrpcService.pb.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\FKUserMapper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\FKBaseMapper.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\FKFieldMapper.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Impl-FKBaseMapper.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Inl-QueryCondition.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Example\FKUserTestEntity.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Example\FKUserTestMapper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Inl-CoreStructDef.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Inl-ValueBinder.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Inl-QuerySort.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Mapper\Inl-TimeUtils.ipp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MySQL\Entity\TabularPrintable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FKLogger-Defend.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Example\FKTimeTestMapper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Example\FKTimeTestEntity.h">
+    <ClInclude Include="Core\FKGateServer.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

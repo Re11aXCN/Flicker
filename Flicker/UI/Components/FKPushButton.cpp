@@ -5,7 +5,7 @@
 
 #include <NXTheme.h>
 
-#include "FKConstant.h"
+#include "Self/FKDef.h"
 
 FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
     : NXPushButton(parent)

@@ -31,9 +31,6 @@
     <ClCompile Include="Source\FKHttpManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Global\FKUtils.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="UI\FKLauncherShell.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -55,24 +52,15 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\FKTcpManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Resource\ico\resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Global\FKUtils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\FKMacro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\SnowflakeGenerator.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\FKConstant.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Global\FKDef.h">
+    <ClInclude Include="Self\FKDef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -106,6 +94,9 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="UI\Components\FKIconLabel.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Source\FKTcpManager.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>
