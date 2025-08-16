@@ -6,8 +6,8 @@
 #include <QRegion>
 
 #include <NXTheme.h>
-#include "Self/FKDef.h"
-
+#include "FKDef.h"
+using namespace Flicker::Client;
 FKLineEdit::FKLineEdit(const ButtonConfig& buttonConfig, QWidget* parent)
     : NXLineEdit(parent)
     , _pButtonText(buttonConfig.ButtonText)
@@ -41,7 +41,7 @@ void FKLineEdit::paintEvent(QPaintEvent* event)
     // 设置按钮颜色
     QColor btnColor;
     if (!_pButtonEnabled || !isInputValid()) {
-        btnColor = Constant::DESCRIPTION_TEXT_COLOR;
+        btnColor = Constants::DESCRIPTION_TEXT_COLOR;
     } else if (_pButtonPressed) {
         btnColor = NXThemeColor(NXThemeType::Light, PrimaryPress);
     } else if (_pButtonHovered) {

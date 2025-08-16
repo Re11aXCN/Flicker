@@ -11,10 +11,11 @@
 #include <QStyleOption>
 #include <NXTheme.h>
 
-#include "Common/utils/utils.h"
-
-#include "Self/FKDef.h"
+#include "universal/utils.h"
+#include "FKDef.h"
 #include "Components/FKPushButton.h"
+using namespace Flicker::Client;
+using namespace universal;
 FKSwitchPannel::FKSwitchPannel(QWidget* parent /*= nullptr*/)
     : QWidget(parent)
     , _pLoginOpacity{ 1.0 }
@@ -89,9 +90,9 @@ void FKSwitchPannel::paintEvent(QPaintEvent* event)
 
     // 2. 创建锥形渐变
     QConicalGradient gradient(center, 180);  // 180度起点在负x轴
-    gradient.setColorAt(0.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);     // 起点黑色
+    gradient.setColorAt(0.0, Constants::SWITCH_CIRCLE_DARK_SHADOW_COLOR);     // 起点黑色
     gradient.setColorAt(0.5, Qt::white);     // 180度后变为白色
-    gradient.setColorAt(1.0, Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);     // 回到起点黑色
+    gradient.setColorAt(1.0, Constants::SWITCH_CIRCLE_DARK_SHADOW_COLOR);     // 回到起点黑色
 
     // 3. 创建圆环路径
     QPainterPath ringPath;
@@ -120,25 +121,25 @@ void FKSwitchPannel::_initUI()
     _pRegisterDescriptionEffect = new QGraphicsOpacityEffect(this);
     _pSwitchBtnEffect = new QGraphicsOpacityEffect(this);
 
-    _pLoginTitleText = new NXText(utils::qconcat(
+    _pLoginTitleText = new NXText(utils::qstring::qconcat(
         "<font color='",
-        utils::colorToCssString(Constant::DARK_TEXT_COLOR),
+        utils::qcolor::qcolor_to_cssqstr(Constants::DARK_TEXT_COLOR),
         "'>Hello Friend！</font>"
     ), this);
-    _pLoginDescriptionText = new NXText(utils::qconcat(
+    _pLoginDescriptionText = new NXText(utils::qstring::qconcat(
         "<font color='",
-        utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+        utils::qcolor::qcolor_to_cssqstr(Constants::DESCRIPTION_TEXT_COLOR),
         "'>去注册一个账号，成为尊贵的粉丝会员，让我们踏入奇妙的旅途！</font>"
     ), this);
 
-    _pRegisterTitleText = new NXText(utils::qconcat(
+    _pRegisterTitleText = new NXText(utils::qstring::qconcat(
         "<font color='",
-        utils::colorToCssString(Constant::DARK_TEXT_COLOR),
+        utils::qcolor::qcolor_to_cssqstr(Constants::DARK_TEXT_COLOR),
         "'>Welcome Back！</font>"
     ), this);
-    _pRegisterDescriptionText = new NXText(utils::qconcat(
+    _pRegisterDescriptionText = new NXText(utils::qstring::qconcat(
         "<font color='",
-        utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR),
+        utils::qcolor::qcolor_to_cssqstr(Constants::DESCRIPTION_TEXT_COLOR),
         "'>已经有账号了嘛，去登入账号来进入奇妙世界吧！！！</font>"
     ), this);
 
@@ -176,8 +177,8 @@ void FKSwitchPannel::_initUI()
 
     _pSwitchBtn->setGraphicsEffect(_pSwitchBtnEffect);
 
-    constexpr int XOffset = (Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT) / 2;
-    constexpr int YOffset = Constant::WIDGET_HEIGHT / 2;
+    constexpr int XOffset = (Constants::WIDGET_WIDTH - Constants::WIDGET_HEIGHT) / 2;
+    constexpr int YOffset = Constants::WIDGET_HEIGHT / 2;
     const QSize loginTitleSize = _pLoginTitleText->size();
     const QSize loginDescriptionSize = _pLoginDescriptionText->size();
     const QSize switchBtnSize = _pSwitchBtn->size();

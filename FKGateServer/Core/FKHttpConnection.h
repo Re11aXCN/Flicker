@@ -18,8 +18,8 @@
  * @Member _pTimeout: 用来设置HTTP请求的超时时间
  * ======================================
 *************************************************************************************/
-#ifndef FK_HTTPCONNECTION_H_
-#define FK_HTTPCONNECTION_H_
+#ifndef FK_HTTP_CONNECTION_H_
+#define FK_HTTP_CONNECTION_H_
 
 #include <string>
 #include <unordered_map>
@@ -69,6 +69,6 @@ private:
     CloseCallback _pCloseCallback;
 };
 
-#endif // !FK_HTTPCONNECTION_H_
+#endif // !FK_HTTP_CONNECTION_H_
 
 

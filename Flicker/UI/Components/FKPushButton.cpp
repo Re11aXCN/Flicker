@@ -5,8 +5,8 @@
 
 #include <NXTheme.h>
 
-#include "Self/FKDef.h"
-
+#include "FKDef.h"
+using namespace Flicker::Client;
 FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
     : NXPushButton(parent)
 {
@@ -16,12 +16,12 @@ FKPushButton::FKPushButton(QWidget* parent /*= nullptr*/)
     setLightDefaultColor(NXThemeColor(NXThemeType::Light, PrimaryNormal));
     setLightHoverColor(NXThemeColor(NXThemeType::Light, PrimaryHover));
     setLightPressColor(NXThemeColor(NXThemeType::Light, PrimaryPress));
-    setLightTextColor(Constant::LIGHT_TEXT_COLOR);
+    setLightTextColor(Constants::LIGHT_TEXT_COLOR);
 
     setDarkDefaultColor(NXThemeColor(NXThemeType::Dark, PrimaryNormal));
     setDarkHoverColor(NXThemeColor(NXThemeType::Dark, PrimaryHover));
     setDarkPressColor(NXThemeColor(NXThemeType::Dark, PrimaryPress));
-    setDarkTextColor(Constant::LIGHT_TEXT_COLOR);
+    setDarkTextColor(Constants::LIGHT_TEXT_COLOR);
 
     _pPressRadius = 0;
     _pHoverOpacity = 0;

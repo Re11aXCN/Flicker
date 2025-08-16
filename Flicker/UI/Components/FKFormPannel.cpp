@@ -1,28 +1,33 @@
 ﻿#include "FKFormPannel.h"
 
+#include <QSysInfo>
 #include <QTimer> 
 #include <QPainter>
 #include <QPainterPath>
 #include <QJsonDocument>
 #include <QCryptographicHash>
 #include <QRandomGenerator>
+#include <QUuid>
 
 #include <NXTheme.h>
 #include <NXIcon.h>
-#include "Common/logger/logger_defend.h"
-#include "Common/utils/utils.h"
+#include "Library/Logger/logger.h"
+#include "universal/utils.h"
+#include "FKDef.h"
 
-#include "Self/FKDef.h"
 #include "FKLauncherShell.h"
 #include "Components/FKPushButton.h"
 #include "Components/FKLineEdit.h"
 #include "Components/FKIconLabel.h"
 #include "Source/FKHttpManager.h"
+#include "Source/FKTcpManager.h"
 #include "magic_enum/magic_enum.hpp"
 
 static QRegularExpression s_email_pattern_regex(R"(^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
 static QRegularExpression s_username_pattern_regex("^[a-zA-Z0-9_]+$");
 
+using namespace Flicker::Client;
+using namespace universal;
 FKFormPannel::FKFormPannel(QWidget* parent /*= nullptr*/)
     : QWidget(parent)
     , _pVerifyCodeTimer(new QTimer(this))
@@ -54,6 +59,17 @@ FKFormPannel::FKFormPannel(QWidget* parent /*= nullptr*/)
     QObject::connect(_pShowConfirmPasswordAction, &QAction::triggered, this, &FKFormPannel::_onShowConfirmPasswordActionTriggered);
     
     QObject::connect(_pSwitchSigninOrResetText, &NXText::clicked, this, &FKFormPannel::_onSwitchSigninOrResetTextClicked);
+
+    auto tcpManager = FKTcpManager::getInstance();
+    tcpManager->setAutoAuthenticate(true);
+    tcpManager->setConnectTimeout(10000);
+    tcpManager->setHeartbeatInterval(60000);
+    tcpManager->setHeartbeatRetrySettings(3);
+    tcpManager->setReconnectSettings(3, 5000);
+    QObject::connect(tcpManager.get(), &FKTcpManager::authenticationResult, this, &FKFormPannel::_handleAuthenticationResult);
+    QObject::connect(tcpManager.get(), &FKTcpManager::connectionError, this, &FKFormPannel::_handleTcpConnectionError);
+    _pUsernameLineEdit->setText("2634544095@qq.com");
+    _pPasswordLineEdit->setText("123456789");
 }
 
 FKFormPannel::~FKFormPannel()
@@ -69,12 +85,12 @@ void FKFormPannel::toggleFormType()
     // 重置密码——输入新的密码 到 登录，需要重置状态
     _pIsSwitchStackedWidget = false;
     // 重置验证状态
-    _pValidationFlags = Launcher::InputValidationFlag::None;
+    _pValidationFlags = Enums::InputValidationFlag::None;
 
     // 清空所有输入框（可能当前输入LineEdit有信息，切换后要清空）
     _pUsernameLineEdit->clear();
     _pPasswordLineEdit->clear();
-    if (_pFormType != Launcher::FormType::Authentication) {
+    if (_pFormType != Enums::FormType::Authentication) {
         _pEmailLineEdit->clear();
     }
     _pConfirmPasswordLineEdit->clear();
@@ -153,7 +169,7 @@ void FKFormPannel::_initUI()
 
     _pTitleText->setText("登 录 账 号");
     _pTitleText->setFont(QFont{"华文宋体"});
-    _pTitleText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
+    _pTitleText->setStyleSheet(utils::qstring::qconcat("color: ", utils::qcolor::qcolor_to_cssqstr(Constants::DARK_TEXT_COLOR), ";"));
     _pTitleText->setTextStyle(NXTextType::CustomStyle, 32, QFont::Weight::Black);
     _pQQIconLabel->setFixedSize(32, 32);
     _pWechatIconLabel->setFixedSize(32, 32);
@@ -162,7 +178,7 @@ void FKFormPannel::_initUI()
     _pDescriptionText->setText("选择登录方式或输入用户名/邮箱登录");
     _pDescriptionText->setFixedSize(300, 14);
     _pDescriptionText->setAlignment(Qt::AlignCenter);
-    _pDescriptionText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DESCRIPTION_TEXT_COLOR), ";"));
+    _pDescriptionText->setStyleSheet(utils::qstring::qconcat("color: ", utils::qcolor::qcolor_to_cssqstr(Constants::DESCRIPTION_TEXT_COLOR), ";"));
     _pDescriptionText->setTextStyle(NXTextType::CustomStyle, 13, QFont::Weight::Light);
 
     _pUsernameLineEdit->setPlaceholderText("用户名/邮箱");
@@ -181,8 +197,8 @@ void FKFormPannel::_initUI()
     _pSwitchSigninOrResetText->setFixedSize(70, 17);
     _pSwitchSigninOrResetText->setIsAllowClick(true);
     _pSwitchSigninOrResetText->setAlignment(Qt::AlignCenter);
-    _pSwitchSigninOrResetText->setStyleSheet(utils::qconcat("color: ", utils::colorToCssString(Constant::DARK_TEXT_COLOR), ";"));
-    _pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetType::BottomBorder, Constant::DESCRIPTION_TEXT_COLOR);
+    _pSwitchSigninOrResetText->setStyleSheet(utils::qstring::qconcat("color: ", utils::qcolor::qcolor_to_cssqstr(Constants::DARK_TEXT_COLOR), ";"));
+    _pSwitchSigninOrResetText->setBorderStyle(1, NXWidgetType::BottomBorder, Constants::DESCRIPTION_TEXT_COLOR);
     _pSwitchSigninOrResetText->setTextStyle(NXTextType::CustomStyle, 14, QFont::Weight::Light);
     _pConfirmButton->setEnabled(false);
 
@@ -251,49 +267,62 @@ void FKFormPannel::_initUI()
 void FKFormPannel::_initRegistryCallback()
 {
 #define SHOW_HTTP_RESPONSE_MESSAGE(SuccessPos, ErrorPos) \
-if (responseJsonObj["response_status_code"].toInt() != static_cast<int>(flicker::http::status::ok)) {\
-    FKLauncherShell::ShowMessage(utils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::##ErrorPos);\
+if (responseJsonObj["response_status_code"].toInt() != static_cast<int>(boost::beast::http::status::ok)) {\
+    FKLauncherShell::ShowMessage(utils::qstring::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::ErrorPos);\
     return;\
 }\
-FKLauncherShell::ShowMessage(utils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::##SuccessPos)
+FKLauncherShell::ShowMessage(utils::qstring::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Success, NXMessageBarType::SuccessPos)
 
 
-    _pResponseCallbacks.insert(flicker::http::service::VerifyCode, [this](const QJsonObject& responseJsonObj) {
-        auto status = static_cast<flicker::http::status>(responseJsonObj["response_status_code"].toInt());
+    _pResponseCallbacks.insert(Enums::ServiceType::VerifyCode, [this](const QJsonObject& responseJsonObj) {
+        auto status = static_cast<boost::beast::http::status>(responseJsonObj["response_status_code"].toInt());
         auto message = responseJsonObj["message"].toString();
-        if (status != flicker::http::status::ok) {
-            FKLauncherShell::ShowMessage(utils::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, _pFormType == Launcher::FormType::Register ? NXMessageBarType::BottomRight : NXMessageBarType::BottomLeft);
-            if (message.contains("exist")) {
-                if (_pVerifyCodeTimer->isActive()) {
-                    _pVerifyCodeTimer->stop();
-                }
-                _pVerifyCodeLineEdit->setButtonText("获取验证码");
-                _pVerifyCodeLineEdit->setButtonEnabled(true);
+        if (status != boost::beast::http::status::ok) {
+            FKLauncherShell::ShowMessage(utils::qstring::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Error, _pFormType == Enums::FormType::Register ? NXMessageBarType::BottomRight : NXMessageBarType::BottomLeft);
+            if (_pVerifyCodeTimer->isActive()) {
+                _pVerifyCodeTimer->stop();
             }
+            _pVerifyCodeLineEdit->setButtonText("获取验证码");
+            _pVerifyCodeLineEdit->setButtonEnabled(true);
             return;
         }
-        FKLauncherShell::ShowMessage(utils::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Success, _pFormType == Launcher::FormType::Register ? NXMessageBarType::TopRight : NXMessageBarType::TopLeft);
+        FKLauncherShell::ShowMessage(utils::qstring::qconcat("SUCCESS, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), message, NXMessageBarType::Success, _pFormType == Enums::FormType::Register ? NXMessageBarType::TopRight : NXMessageBarType::TopLeft);
         QJsonObject data = responseJsonObj["data"].toObject();
-        if (data["verify_type"].toInt() == static_cast<int>(flicker::http::service::ResetPassword)) {
+        if (data["verify_type"].toInt() == static_cast<int>(Enums::ServiceType::ResetPassword)) {
             _pConfirmButton->setEnabled(true);
         }
         });
 
-    _pResponseCallbacks.insert(flicker::http::service::Login, [this](const QJsonObject& responseJsonObj) {
-        SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomLeft);
-        });
+    _pResponseCallbacks.insert(Enums::ServiceType::Login, [this](const QJsonObject& responseJsonObj) {
+        if(responseJsonObj["response_status_code"].toInt() != static_cast<int>(boost::beast::http::status::ok)) {
+            FKLauncherShell::ShowMessage(utils::qstring::qconcat("ERROR, HTTP CODE: " + responseJsonObj["response_status_code"].toString()), responseJsonObj["message"].toString(), NXMessageBarType::Error, NXMessageBarType::BottomLeft);
+            return;
+        }
+        QJsonObject dataObj = responseJsonObj["data"].toObject();
 
-    _pResponseCallbacks.insert(flicker::http::service::Register, [this](const QJsonObject& responseJsonObj) {
+        QString userUuid = dataObj["user_uuid"].toString();
+        QString token = dataObj["token"].toString();
+        qint64 expiresAt = dataObj["expires_at"].toVariant().toLongLong();
+        
+        QString clientDeviceId = dataObj["client_device_id"].toString();
+        QString chatServerId = dataObj["chat_server_id"].toString();
+        QString chatServerHost = dataObj["chat_server_host"].toString();
+        int chatServerPort = dataObj["chat_server_port"].toInt();
+        QString chatServerZone = dataObj["chat_server_zone"].toString();
+
+        this->_connectToChatServer(chatServerHost, chatServerPort, token, clientDeviceId);
+    });
+    _pResponseCallbacks.insert(Enums::ServiceType::Register, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomRight);
         });
 
-    _pResponseCallbacks.insert(flicker::http::service::ResetPassword, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(Enums::ServiceType::ResetPassword, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopLeft, BottomRight);
         Q_EMIT this->switchClicked();
         QTimer::singleShot(550, [this]() { _onSwitchSigninOrResetTextClicked(); });
         });
 
-    _pResponseCallbacks.insert(flicker::http::service::AuthenticateUser, [this](const QJsonObject& responseJsonObj) {
+    _pResponseCallbacks.insert(Enums::ServiceType::AuthenticateResetPwd, [this](const QJsonObject& responseJsonObj) {
         SHOW_HTTP_RESPONSE_MESSAGE(TopRight, BottomLeft);
         Q_EMIT this->switchClicked();
         });
@@ -303,15 +332,15 @@ void FKFormPannel::_updateSwitchedUI()
 {
     if (_pCentralStackedWidget->currentIndex() == 0) {
         if (_pIsSwitchStackedWidget) {
-            _pFormType = Launcher::FormType::Authentication;
+            _pFormType = Enums::FormType::Authentication;
 
             _pUniqueLayout->takeAt(9); // _pPasswordLineEdit
             _pUniqueLayout->takeAt(7); // _pUsernameLineEdit
         }
         else {
-            _pFormType = (_pFormType == Launcher::FormType::Login)
-                ? Launcher::FormType::Register
-                : Launcher::FormType::Login;
+            _pFormType = (_pFormType == Enums::FormType::Login)
+                ? Enums::FormType::Register
+                : Enums::FormType::Login;
 
             while (_pUniqueLayout->count())
             {
@@ -321,12 +350,12 @@ void FKFormPannel::_updateSwitchedUI()
     }
     else {
         if (_pIsSwitchStackedWidget) {
-            _pFormType = Launcher::FormType::Login;
+            _pFormType = Enums::FormType::Login;
         }
         else {
-            _pFormType = (_pFormType == Launcher::FormType::Authentication)
-                ? Launcher::FormType::ResetPassword
-                : Launcher::FormType::Authentication;
+            _pFormType = (_pFormType == Enums::FormType::Authentication)
+                ? Enums::FormType::ResetPassword
+                : Enums::FormType::Authentication;
         }
 
         _pUniqueLayout->takeAt(9); // _pVerifyCodeLineEdit/_pConfirmPasswordLineEdit
@@ -334,7 +363,7 @@ void FKFormPannel::_updateSwitchedUI()
     }
 
     switch (_pFormType) {
-    case Launcher::FormType::Login: {// 其他状态都可以切换到Login
+    case Enums::FormType::Login: {// 其他状态都可以切换到Login
         _pTitleText->setText("登 录 账 号");
         _pDescriptionText->setText("选择登录方式或输入用户名/邮箱登录");
         _pUsernameLineEdit->setPlaceholderText("用户名/邮箱");
@@ -383,7 +412,7 @@ void FKFormPannel::_updateSwitchedUI()
         _pVerifyCodeLineEdit->hide();
         break;
     }
-    case Launcher::FormType::Register: {// 只能由Login切换到Register
+    case Enums::FormType::Register: {// 只能由Login切换到Register
         _pTitleText->setText("创 建 账 号");
         _pDescriptionText->setText("选择注册方式或电子邮箱注册");
         _pUsernameLineEdit->setPlaceholderText("用户名");
@@ -429,7 +458,7 @@ void FKFormPannel::_updateSwitchedUI()
         //<_pBiliBiliIconLabel->hide();
         break;
     }
-    case Launcher::FormType::Authentication: {// 由Login/Reset可以切换到Auth
+    case Enums::FormType::Authentication: {// 由Login/Reset可以切换到Auth
         _pTitleText->setText("验 证 身 份");
         _pDescriptionText->setText("选择验证方式或输入邮箱验证");
         _pSwitchSigninOrResetText->setText("返回登录");
@@ -449,7 +478,7 @@ void FKFormPannel::_updateSwitchedUI()
         _pConfirmPasswordLineEdit->hide();
         break;
     }
-    case Launcher::FormType::ResetPassword: {// 只能由Auth切换到Reset
+    case Enums::FormType::ResetPassword: {// 只能由Auth切换到Reset
         _pTitleText->setText("重 置 密 码");
         _pDescriptionText->setText("请输入新的密码并确认");
         _pPasswordLineEdit->setPlaceholderText("输入密码");
@@ -472,7 +501,7 @@ void FKFormPannel::_updateSwitchedUI()
 }
 
 
-void FKFormPannel::_handleServerResponse(flicker::http::service serviceType, const QJsonObject& responseJsonObj)
+void FKFormPannel::_handleServerResponse(Flicker::Client::Enums::ServiceType serviceType, const QJsonObject& responseJsonObj)
 {
     auto callback = _pResponseCallbacks.value(serviceType);
 
@@ -555,20 +584,20 @@ void FKFormPannel::_updateConfirmButtonState()
     // 所有字段都有效时启用按钮
     switch (_pFormType)
     {
-    case Launcher::FormType::Login: {
-        _pConfirmButton->setEnabled((_pValidationFlags & Launcher::InputValidationFlag::AllLoginValid) == Launcher::InputValidationFlag::AllLoginValid);
+    case Enums::FormType::Login: {
+        _pConfirmButton->setEnabled((_pValidationFlags & Enums::InputValidationFlag::AllLoginValid) == Enums::InputValidationFlag::AllLoginValid);
         break;
     }
-    case Launcher::FormType::Register: {
-        _pConfirmButton->setEnabled((_pValidationFlags & Launcher::InputValidationFlag::AllRegisterValid) == Launcher::InputValidationFlag::AllRegisterValid);
+    case Enums::FormType::Register: {
+        _pConfirmButton->setEnabled((_pValidationFlags & Enums::InputValidationFlag::AllRegisterValid) == Enums::InputValidationFlag::AllRegisterValid);
         break;
     }
-    case Launcher::FormType::Authentication: {
-        //isValid = (_pValidationFlags & Launcher::InputValidationFlag::AllAuthenticationValid) == Launcher::InputValidationFlag::AllAuthenticationValid;
+    case Enums::FormType::Authentication: {
+        //isValid = (_pValidationFlags & Enums::InputValidationFlag::AllAuthenticationValid) == Enums::InputValidationFlag::AllAuthenticationValid;
         break;
     }
-    case Launcher::FormType::ResetPassword: {
-        _pConfirmButton->setEnabled((_pValidationFlags & Launcher::InputValidationFlag::AllResetPasswordValid) == Launcher::InputValidationFlag::AllResetPasswordValid);
+    case Enums::FormType::ResetPassword: {
+        _pConfirmButton->setEnabled((_pValidationFlags & Enums::InputValidationFlag::AllResetPasswordValid) == Enums::InputValidationFlag::AllResetPasswordValid);
         break;
     }
     default: throw std::invalid_argument("Invalid form type");
@@ -577,15 +606,15 @@ void FKFormPannel::_updateConfirmButtonState()
 
 void FKFormPannel::_onUsernameTextChanged(const QString& text)
 {
-    bool isValid = (_pFormType == Launcher::FormType::Login) 
+    bool isValid = (_pFormType == Enums::FormType::Login) 
         ? _validateUsernameOrEmail(text) 
         : _validateUsername(text);
     
     if (isValid) {
-        _pValidationFlags |= Launcher::InputValidationFlag::UsernameValid;
+        _pValidationFlags |= Enums::InputValidationFlag::UsernameValid;
         _pUsernameLineEdit->setStyleSheet(_pNormalStyleSheet);
     } else {
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::UsernameValid };
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::UsernameValid };
     }
     
     _updateConfirmButtonState();
@@ -596,11 +625,11 @@ void FKFormPannel::_onEmailTextChanged(const QString& text)
     bool isValid = _validateEmail(text);
     
     if (isValid) {
-        _pValidationFlags |= Launcher::InputValidationFlag::EmailValid;
+        _pValidationFlags |= Enums::InputValidationFlag::EmailValid;
         _pEmailLineEdit->setStyleSheet(_pNormalStyleSheet);
         _pVerifyCodeLineEdit->setButtonEnabled(true);
     } else {
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::EmailValid };
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::EmailValid };
     }
     
     _updateConfirmButtonState();
@@ -616,8 +645,8 @@ void FKFormPannel::_onPasswordTextChanged(const QString& text)
     }
     else {
         _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
-        FKLauncherShell::ShowMessage("ERROR", "密码只能包含英文、数字、特殊字符，不允许空格！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+        FKLauncherShell::ShowMessage("ERROR", "密码只能包含英文、数字、特殊字符，不允许空格！", NXMessageBarType::Error, _pFormType == Enums::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::PasswordValid };
     }
     
     _updateConfirmButtonState();
@@ -632,8 +661,8 @@ void FKFormPannel::_onConfirmPasswordTextChanged(const QString& text)
     }
     else {
         _pConfirmPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
-        FKLauncherShell::ShowMessage("ERROR", "密码只能包含英文、数字、特殊字符，不允许空格！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::ConfirmPasswordValid };
+        FKLauncherShell::ShowMessage("ERROR", "密码只能包含英文、数字、特殊字符，不允许空格！", NXMessageBarType::Error, _pFormType == Enums::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::ConfirmPasswordValid };
     }
     
     _updateConfirmButtonState();
@@ -644,10 +673,10 @@ void FKFormPannel::_onVerifyCodeTextChanged(const QString& text)
     bool isValid = _validateVerifyCode(text);
     
     if (isValid) {
-        _pValidationFlags |= Launcher::InputValidationFlag::VerifyCodeValid;
+        _pValidationFlags |= Enums::InputValidationFlag::VerifyCodeValid;
         _pVerifyCodeLineEdit->setStyleSheet(_pNormalStyleSheet);
     } else {
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::VerifyCodeValid };
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::VerifyCodeValid };
     }
     
     _updateConfirmButtonState();
@@ -655,22 +684,22 @@ void FKFormPannel::_onVerifyCodeTextChanged(const QString& text)
 
 void FKFormPannel::_onUsernameEditingFinished()
 {
-    if (!(_pValidationFlags & Launcher::InputValidationFlag::UsernameValid)) {
+    if (!(_pValidationFlags & Enums::InputValidationFlag::UsernameValid)) {
         _pUsernameLineEdit->setStyleSheet(_pErrorStyleSheet);
         if (!_pUsernameLineEdit->text().isEmpty()) {
             // 登录/注册
-            FKLauncherShell::ShowMessage("ERROR", "用户名只能包含字母、数字和下划线！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+            FKLauncherShell::ShowMessage("ERROR", "用户名只能包含字母、数字和下划线！", NXMessageBarType::Error, _pFormType == Enums::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
         }
     }
 }
 
 void FKFormPannel::_onEmailEditingFinished()
 {
-    if (!(_pValidationFlags & Launcher::InputValidationFlag::EmailValid)) {
+    if (!(_pValidationFlags & Enums::InputValidationFlag::EmailValid)) {
         _pEmailLineEdit->setStyleSheet(_pErrorStyleSheet);
         if (!_pEmailLineEdit->text().isEmpty()) {
             // 验证/注册
-            FKLauncherShell::ShowMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Authentication ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+            FKLauncherShell::ShowMessage("ERROR", "邮箱格式错误！", NXMessageBarType::Error, _pFormType == Enums::FormType::Authentication ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
             _pVerifyCodeLineEdit->setButtonEnabled(false);
         }
     }
@@ -681,12 +710,12 @@ void FKFormPannel::_onPasswordEditingFinished()
     // 检查确认密码长度是否符合8-20位要求
     QString passwordText = _pPasswordLineEdit->text();
     bool isLengthValid = _validatePasswordLength(passwordText);
-    if (_pFormType == Launcher::FormType::Login) {
+    if (_pFormType == Enums::FormType::Login) {
         if (isLengthValid) {
-            _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
+            _pValidationFlags |= Enums::InputValidationFlag::PasswordValid;
         }
         else {
-            _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+            _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::PasswordValid };
             _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
             FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, NXMessageBarType::BottomLeft);
         }
@@ -701,21 +730,21 @@ void FKFormPannel::_onPasswordEditingFinished()
             {
                 bool isMatch = _validateConfirmPassword(passwordText, comfirmPasswordText);
                 if (isMatch) {
-                    _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
-                    _pValidationFlags |= Launcher::InputValidationFlag::ConfirmPasswordValid;
+                    _pValidationFlags |= Enums::InputValidationFlag::PasswordValid;
+                    _pValidationFlags |= Enums::InputValidationFlag::ConfirmPasswordValid;
                 }
                 else {
-                    _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+                    _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::PasswordValid };
                     _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
                     FKLauncherShell::ShowMessage("ERROR", "两次输入的密码不一致！", NXMessageBarType::Error, NXMessageBarType::BottomRight);
                 }
             }
         }
         else {
-            _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::PasswordValid };
+            _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::PasswordValid };
             _pPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
             if (!passwordText.isEmpty()) {
-                FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+                FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, _pFormType == Enums::FormType::Login ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
             }
         }
     }
@@ -735,18 +764,18 @@ void FKFormPannel::_onConfirmPasswordEditingFinished()
         {
             bool isMatch = _validateConfirmPassword(passwordText, comfirmPasswordText);
             if (isMatch) {
-                _pValidationFlags |= Launcher::InputValidationFlag::PasswordValid;
-                _pValidationFlags |= Launcher::InputValidationFlag::ConfirmPasswordValid;
+                _pValidationFlags |= Enums::InputValidationFlag::PasswordValid;
+                _pValidationFlags |= Enums::InputValidationFlag::ConfirmPasswordValid;
             } 
             else {
-                _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::ConfirmPasswordValid };
+                _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::ConfirmPasswordValid };
                 _pConfirmPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
                 FKLauncherShell::ShowMessage("ERROR", "两次输入的密码不一致！", NXMessageBarType::Error, NXMessageBarType::BottomRight);
             }
         }
     } 
     else {
-        _pValidationFlags &= ~Launcher::InputValidationFlags{ Launcher::InputValidationFlag::ConfirmPasswordValid };
+        _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::ConfirmPasswordValid };
         _pConfirmPasswordLineEdit->setStyleSheet(_pErrorStyleSheet);
         if (!_pConfirmPasswordLineEdit->text().isEmpty()) {
             FKLauncherShell::ShowMessage("ERROR", "密码长度必须为8~20位！", NXMessageBarType::Error, NXMessageBarType::BottomRight);
@@ -758,11 +787,11 @@ void FKFormPannel::_onConfirmPasswordEditingFinished()
 
 void FKFormPannel::_onVerifyCodeEditingFinished()
 {
-    if (!(_pValidationFlags & Launcher::InputValidationFlag::VerifyCodeValid)) {
+    if (!(_pValidationFlags & Enums::InputValidationFlag::VerifyCodeValid)) {
         _pVerifyCodeLineEdit->setStyleSheet(_pErrorStyleSheet);
         if (!_pVerifyCodeLineEdit->text().isEmpty()) {
             // 验证/注册
-            FKLauncherShell::ShowMessage("ERROR", "验证码格式错误！", NXMessageBarType::Error, _pFormType == Launcher::FormType::Authentication ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
+            FKLauncherShell::ShowMessage("ERROR", "验证码格式错误！", NXMessageBarType::Error, _pFormType == Enums::FormType::Authentication ? NXMessageBarType::BottomLeft : NXMessageBarType::BottomRight);
         }
     }
 }
@@ -783,39 +812,24 @@ void FKFormPannel::_onShowConfirmPasswordActionTriggered()
     _pShowConfirmPasswordAction->setText(confirmPasswordVisible ? "隐藏密码" : "显示密码");
 }
 
-void FKFormPannel::_updateVerifyCodeTimer()
-{
-    _pRemainingSeconds--;
-
-    if (_pRemainingSeconds > 0) {
-        _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
-    }
-    else {
-        // 倒计时结束
-        _pVerifyCodeTimer->stop();
-        _pVerifyCodeLineEdit->setButtonText("获取验证码");
-        _pVerifyCodeLineEdit->setButtonEnabled(true);
-    }
-}
-
 void FKFormPannel::_onGetVerifyCodeButtonClicked()
 {
     // 定时器设置，防止用户多次点击
-    _pRemainingSeconds = 60;
-    _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pRemainingSeconds));
+    _pVerifyRemainingSeconds = 60;
+    _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pVerifyRemainingSeconds));
     _pVerifyCodeLineEdit->setButtonEnabled(false);
     _pVerifyCodeTimer->start();
 
     QJsonObject requestObj, dataObj;
     dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
-    dataObj["verify_type"] = _pFormType == Launcher::FormType::Register
-        ? static_cast<int>(flicker::http::service::Register)
-        : static_cast<int>(flicker::http::service::ResetPassword);
-    requestObj["request_service_type"] = static_cast<int>(flicker::http::service::VerifyCode);
+    dataObj["verify_type"] = _pFormType == Enums::FormType::Register
+        ? static_cast<int>(Enums::ServiceType::Register)
+        : static_cast<int>(Enums::ServiceType::ResetPassword);
+    requestObj["request_service_type"] = static_cast<int>(Enums::ServiceType::VerifyCode);
     requestObj["data"] = dataObj;
 
-    FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::VerifyCode,
-        "http://localhost:8080/get_verify_code",
+    FKHttpManager::getInstance()->sendHttpRequest(Enums::ServiceType::VerifyCode,
+        "http://localhost:9527/get_verify_code",
         requestObj);
 }
 
@@ -825,49 +839,51 @@ void FKFormPannel::_onComfirmButtonClicked()
     // 这里只需要处理提交逻辑，不需要重复验证
     QJsonObject requestObj, dataObj;
     switch (_pFormType) {
-    case Launcher::FormType::Login: {
+    case Enums::FormType::Login: {
         dataObj["username"] = _pUsernameLineEdit->text().trimmed();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
-        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::Login);
+        dataObj["client_device_id"] = QString(QSysInfo::machineUniqueId());
+
+        requestObj["request_service_type"] = static_cast<int>(Enums::ServiceType::Login);
         requestObj["data"] = dataObj;
 
-        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::Login,
-            "http://localhost:8080/login_user",
+        FKHttpManager::getInstance()->sendHttpRequest(Enums::ServiceType::Login,
+            "http://localhost:9527/login_user",
             requestObj);
         break;
     }
-    case Launcher::FormType::Register: {
+    case Enums::FormType::Register: {
         dataObj["username"] = _pUsernameLineEdit->text().trimmed();
         dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
         dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
-        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::Register);
+        requestObj["request_service_type"] = static_cast<int>(Enums::ServiceType::Register);
         requestObj["data"] = dataObj;
 
-        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::Register, 
-            "http://localhost:8080/register_user",
+        FKHttpManager::getInstance()->sendHttpRequest(Enums::ServiceType::Register, 
+            "http://localhost:9527/register_user",
             requestObj);
         break;
     }
-    case Launcher::FormType::Authentication: {
+    case Enums::FormType::Authentication: {
         dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["verify_code"] = _pVerifyCodeLineEdit->text().trimmed();
-        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::AuthenticateUser);
+        requestObj["request_service_type"] = static_cast<int>(Enums::ServiceType::AuthenticateResetPwd);
         requestObj["data"] = dataObj;
 
-        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::AuthenticateUser,
-            "http://localhost:8080/authenticate_user",
+        FKHttpManager::getInstance()->sendHttpRequest(Enums::ServiceType::AuthenticateResetPwd,
+            "http://localhost:9527/authenticate_reset_pwd",
             requestObj);
         break;
     }
-    case Launcher::FormType::ResetPassword: {
+    case Enums::FormType::ResetPassword: {
         dataObj["email"] = _pEmailLineEdit->text().trimmed().toLower();
         dataObj["hashed_password"] = QString(QCryptographicHash::hash(_pPasswordLineEdit->text().toUtf8(), QCryptographicHash::Sha256).toHex());
-        requestObj["request_service_type"] = static_cast<int>(flicker::http::service::ResetPassword);
+        requestObj["request_service_type"] = static_cast<int>(Enums::ServiceType::ResetPassword);
         requestObj["data"] = dataObj;
 
-        FKHttpManager::getInstance()->sendHttpRequest(flicker::http::service::ResetPassword,
-            "http://localhost:8080/reset_password",
+        FKHttpManager::getInstance()->sendHttpRequest(Enums::ServiceType::ResetPassword,
+            "http://localhost:9527/reset_password",
             requestObj);
         break;
     }
@@ -886,4 +902,43 @@ void FKFormPannel::_onSwitchSigninOrResetTextClicked()
         _updateSwitchedUI();
         _pCentralStackedWidget->doWindowStackSwitch(NXWindowType::Scale, 0, true);
     }
+}
+
+void FKFormPannel::_updateVerifyCodeTimer()
+{
+    _pVerifyRemainingSeconds--;
+
+    if (_pVerifyRemainingSeconds > 0) {
+        _pVerifyCodeLineEdit->setButtonText(QString("%1s").arg(_pVerifyRemainingSeconds));
+    }
+    else {
+        // 倒计时结束
+        _pVerifyCodeTimer->stop();
+        _pVerifyCodeLineEdit->setButtonText("获取验证码");
+        _pVerifyCodeLineEdit->setButtonEnabled(true);
+    }
+}
+
+void FKFormPannel::_connectToChatServer(const QString& host, int port, const QString& loginToken, const QString& clientDeviceId)
+{
+    auto tcpManager = FKTcpManager::getInstance();
+    tcpManager->setAuthenticationInfo(loginToken, clientDeviceId);
+    tcpManager->connectToServer(host, static_cast<uint16_t>(port));
+}
+
+void FKFormPannel::_handleAuthenticationResult(bool success, const QString& message)
+{
+    auto tcpManager = FKTcpManager::getInstance();
+    if (success) {
+        FKLauncherShell::ShowMessage("SUCCESS", "Login successful!", NXMessageBarType::Success, NXMessageBarType::TopLeft);
+    }
+    else {
+        FKLauncherShell::ShowMessage("ERROR", message, NXMessageBarType::Error, NXMessageBarType::BottomLeft);
+        tcpManager->disconnectFromServer();
+    }
+}
+
+void FKFormPannel::_handleTcpConnectionError(const QString& error)
+{
+    FKLauncherShell::ShowMessage("ERROR", error, NXMessageBarType::Error, NXMessageBarType::BottomLeft);
 }

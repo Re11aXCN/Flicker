@@ -17,18 +17,17 @@
 #include <QNetworkAccessManager>
 #include <QJsonObject>
 
-#include "Common/global/define_enum.h"
-#include "Common/global/macro.h"
+#include "FKDef.h"
 class FKHttpManager : public QObject, public std::enable_shared_from_this<FKHttpManager>
 {
     Q_OBJECT
     SINGLETON_CREATE_SHARED_H(FKHttpManager)
 public:
     ~FKHttpManager() = default;
-    void sendHttpRequest(flicker::http::service serviceType, const QString& url, const QJsonObject& json);
+    void sendHttpRequest(Flicker::Client::Enums::ServiceType serviceType, const QString& url, const QJsonObject& json);
 
 Q_SIGNALS:
-    void httpRequestFinished(flicker::http::service serviceType, const QJsonObject& json);
+    void httpRequestFinished(Flicker::Client::Enums::ServiceType serviceType, const QJsonObject& json);
 private:
     explicit FKHttpManager(QObject* parent = nullptr);
 

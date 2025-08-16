@@ -1,0 +1,443 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flicker - 验证您的注册</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 重置样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        body {
+            background: white /*linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c)*/;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .email-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 20px;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+            position: relative;
+            transition: transform 0.3s ease;
+        }
+        
+        .email-container:hover {
+            transform: translateY(-5px);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            padding: 40px 20px 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .logo-container {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 70px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .logo {
+            color: #6a11cb;
+            font-size: 36px;
+        }
+        
+        .app-name {
+            color: white;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .tagline {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            font-weight: 300;
+        }
+        
+        .content {
+            padding: 50px 30px 40px;
+            text-align: center;
+            background: #fff;
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 30px;
+            position: relative;
+            padding-bottom: 15px;
+        }
+        
+        .title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, #6a11cb, #2575fc);
+            border-radius: 2px;
+        }
+        
+        .text {
+            font-size: 17px;
+            color: #4a5568;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        
+        .verification-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 30px 0;
+        }
+        
+        .verification-code {
+            background: #f8f9fc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px 40px;
+            font-size: 40px;
+            font-weight: 800;
+            color: #3182ce;
+            letter-spacing: 8px;
+            display: inline-block;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .verification-code:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .copy-btn {
+            display: inline-flex;
+            align-items: center;
+            background: #3182ce;
+            color: white;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(49, 130, 206, 0.4);
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        
+        .copy-btn:hover {
+            background: #2b6cb0;
+            transform: translateY(-3px);
+            box-shadow: 0 7px 20px rgba(49, 130, 206, 0.5);
+        }
+        
+        .copy-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .copy-btn i {
+            margin-right: 12px;
+            font-size: 20px;
+        }
+        
+        .note {
+            background: #f0f9ff;
+            border-left: 4px solid #3182ce;
+            padding: 20px;
+            text-align: left;
+            margin: 40px 0 30px;
+            border-radius: 0 8px 8px 0;
+            font-size: 15px;
+        }
+        
+        .note-title {
+            color: #2d3748;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .note-title i {
+            color: #3182ce;
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .note ul {
+            padding-left: 30px;
+        }
+        
+        .note li {
+            margin-bottom: 10px;
+            color: #4a5568;
+        }
+        
+        .support {
+            font-size: 16px;
+            color: #4a5568;
+            margin-top: 40px;
+        }
+        
+        .support a {
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .support a:hover {
+            text-decoration: underline;
+            color: #2b6cb0;
+        }
+        
+        .footer {
+            background: #f7fafc;
+            padding: 30px 20px;
+            text-align: center;
+            color: #718096;
+            font-size: 14px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .footer-links {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .footer-links a {
+            color: #4a5568;
+            text-decoration: none;
+            margin: 0 15px;
+            transition: color 0.2s;
+            display: inline-block;
+            padding: 5px 0;
+        }
+        
+        .footer-links a:hover {
+            color: #3182ce;
+            text-decoration: underline;
+        }
+        
+        .address {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .automated-note {
+            font-size: 13px;
+            color: #a0aec0;
+            margin-top: 25px;
+            font-style: italic;
+        }
+        
+        .copy-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(49, 130, 206, 0.95);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.4s ease;
+            z-index: 1000;
+        }
+        
+        .copy-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        @media (max-width: 620px) {
+            .email-container {
+                margin: 10px;
+            }
+            
+            .content {
+                padding: 40px 20px;
+            }
+            
+            .verification-code {
+                font-size: 30px;
+                padding: 20px 30px;
+                letter-spacing: 6px;
+            }
+            
+            .title {
+                font-size: 24px;
+            }
+            
+            .copy-btn {
+                padding: 14px 30px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 复制成功通知 -->
+    <div class="copy-notification" id="copyNotification">
+        <i class="fas fa-check-circle"></i> 验证码已复制到剪贴板！
+    </div>
+    
+    <div class="email-container">
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo">
+                    <i class="fas fa-bolt"></i>
+                </div>
+            </div>
+            <h1 class="app-name">Flicker</h1>
+            <p class="tagline">即时通讯，连接世界</p>
+        </div>
+        
+        <div class="content">
+            <h2 class="title">验证您的{{VERIFICATION_TYPE}}</h2>
+            <p class="text">感谢您{{VERIFICATION_TYPE}}Flicker！为完成{{VERIFICATION_TYPE}}，请复制下方验证码并粘贴到{{VERIFICATION_TYPE}}页面：</p>
+            
+            <div class="verification-container">
+				<div class="verification-code" id="verificationCode">{{VERIFICATION_CODE}}</div>
+                
+                <button class="copy-btn" id="copyButton">
+                    <i class="fas fa-copy"></i> 复制验证码
+                </button>
+            </div>
+            
+            <div class="note">
+                <div class="note-title">
+                    <i class="fas fa-info-circle"></i> 重要提示：
+                </div>
+                <ul>
+                    <li>此验证码将在 <strong>5分钟</strong> 后失效</li>
+                    <li>请勿将此代码分享给任何人</li>
+                    <li>如果您没有请求此验证码，请忽略此邮件</li>
+                    <li>复制后请尽快在{{VERIFICATION_TYPE}}页面完成验证</li>
+                </ul>
+            </div>
+            
+            <p class="support">
+                如有任何问题，请随时回复此邮件或访问我们的
+                <a href="#">帮助中心</a>。
+            </p>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-links">
+                <a href="#">帮助中心</a>
+                <a href="#">隐私政策</a>
+                <a href="#">服务条款</a>
+                <a href="#">联系我们</a>
+            </div>
+            
+             <div class="address">
+				Re11aXCN <br>
+				https://github.com/Re11aXCN<br>
+				CN
+             </div>
+            
+             <p class="automated-note">
+                 这是一封自动发送的邮件。如果您未进行{{VERIFICATION_TYPE}}操作，请忽略此邮件。
+             </p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const copyButton = document.getElementById('copyButton');
+            const verificationCode = document.getElementById('verificationCode');
+            const notification = document.getElementById('copyNotification');
+            
+            copyButton.addEventListener('click', function() {
+                // 获取验证码文本
+                const code = verificationCode.innerText.trim();
+                
+                // 使用现代剪贴板API
+                navigator.clipboard.writeText(code).then(() => {
+                    // 显示复制成功通知
+                    notification.classList.add('show');
+                    
+                    // 更新按钮状态
+                    copyButton.innerHTML = '<i class="fas fa-check"></i> 已复制！';
+                    copyButton.style.background = '#10b981';
+                    
+                    // 3秒后恢复按钮状态
+                    setTimeout(() => {
+                        copyButton.innerHTML = '<i class="fas fa-copy"></i> 复制验证码';
+                        copyButton.style.background = '#3182ce';
+                        notification.classList.remove('show');
+                    }, 3000);
+                }).catch(err => {
+                    // 备用方法（适用于旧浏览器）
+                    const textArea = document.createElement('textarea');
+                    textArea.value = code;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    
+                    try {
+                        document.execCommand('copy');
+                        
+                        // 显示复制成功通知
+                        notification.classList.add('show');
+                        
+                        // 更新按钮状态
+                        copyButton.innerHTML = '<i class="fas fa-check"></i> 已复制！';
+                        copyButton.style.background = '#10b981';
+                        
+                        // 3秒后恢复按钮状态
+                        setTimeout(() => {
+                            copyButton.innerHTML = '<i class="fas fa-copy"></i> 复制验证码';
+                            copyButton.style.background = '#3182ce';
+                            notification.classList.remove('show');
+                        }, 3000);
+                    } catch (err) {
+                        alert('无法复制验证码，请手动复制: ' + code);
+                    }
+                    
+                    document.body.removeChild(textArea);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

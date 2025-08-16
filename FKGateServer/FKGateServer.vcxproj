@@ -34,17 +34,17 @@
     <ClInclude Include="Core\FKGateServer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Common\config\config_manager.cpp" />
-    <ClCompile Include="..\Common\grpc\grpc_service.grpc.pb.cc" />
-    <ClCompile Include="..\Common\grpc\grpc_service.pb.cc" />
-    <ClCompile Include="..\Common\grpc\grpc_service_pool_manager.cpp" />
-    <ClCompile Include="..\Common\mysql\entity\base_entity.cpp" />
-    <ClCompile Include="..\Common\mysql\mapper\user_mapper.cpp" />
-    <ClCompile Include="..\Common\mysql\mysql_connection.cpp" />
-    <ClCompile Include="..\Common\mysql\mysql_connection_pool.cpp" />
-    <ClCompile Include="..\Common\redis\redis_connection_pool.cpp" />
-    <ClCompile Include="..\Common\server\asio_thread_pool.cpp" />
-    <ClCompile Include="Core\main.cpp" />
+    <ClCompile Include="..\Flicker\Global\Asio\FKIoContextThreadPool.cpp" />
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.grpc.pb.cc" />
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.pb.cc" />
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcServiceStubPoolManager.cpp" />
+    <ClCompile Include="..\Flicker\Global\Mysql\FKUserMapper.cpp" />
+    <ClCompile Include="..\Flicker\Global\Redis\FKRedisSingleton.cpp" />
+    <ClCompile Include="..\Flicker\Global\universal\mysql\base_entity.cpp" />
+    <ClCompile Include="..\Flicker\Global\universal\mysql\connection.cpp" />
+    <ClCompile Include="..\Flicker\Global\universal\mysql\connection_pool.cpp" />
+    <ClCompile Include="..\Flicker\Global\universal\smtp\smtp_mail_sender.cpp" />
+    <ClCompile Include="_GateServerEntryPoint.cpp" />
     <ClCompile Include="Core\FKHttpConnection.cpp" />
     <ClCompile Include="Core\FKLogicSystem.cpp" />
     <ClCompile Include="Core\FKGateServer.cpp" />
@@ -180,11 +180,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNIVERSAL_MYSQL_HEADER_ONLY;_DEBUG;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir);$(SolutionDir)Server;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(SolutionDir);$(SolutionDir)Flicker\Global;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -194,7 +194,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>loggerd.lib;spdlogd.lib;fmtd.lib;hiredisd.lib;redis++.lib;jsoncpp.lib;abseil_dll.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lited.lib;libprotobufd.lib;libprotocd.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>logger.lib;libbcrypt.lib;libcurl.lib;libmysql.lib;fmt.lib;spdlog.lib;hiredis.lib;redis++.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;abseil_dll.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(MYSQL_HOME)\lib;$(VCPKG_INS_PACKAGE_DIR)\debug\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -204,11 +204,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_RELEASE;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNIVERSAL_MYSQL_HEADER_ONLY;_RELEASE;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir);$(SolutionDir)Server;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(SolutionDir);$(SolutionDir)Flicker\Global;$(VCPKG_INS_PACKAGE_DIR)\include;$(BOOST_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -219,8 +219,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>logger.lib;spdlog.lib;fmt.lib;libmysql.lib;redis++.lib;hiredis.lib;jsoncpp.lib;abseil_dll.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(MYSQL_HOME)\lib;$(VCPKG_INS_PACKAGE_DIR)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>logger.lib;libbcrypt.lib;libcurl.lib;libmysql.lib;fmt.lib;spdlog.lib;hiredis.lib;redis++.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;abseil_dll.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(VCPKG_INS_PACKAGE_DIR)\lib;$(BOOST_INS_PACKAGE_DIR)\lib;$(MYSQL_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
@@ -229,7 +229,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_RELWITHDEBINFO;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNIVERSAL_MYSQL_HEADER_ONLY;_RELWITHDEBINFO;_WIN32_WINNT=0x0601;_UNICODE;UNICODE;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -241,13 +241,13 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>
       </ForcedIncludeFiles>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir);$(SolutionDir)Server;$(BOOST_INS_PACKAGE_DIR)\include;$(VCPKG_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(SolutionDir);$(SolutionDir)Flicker\Global;$(VCPKG_INS_PACKAGE_DIR)\include;$(BOOST_INS_PACKAGE_DIR)\include;$(MYSQL_HOME)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalDependencies>logger.lib;spdlog.lib;fmt.lib;libmysql.lib;redis++.lib;hiredis.lib;jsoncpp.lib;abseil_dll.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(BOOST_INS_PACKAGE_DIR)\lib;$(MYSQL_HOME)\lib;$(VCPKG_INS_PACKAGE_DIR)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>logger.lib;libbcrypt.lib;libcurl.lib;libmysql.lib;fmt.lib;spdlog.lib;hiredis.lib;redis++.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_log_internal_structured_proto.lib;absl_poison.lib;absl_tracing_internal.lib;absl_utf8_for_code_point.lib;address_sorting.lib;abseil_dll.lib;cares.lib;gpr.lib;grpc++.lib;grpc++_alts.lib;grpc++_error_details.lib;grpc++_reflection.lib;grpc++_unsecure.lib;grpc.lib;grpcpp_channelz.lib;grpc_authorization_provider.lib;grpc_plugin_support.lib;grpc_unsecure.lib;libcrypto.lib;libprotobuf-lite.lib;libprotobuf.lib;libprotoc.lib;libssl.lib;re2.lib;upb_base_lib.lib;upb_json_lib.lib;upb_mem_lib.lib;upb_message_lib.lib;upb_mini_descriptor_lib.lib;upb_textformat_lib.lib;upb_wire_lib.lib;utf8_range.lib;utf8_validity.lib;zlib.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Bin\$(SolutionName)_$(Configuration)_$(Platform);$(VCPKG_INS_PACKAGE_DIR)\lib;$(BOOST_INS_PACKAGE_DIR)\lib;$(MYSQL_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

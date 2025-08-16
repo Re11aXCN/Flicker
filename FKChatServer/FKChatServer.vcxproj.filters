@@ -15,8 +15,34 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="_ChatServerEntryPoint.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\Flicker\Global\Asio\FKIoContextThreadPool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.grpc.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.pb.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcServiceStubPoolManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\FKTcpConnection.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\FKChatServer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\FKTcpConnection.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\FKChatServer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

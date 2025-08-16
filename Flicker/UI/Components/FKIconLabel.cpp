@@ -3,7 +3,8 @@
 #include <QEvent>
 #include <QStyleOption>
 
-#include "Self/FKDef.h"
+#include "FKDef.h"
+using namespace Flicker::Client;
 FKIconLabel::FKIconLabel(const QString& iconString, QWidget* parent /*= nullptr*/)
     : NXText(parent)
     , _pIconString(iconString)
@@ -55,7 +56,7 @@ void FKIconLabel::paintEvent(QPaintEvent* event)
     font.setPixelSize(25); // 25px 大小
     painter.setFont(font);
 
-    QColor currColor = _pMouseHover ? Constant::LAUNCHER_ICON_HOVER_COLOR : Constant::LAUNCHER_ICON_NORMAL_COLOR;
+    QColor currColor = _pMouseHover ? Constants::LAUNCHER_ICON_HOVER_COLOR : Constants::LAUNCHER_ICON_NORMAL_COLOR;
     // 根据悬停状态设置颜色
     painter.setPen(currColor);
     painter.drawText(rect(), Qt::AlignCenter, _pIconString);

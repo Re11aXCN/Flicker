@@ -1,8 +1,8 @@
 ﻿#include "FKHttpConnection.h"
 
 #include "FKLogicSystem.h"
-#include "Common/utils/utils.h"
-#include "Common/logger/logger_defend.h"
+#include "Flicker/Global/universal/utils.h"
+#include "Library/Logger/logger.h"
 
 FKHttpConnection::FKHttpConnection(boost::asio::io_context& ioc)
     : _pSocket(ioc)
@@ -147,7 +147,7 @@ void FKHttpConnection::_writeResponse()
     // 设置内容长度和常见响应头
     _pResponse.content_length(_pResponse.body().size());
     _pResponse.set(boost::beast::http::field::server, "GateServer");
-    _pResponse.set(boost::beast::http::field::date, utils::get_gmtime());
+    _pResponse.set(boost::beast::http::field::date, universal::utils::time::get_gmtime());
     
     // 设置为短连接
     _pResponse.keep_alive(false);
@@ -203,13 +203,13 @@ void FKHttpConnection::_handleRequest()
         {
         case boost::beast::http::verb::get: {
             // 解析GET请求的查询参数
-            _pQueryParams = utils::parse_query_params(_pRequest.target(), _pUrl);
+            _pQueryParams = universal::utils::miscella::parse_query_params(_pRequest.target(), _pUrl);
             
             // 记录解析后的URL和参数数量
             LOGGER_INFO(std::format("解析URL: {}, 参数数量: {}", _pUrl, _pQueryParams.size()));
             
             // 调用业务逻辑处理
-            success = FKLogicSystem::getInstance()->callBack(_pUrl, flicker::http::verb::get, shared_from_this());
+            success = FKLogicSystem::getInstance()->callBack(_pUrl, boost::beast::http::verb::get, shared_from_this());
             break;
         }
         case boost::beast::http::verb::post: {
@@ -220,7 +220,7 @@ void FKHttpConnection::_handleRequest()
             LOGGER_INFO(std::format("POST请求: {}, 请求体大小: {}", _pUrl, _pRequest.body().size()));
             
             // 调用业务逻辑处理
-            success = FKLogicSystem::getInstance()->callBack(_pUrl, flicker::http::verb::post, shared_from_this());
+            success = FKLogicSystem::getInstance()->callBack(_pUrl, boost::beast::http::verb::post, shared_from_this());
             break;
         }
         case boost::beast::http::verb::options: {

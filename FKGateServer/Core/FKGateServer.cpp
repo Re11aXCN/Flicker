@@ -1,8 +1,9 @@
 ﻿#include "FKGateServer.h"
 
 #include "FKHttpConnection.h"
-#include "Common/server/asio_ioc_thread_pool.h"
-#include "Common/logger/logger_defend.h"
+#include "Flicker/Global/Asio/FKIoContextThreadPool.h"
+#include "Flicker/Global/FKDef.h"
+#include "Library/Logger/logger.h"
 
 FKGateServer::FKGateServer(boost::asio::io_context& ioc, UINT16 port)
     : _pIoContext(ioc)
@@ -53,7 +54,7 @@ void FKGateServer::start()
     _pIsRunning = true;
     try {
         // 获取下一个可用的IO上下文
-        AsioIocThreadPool::ioContext& ioc = AsioIocThreadPool::getInstance()->getNextContext();
+        FKIoContextThreadPool::ioContext& ioc = FKIoContextThreadPool::getInstance()->getNextContext();
         // 创建新的HTTP连接对象
         std::shared_ptr<FKHttpConnection> connection = std::make_shared<FKHttpConnection>(ioc);
 

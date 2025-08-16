@@ -9,6 +9,14 @@
       {
         "Path": "FKGateServer\\FKGateServer.vcxproj",
         "Action": "Start"
+      },
+      {
+        "Path": "FKStatusServer\\FKStatusServer.vcxproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "FKChatServer\\FKChatServer.vcxproj",
+        "Action": "Start"
       }
     ]
   }

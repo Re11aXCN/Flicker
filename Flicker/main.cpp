@@ -2,7 +2,7 @@
 #include <QScreen>
 #include <QFontDatabase>
 #include <NXApplication.h>
-#include "Common/logger/logger_defend.h"
+#include "Library/Logger/logger.h"
 #include "FKLauncherShell.h"
 int main(int argc, char* argv[])
 {

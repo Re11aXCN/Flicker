@@ -120,7 +120,7 @@ UserTestEntity UserTestMapper::createEntityFromRow(MYSQL_ROW row, MYSQL_FIELD* f
 
 std::optional<UserTestEntity> UserTestMapper::findByEmail(const std::string& email) {
     try {
-        auto results = queryEntities<>(findByEmailQuery(), varchar{ email.data(), static_cast<unsigned long>(email.length()) });
+        auto results = queryEntities<>(findByEmailQuery(), mysql_varchar{ email.data(), static_cast<unsigned long>(email.length()) });
         
         if (results.empty()) {
             return std::nullopt;
@@ -135,7 +135,7 @@ std::optional<UserTestEntity> UserTestMapper::findByEmail(const std::string& ema
 
 std::optional<UserTestEntity> UserTestMapper::findByUsername(const std::string& username) {
     try {
-        auto results = queryEntities<>(findByUsernameQuery(), varchar{ username.data(), static_cast<unsigned long>(username.length()) });
+        auto results = queryEntities<>(findByUsernameQuery(), mysql_varchar{ username.data(), static_cast<unsigned long>(username.length()) });
         
         if (results.empty()) {
             return std::nullopt;
@@ -178,7 +178,7 @@ void UserTestMapper::testTrueCondition()
             std::string f1 = "123456789";
             auto results4 = updateFieldsByCondition(condition, 
                 std::vector<std::string>{"password"},
-                BindableParam{ varchar{ f1.data(), static_cast<unsigned long>(f1.length()) } });
+                BindableParam{ mysql_varchar{ f1.data(), static_cast<unsigned long>(f1.length()) } });
 
             LOGGER_INFO(std::format("TrueCondition测试 - updateFieldsByCondition影响行数: {}", results4.second));
             auto results1 = queryEntitiesByCondition<>(condition);
@@ -220,7 +220,7 @@ void UserTestMapper::testTrueCondition()
 void UserTestMapper::testEqualCondition() {
     try {
         // 创建等值条件
-        auto condition = QueryConditionBuilder::eq_("username", varchar{"test1", 5});
+        auto condition = QueryConditionBuilder::eq_("username", mysql_varchar{"test1", 5});
         
         // 查询符合条件的实体
         auto results = queryEntitiesByCondition<>(condition);
@@ -239,7 +239,7 @@ void UserTestMapper::testEqualCondition() {
 void UserTestMapper::testNotEqualCondition() {
     try {
         // 创建不等值条件
-        auto condition = QueryConditionBuilder::neq_("username", varchar{"test1", 5});
+        auto condition = QueryConditionBuilder::neq_("username", mysql_varchar{"test1", 5});
         
         // 查询符合条件的实体
         auto results = queryEntitiesByCondition<>(condition);
@@ -339,7 +339,7 @@ void UserTestMapper::testLessThanCondition() {
 void UserTestMapper::testLikeCondition() {
     try {
         // 创建模糊匹配条件 (username LIKE 'test%')
-        auto condition = QueryConditionBuilder::like_("username", varchar{ "test%", 5 });
+        auto condition = QueryConditionBuilder::like_("username", mysql_varchar{ "test%", 5 });
         
         // 查询符合条件的实体
         auto results = queryEntitiesByCondition<>(condition);
@@ -358,7 +358,7 @@ void UserTestMapper::testLikeCondition() {
 void UserTestMapper::testRegexpCondition() {
     try {
         // 创建正则表达式条件 (username REGEXP '^test[0-9]')
-        auto condition = QueryConditionBuilder::regexp_("username", varchar{ "^test[0-9]", 10 });
+        auto condition = QueryConditionBuilder::regexp_("username", mysql_varchar{ "^test[0-9]", 10 });
         
         // 查询符合条件的实体
         auto results = queryEntitiesByCondition<>(condition);
@@ -450,7 +450,7 @@ void UserTestMapper::testAndCondition() {
         // 创建AND条件 (id > 1 AND username LIKE 'test%')
         auto andCondition = QueryConditionBuilder::and_();
         andCondition->addCondition(QueryConditionBuilder::gt_("id", (uint32_t)1));
-        andCondition->addCondition(QueryConditionBuilder::like_("username", varchar{ "test%", 5 }));
+        andCondition->addCondition(QueryConditionBuilder::like_("username", mysql_varchar{ "test%", 5 }));
         std::unique_ptr<IQueryCondition> baseCondition = std::move(andCondition);
 
         // 查询符合条件的实体
@@ -539,7 +539,7 @@ void UserTestMapper::testUpdateByCondition() {
         std::vector<std::string> fieldNames = {"email", "password", "update_time"};
         auto [status, affectedRows] = updateFieldsByCondition(condition, fieldNames,
             ExpressionParam("'123@test.com'"),
-            BindableParam{ varchar{"updated_password", 16} },
+            BindableParam{ mysql_varchar{"updated_password", 16} },
             ExpressionParam("NOW(3)"));
         
         // 输出结果
@@ -584,8 +584,8 @@ void UserTestMapper::testComplexCondition() {
         andCondition->addCondition(QueryConditionBuilder::gt_("id", (uint32_t)1));
         
         auto orCondition = std::make_unique<OrCondition>();
-        orCondition->addCondition(QueryConditionBuilder::like_("username", varchar{ "test%", 5 }));
-        orCondition->addCondition(QueryConditionBuilder::like_("email", varchar{ "%@test.com", 10 }));
+        orCondition->addCondition(QueryConditionBuilder::like_("username", mysql_varchar{ "test%", 5 }));
+        orCondition->addCondition(QueryConditionBuilder::like_("email", mysql_varchar{ "%@test.com", 10 }));
         
         andCondition->addCondition(std::move(orCondition));
         andCondition->addCondition(QueryConditionBuilder::isNotNull_("update_time"));

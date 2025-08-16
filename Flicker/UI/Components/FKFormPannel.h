@@ -23,9 +23,8 @@
 #include <QHBoxLayout>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
-#include "Common/global/define_enum.h"
 
-#include "Self/FKDef.h"
+#include "FKDef.h"
 class FKPushButton;
 class FKLineEdit;
 class FKIconLabel;
@@ -58,42 +57,50 @@ private:
     bool _validateConfirmPassword(const QString& password, const QString& confirmPassword);
     bool _validateVerifyCode(const QString& verifyCode);
 
-    // private slots
-    Q_SLOT void _handleServerResponse(flicker::http::service serviceType, const QJsonObject& responseJsonObj);
-    Q_SLOT void _onGetVerifyCodeButtonClicked();
-    Q_SLOT void _onComfirmButtonClicked();
-    Q_SLOT void _onSwitchSigninOrResetTextClicked();
+private Q_SLOTS:
+    void _handleServerResponse(Flicker::Client::Enums::ServiceType serviceType, const QJsonObject& responseJsonObj);
+    void _onGetVerifyCodeButtonClicked();
+    void _onComfirmButtonClicked();
+    void _onSwitchSigninOrResetTextClicked();
 
     // 输入验证槽
-    Q_SLOT void _onUsernameTextChanged(const QString& text);
-    Q_SLOT void _onEmailTextChanged(const QString& text);
-    Q_SLOT void _onPasswordTextChanged(const QString& text);
-    Q_SLOT void _onConfirmPasswordTextChanged(const QString& text);
-    Q_SLOT void _onVerifyCodeTextChanged(const QString& text);
+    void _onUsernameTextChanged(const QString& text);
+    void _onEmailTextChanged(const QString& text);
+    void _onPasswordTextChanged(const QString& text);
+    void _onConfirmPasswordTextChanged(const QString& text);
+    void _onVerifyCodeTextChanged(const QString& text);
     
     // 输入框焦点变化槽
-    Q_SLOT void _onUsernameEditingFinished();
-    Q_SLOT void _onEmailEditingFinished();
-    Q_SLOT void _onPasswordEditingFinished();
-    Q_SLOT void _onConfirmPasswordEditingFinished();
-    Q_SLOT void _onVerifyCodeEditingFinished();
+    void _onUsernameEditingFinished();
+    void _onEmailEditingFinished();
+    void _onPasswordEditingFinished();
+    void _onConfirmPasswordEditingFinished();
+    void _onVerifyCodeEditingFinished();
 
-    Q_SLOT void _onShowPasswordActionTriggered();
-    Q_SLOT void _onShowConfirmPasswordActionTriggered();
+    void _onShowPasswordActionTriggered();
+    void _onShowConfirmPasswordActionTriggered();
 
-    Q_SLOT void _updateVerifyCodeTimer();
+    void _updateVerifyCodeTimer();
 
+    // TCP连接相关方法;
+    void _connectToChatServer(const QString& host, int port, const QString& loginToken, const QString& clientDeviceId);
+    void _handleTcpConnectionError(const QString& error);
+    void _handleAuthenticationResult(bool success, const QString& message);
+private:
     bool _pIsSwitchStackedWidget{ false };
-    int _pRemainingSeconds{ 0 };
+    int _pVerifyRemainingSeconds{ 0 };
 
-    Launcher::FormType _pFormType{ Launcher::FormType::Login };
+    Flicker::Client::Enums::FormType _pFormType
+    { Flicker::Client::Enums::FormType::Login };
     // 验证状态标志
-    Launcher::InputValidationFlags _pValidationFlags{ Launcher::InputValidationFlag::None };
+    Flicker::Client::Enums::InputValidationFlags _pValidationFlags
+    { Flicker::Client::Enums::InputValidationFlag::None };
+
     QString _pErrorStyleSheet{};
     QString _pNormalStyleSheet{};
     QIcon _pShowPasswordIcon;
     QIcon _pHidePasswordIcon;
-    QHash<flicker::http::service, std::function<void(const QJsonObject&)>> _pResponseCallbacks;
+    QHash<Flicker::Client::Enums::ServiceType, std::function<void(const QJsonObject&)>> _pResponseCallbacks;
 
     QWidget* _pLoginRegisterWidget{ nullptr };
     QWidget* _pResetPasswordWidget{ nullptr };

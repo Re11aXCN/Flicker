@@ -5,12 +5,13 @@
 #include <QParallelAnimationGroup>
 
 #include <NXIcon.h>
-#include "Common/utils/utils.h"
+#include "universal/utils.h"
 
-#include "Self/FKDef.h"
+#include "FKDef.h"
 #include "Components/FKFormPannel.h"
 #include "Components/FKSwitchPannel.h"
 
+using namespace Flicker::Client;
 FKLauncherShell::FKLauncherShell(QWidget* parent /*= nullptr*/)
     : NXWidget(parent)
     , _pCircleX{ 0.0 }
@@ -49,17 +50,17 @@ void FKLauncherShell::paintEvent(QPaintEvent* event)
 
     QPainter painter(this);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-    _drawEdgeShadow(painter, _pSwitchPannel->rect(), Constant::SWITCH_BOX_SHADOW_COLOR, Constant::SWITCH_BOX_SHADOW_WIDTH);
+    _drawEdgeShadow(painter, _pSwitchPannel->rect(), Constants::SWITCH_BOX_SHADOW_COLOR, Constants::SWITCH_BOX_SHADOW_WIDTH);
 }
 
 void FKLauncherShell::_initUi()
 {
     setAppBarHeight(30);
     setIsFixedSize(true);
-    setFixedSize(Constant::WIDGET_WIDTH, Constant::WIDGET_HEIGHT);
+    setFixedSize(Constants::WIDGET_WIDTH, Constants::WIDGET_HEIGHT);
     setWindowTitle("Flicker");
     setWindowIcon(QIcon(":/Resource/ico/Weixin_IDI_ICON1.ico"));
-    setCustomBackgroundColor(Constant::LIGHT_MAIN_BG_COLOR, Constant::DARK_MAIN_BG_COLOR);
+    setCustomBackgroundColor(Constants::LIGHT_MAIN_BG_COLOR, Constants::DARK_MAIN_BG_COLOR);
     setWindowButtonFlags(NXAppBarType::MinimizeButtonHint | NXAppBarType::CloseButtonHint);
     _pMessageButton = new NXMessageButton(this);
     _pFormPannel = new FKFormPannel(this);
@@ -69,14 +70,14 @@ void FKLauncherShell::_initUi()
     _pMessageButton->setFixedSize(1, 1);
     _pMessageButton->setVisible(false);
 
-    _pFormPannel->setFixedSize(Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
-    _pSwitchPannel->setFixedSize(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
+    _pFormPannel->setFixedSize(Constants::WIDGET_HEIGHT, Constants::WIDGET_HEIGHT);
+    _pSwitchPannel->setFixedSize(Constants::WIDGET_WIDTH - Constants::WIDGET_HEIGHT, Constants::WIDGET_HEIGHT);
 
-    _pShadowWidget->setFixedSize(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, Constant::WIDGET_HEIGHT);
+    _pShadowWidget->setFixedSize(Constants::WIDGET_WIDTH - Constants::WIDGET_HEIGHT, Constants::WIDGET_HEIGHT);
     _pShadowWidget->setAttribute(Qt::WA_TranslucentBackground, true);
     _pShadowWidget->setBlur(30.0);
-    _pShadowWidget->setLightColor(Constant::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
-    _pShadowWidget->setDarkColor(Constant::SWITCH_CIRCLE_LIGHT_SHADOW_COLOR);
+    _pShadowWidget->setLightColor(Constants::SWITCH_CIRCLE_DARK_SHADOW_COLOR);
+    _pShadowWidget->setDarkColor(Constants::SWITCH_CIRCLE_LIGHT_SHADOW_COLOR);
     _pShadowWidget->setLightOffset({ -5,-5 });
     _pShadowWidget->setDarkOffset({ 5,5 });
     _pShadowWidget->setProjectionType(NXWidgetType::BoxShadow::ProjectionType::Outset);
@@ -84,7 +85,7 @@ void FKLauncherShell::_initUi()
     _pShadowWidget->setCustomDraw([this](QPainter* painter, QWidget* p) {
         painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
         painter->setPen(Qt::NoPen);
-        painter->setBrush(Constant::LIGHT_MAIN_BG_COLOR);
+        painter->setBrush(Constants::LIGHT_MAIN_BG_COLOR);
         QPainterPath rectPath;
         rectPath.addRect(_pShadowWidget->rect());
         // 创建凹槽路径
@@ -116,7 +117,7 @@ void FKLauncherShell::_initUi()
         QPainterPath finalPath = rectPath.subtracted(notchPath);
         painter->drawPath(finalPath);
         });
-    _pFormPannel->move(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, 0);
+    _pFormPannel->move(Constants::WIDGET_WIDTH - Constants::WIDGET_HEIGHT, 0);
     _pSwitchPannel->move(0, 0);
     _pShadowWidget->move(0, 0);
     
@@ -183,14 +184,14 @@ void FKLauncherShell::_onSwitchPannelButtonClicked()
     _pFormPannelAnimation->setStartValue(formPos);
     _pSwitchCircleXAnimation->setStartValue(_pCircleX);
     if (switchPos.x() == 0) {
-        _pSwitchPannelAnimation->setEndValue(QPoint(Constant::WIDGET_HEIGHT, 0));
-        _pShadowWidgetAnimation->setEndValue(QPoint(Constant::WIDGET_HEIGHT, 0));
+        _pSwitchPannelAnimation->setEndValue(QPoint(Constants::WIDGET_HEIGHT, 0));
+        _pShadowWidgetAnimation->setEndValue(QPoint(Constants::WIDGET_HEIGHT, 0));
         _pFormPannelAnimation->setEndValue(QPoint(0, 0));
         _pSwitchCircleXAnimation->setEndValue(250.0);
     } else {
         _pSwitchPannelAnimation->setEndValue(QPoint(0, 0));
         _pShadowWidgetAnimation->setEndValue(QPoint(0, 0));
-        _pFormPannelAnimation->setEndValue(QPoint(Constant::WIDGET_WIDTH - Constant::WIDGET_HEIGHT, 0));
+        _pFormPannelAnimation->setEndValue(QPoint(Constants::WIDGET_WIDTH - Constants::WIDGET_HEIGHT, 0));
         _pSwitchCircleXAnimation->setEndValue(0.0);
     }
     

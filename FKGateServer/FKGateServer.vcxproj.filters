@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Core\main.cpp">
+    <ClCompile Include="_GateServerEntryPoint.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Core\FKHttpConnection.cpp">
@@ -27,34 +27,34 @@
     <ClCompile Include="Core\FKGateServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\server\asio_thread_pool.cpp">
+    <ClCompile Include="..\Flicker\Global\Mysql\FKUserMapper.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\redis\redis_connection_pool.cpp">
+    <ClCompile Include="..\Flicker\Global\Redis\FKRedisSingleton.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\mysql\mysql_connection_pool.cpp">
+    <ClCompile Include="..\Flicker\Global\universal\mysql\base_entity.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\mysql\mysql_connection.cpp">
+    <ClCompile Include="..\Flicker\Global\universal\mysql\connection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\mysql\mapper\user_mapper.cpp">
+    <ClCompile Include="..\Flicker\Global\universal\mysql\connection_pool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\mysql\entity\base_entity.cpp">
+    <ClCompile Include="..\Flicker\Global\universal\smtp\smtp_mail_sender.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\config\config_manager.cpp">
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.grpc.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\grpc\grpc_service.grpc.pb.cc">
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcService.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\grpc\grpc_service.pb.cc">
+    <ClCompile Include="..\Flicker\Global\Grpc\FKGrpcServiceStubPoolManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\grpc\grpc_service_pool_manager.cpp">
+    <ClCompile Include="..\Flicker\Global\Asio\FKIoContextThreadPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

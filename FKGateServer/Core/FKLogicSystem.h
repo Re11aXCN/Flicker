@@ -12,8 +12,8 @@
  * Modifications: 
  * ======================================
 *************************************************************************************/
-#ifndef FK_LOGICSYSTEM_H_
-#define FK_LOGICSYSTEM_H_
+#ifndef FK_LOGIC_SYSTEM_H_
+#define FK_LOGIC_SYSTEM_H_
 
 #include <string>
 #include <unordered_map>
@@ -24,8 +24,8 @@
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
 
-#include "Common/global/define_enum.h"
-#include "Common/global/macro.h"
+#include "Flicker/Global/FKDef.h"
+#include "universal/mysql/connection_pool.h"
 
 class FKHttpConnection;
 class FKLogicSystem {
@@ -34,9 +34,9 @@ class FKLogicSystem {
 public:
 
     // 外部调用
-    bool callBack(const std::string& url, flicker::http::verb requestType, std::shared_ptr<FKHttpConnection> connection);
+    bool callBack(const std::string& url, boost::beast::http::verb requestType, std::shared_ptr<FKHttpConnection> connection);
     // 内部注册业务回调
-    void registerCallback(const std::string& url, flicker::http::verb requestType, MessageHandler handler);
+    void registerCallback(const std::string& url, boost::beast::http::verb requestType, MessageHandler handler);
 private:
     FKLogicSystem();
     ~FKLogicSystem() = default;
@@ -44,8 +44,9 @@ private:
     std::unordered_map<std::string, MessageHandler> _pPostRequestCallBacks;
     std::unordered_map<std::string, MessageHandler> _pGetRequestCallBacks;
 
+    universal::mysql::ConnectionPoolSharedPtr _pFlickerDbPool;
 };
 
-#endif // !FK_LOGICSYSTEM_H_
+#endif // !FK_LOGIC_SYSTEM_H_
 
 
