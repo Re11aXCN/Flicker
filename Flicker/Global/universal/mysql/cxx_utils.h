@@ -9,18 +9,11 @@
 #include <expected>
 #include <mysql.h>
 #include <mysqld_error.h>
+#include <magic_enum/magic_enum_all.hpp>
 #include "universal/utils.h"
 namespace universal::mysql {
-    enum class DbOperatorStatus {
-        Success,
-        DataAlreadyExist,
-        DataNotExist,
-        DatabaseError,
-        InvalidParameters
-    };
-
     // MySQL连接错误类型
-    enum class MySQLErrorCode {
+    enum class ErrorCode {
         Success,
         InitializationFailed,
         ConnectionFailed,
@@ -48,15 +41,15 @@ namespace universal::mysql {
 
     // MySQL错误信息结构
     struct MySQLError {
-        MySQLErrorCode code;
+        ErrorCode code;
         std::string message;
-        int mysql_errno = 0;
+        unsigned int mysql_errno = 0;
         
-        MySQLError(MySQLErrorCode c, const std::string& msg, int err_no = 0)
+        MySQLError(ErrorCode c, const std::string& msg, unsigned int err_no = 0)
             : code(c), message(msg), mysql_errno(err_no) {}
         
         friend std::ostream& operator<<(std::ostream& os, const MySQLError& error) {
-            os << "MySQLError[" << static_cast<int>(error.code) << "]: " << error.message;
+            os << "MySQLError[" << magic_enum::enum_name(error.code) << "]: " << error.message;
             if (error.mysql_errno != 0) {
                 os << " (MySQL errno: " << error.mysql_errno << ")";
             }
@@ -64,19 +57,19 @@ namespace universal::mysql {
         }
     };
 
-    // 将MySQL错误码转换为MySQLErrorCode
-    inline MySQLErrorCode mapMySQLError(int mysql_errno) {
+    // 将MySQL错误码转换为ErrorCode
+    inline ErrorCode mapMySQLError(unsigned int mysql_errno) {
         switch (mysql_errno) {
-            case 0: return MySQLErrorCode::Success;
-            case ER_ACCESS_DENIED_ERROR: return MySQLErrorCode::PermissionDenied;
-            case ER_BAD_DB_ERROR: return MySQLErrorCode::DatabaseNotFound;
-            case ER_BAD_TABLE_ERROR: return MySQLErrorCode::TableNotFound;
-            case ER_BAD_FIELD_ERROR: return MySQLErrorCode::FieldNotFound;
-            case ER_DUP_ENTRY: return MySQLErrorCode::DuplicateEntry;
-            case ER_OUTOFMEMORY: return MySQLErrorCode::OutOfMemory;
+            case 0: return ErrorCode::Success;
+            case ER_ACCESS_DENIED_ERROR: return ErrorCode::PermissionDenied;
+            case ER_BAD_DB_ERROR: return ErrorCode::DatabaseNotFound;
+            case ER_BAD_TABLE_ERROR: return ErrorCode::TableNotFound;
+            case ER_BAD_FIELD_ERROR: return ErrorCode::FieldNotFound;
+            case ER_DUP_ENTRY: return ErrorCode::DuplicateEntry;
+            case ER_OUTOFMEMORY: return ErrorCode::OutOfMemory;
             case ER_CON_COUNT_ERROR:
-            case ER_OUT_OF_RESOURCES: return MySQLErrorCode::ConnectionFailed;
-            default: return MySQLErrorCode::UnknownError;
+            case ER_OUT_OF_RESOURCES: return ErrorCode::ConnectionFailed;
+            default: return ErrorCode::UnknownError;
         }
     }
 
@@ -102,17 +95,17 @@ namespace universal::mysql {
     
     // 辅助函数：创建错误结果
     template<typename T>
-    inline MySQLResult<T> makeError(MySQLErrorCode code, const std::string& message, int mysql_errno = 0) {
+    inline MySQLResult<T> makeError(ErrorCode code, const std::string& message, int mysql_errno = 0) {
         return std::unexpected(MySQLError(code, message, mysql_errno));
     }
 
-    inline MySQLVoidResult makeError(MySQLErrorCode code, const std::string& message, int mysql_errno = 0) {
+    inline MySQLVoidResult makeError(ErrorCode code, const std::string& message, int mysql_errno = 0) {
         return std::unexpected(MySQLError(code, message, mysql_errno));
     }
     
     // 辅助函数：从MySQL错误创建结果
     template<typename T>
-    inline MySQLResult<T> makeErrorFromMySQL(MYSQL* mysql, MySQLErrorCode code, const std::string& context = "") {
+    inline MySQLResult<T> makeErrorFromMySQL(MYSQL* mysql, ErrorCode code, const std::string& context = "") {
         int err_no = mysql_errno(mysql);
         std::string msg = mysql_error(mysql);
         if (!context.empty()) {
@@ -121,7 +114,7 @@ namespace universal::mysql {
         return std::unexpected(MySQLError(code, msg, err_no));
     }
 
-    inline MySQLVoidResult makeErrorFromMySQL(MYSQL* mysql, MySQLErrorCode code, const std::string& context = "") {
+    inline MySQLVoidResult makeErrorFromMySQL(MYSQL* mysql, ErrorCode code, const std::string& context = "") {
         int err_no = mysql_errno(mysql);
         std::string msg = mysql_error(mysql);
         if (!context.empty()) {
@@ -134,7 +127,7 @@ namespace universal::mysql {
     
     // 辅助函数：从MySQL STMT错误创建结果
     template<typename T>
-    inline MySQLResult<T> makeErrorFromStmt(MYSQL_STMT* stmt, MySQLErrorCode code, const std::string& context = "") {
+    inline MySQLResult<T> makeErrorFromStmt(MYSQL_STMT* stmt, ErrorCode code, const std::string& context = "") {
         int err_no = mysql_stmt_errno(stmt);
         std::string msg = mysql_stmt_error(stmt);
         if (!context.empty()) {
@@ -143,7 +136,7 @@ namespace universal::mysql {
         return std::unexpected(MySQLError(code, msg, err_no));
     }
 
-    inline MySQLVoidResult makeErrorFromStmt(MYSQL_STMT* stmt, MySQLErrorCode code, const std::string& context = "") {
+    inline MySQLVoidResult makeErrorFromStmt(MYSQL_STMT* stmt, ErrorCode code, const std::string& context = "") {
         int err_no = mysql_stmt_errno(stmt);
         std::string msg = mysql_stmt_error(stmt);
         if (!context.empty()) {
@@ -265,6 +258,40 @@ namespace universal::mysql {
     template<typename Type>
     inline constexpr bool is_optional_type_v = is_optional_type<Type>::value;
 
+    // 定义类型特征：检查类型是否被支持
+    template <typename T>
+    struct is_supported_bind_type {
+    private:
+        using RawType = std::remove_cv_t<std::remove_reference_t<T>>;
+        template <typename U>
+        static constexpr bool check_non_optional() {
+            return
+                std::is_integral_v<U> ||
+                std::is_floating_point_v<U> ||
+                is_mysql_varchar_type_v<U> ||
+                is_mysql_char_type_v<U> ||
+                std::is_same_v<U, MYSQL_TIME>;
+        }
+        template <typename U>
+        static constexpr bool check_optional() {
+            if constexpr (is_optional_type_v<U>) {
+                return is_supported_bind_type<typename U::value_type>::value;
+            }
+            else {
+                return false;
+            }
+        }
+    public:
+        static constexpr bool value = check_non_optional<RawType>() || check_optional<RawType>();
+    };
+
+    template <typename T>
+    inline constexpr bool is_supported_bind_type_v = is_supported_bind_type<T>::value;
+
+    // 辅助模板用于触发编译错误
+    template <typename>
+    struct dependent_false : std::false_type {};
+
     // 参数包分离器，将BindableParam和ExpressionParam分离
     template<typename...>
     struct Separator;
@@ -313,6 +340,11 @@ namespace universal::mysql {
     template<typename ValueType>
     inline void bindSingleValue(MYSQL_BIND& bind, ValueType&& value)
     {
+        // 编译时类型检查：确保类型被支持
+        static_assert(is_supported_bind_type_v<ValueType>,
+            "Unsupported value type in bindSingleValue. Allowed types: "
+            "integral, floating_point, mysql_varchar, mysql_char, MYSQL_TIME, optional<supported>");
+
         using RawType = std::remove_cv_t<std::remove_reference_t<ValueType>>;
         //using Type = std::decay_t<ValueType>; // 类型退化、数组→指针转换、函数→函数指针
         if constexpr (std::is_integral_v<RawType>) {
@@ -382,7 +414,7 @@ namespace universal::mysql {
             }
         }
         else {
-            throw std::runtime_error("Unsupported value type in bindSingleValue");
+            static_assert(dependent_false<ValueType>::value, "Unhandled type in bindSingleValue");
         }
     }
     
@@ -392,6 +424,38 @@ namespace universal::mysql {
         size_t index = 0;
         (bindSingleValue(binds[index++], std::forward<Args>(args)), ...);
     }
+
+    /*
+    template<typename... Args>
+    inline MySQLVoidResult bindParams(MYSQL_BIND* binds, Args&&... args) {
+        size_t index = 0;
+        MySQLVoidResult final_result{}; // 默认构造为成功状态
+
+        // 单个参数的绑定处理器
+        auto bind_one = [&](auto&& arg) -> bool {
+            // 如果已经遇到错误，跳过后续绑定
+            if (!final_result) return false;
+
+            // 执行单个绑定并检查结果
+            auto single_result = bindSingleValue(binds[index], std::forward<decltype(arg)>(arg));
+            if (!single_result) {
+                final_result = std::move(single_result); // 捕获错误
+                return false;
+            }
+            ++index;
+            return true;
+        };
+
+        // 使用短路逻辑的折叠表达式：
+        // 1. 遇到 false 会停止后续绑定
+        // 2. 初始化列表确保执行顺序
+        (void)std::initializer_list<int>{ 
+            (bind_one(std::forward<Args>(args)) ? 0 : -1)...
+        };
+
+        return final_result;
+    }
+    */
 }
 
 #endif // !UNIVERSAL_MYSQL_CXX_UTILS_H_

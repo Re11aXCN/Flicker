@@ -7,53 +7,38 @@
 namespace universal::mysql {
     Connection::Connection(const ConnectionOptions& opts)
         : _opts(opts), _create_time(std::chrono::steady_clock::now()), _last_active(_create_time) {
-        try {
-            // 初始化MySQL连接
-            _mysql = mysql_init(nullptr);
-            if (!_mysql) {
-                throw std::runtime_error("MySQL初始化失败");
-            }
-
-            // 设置连接选项
-            _set_options();
-
-            // 建立连接
-            if (!mysql_real_connect(
-                _mysql,
-                _opts.host.c_str(),
-                _opts.username.c_str(),
-                _opts.password.c_str(),
-                _opts.database.c_str(),
-                _opts.port,
-                _opts.type == ConnectionType::SOCKET ? _opts.socket_path.c_str() : nullptr,
-                _opts.client_flag
-            )) {
-                std::string error = mysql_error(_mysql);
-                mysql_close(_mysql);
-                _mysql = nullptr;
-                throw std::runtime_error("MySQL连接失败: " + error);
-            }
-
-            //// 选择数据库
-            //_select_db();
+        // 初始化MySQL连接
+        _mysql = mysql_init(nullptr);
+        if (!_mysql) {
+            throw std::runtime_error("MySQL初始化失败");
         }
-        catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("创建MySQL连接发生异常: {}", e.what()));
-            if (_mysql) {
-                mysql_close(_mysql);
-                _mysql = nullptr;
-            }
-            throw;
-        }
-    }
 
-    Connection::Connection(const ConnectionOptions& opts, Dummy)
-        : _opts(opts), _create_time(std::chrono::steady_clock::now()), _last_active(_create_time), _mysql(nullptr), _owns_mysql(true) {
-        // 这个构造函数不创建实际连接，由连接池负责创建
+        // 设置连接选项
+        _set_options();
+
+        // 建立连接
+        if (!mysql_real_connect(
+            _mysql,
+            _opts.host.c_str(),
+            _opts.username.c_str(),
+            _opts.password.c_str(),
+            _opts.database.c_str(),
+            _opts.port,
+            _opts.type == ConnectionType::SOCKET ? _opts.socket_path.c_str() : nullptr,
+            _opts.client_flag
+        )) {
+            std::string error = mysql_error(_mysql);
+            mysql_close(_mysql);
+            _mysql = nullptr;
+            throw std::runtime_error("MySQL连接失败: " + error);
+        }
+
+        //// 选择数据库
+        //_select_db();
     }
 
     Connection::Connection(Connection&& other) noexcept
-        : _mysql(nullptr), _owns_mysql(true), _create_time(), _last_active(), _opts() {
+        : _mysql(nullptr), _create_time(), _last_active(), _opts() {
         swap(*this, other);
     }
 
@@ -65,16 +50,10 @@ namespace universal::mysql {
     }
 
     Connection::~Connection() {
-        try {
-            std::lock_guard<std::mutex> lock(_mutex);
-            if (_mysql && _owns_mysql) {
-                mysql_close(_mysql);
-                _mysql = nullptr;
-            }
-        }
-        catch (...) {
-            // 析构函数中不应抛出异常，但应记录错误
-            LOGGER_ERROR("Connection析构函数发生异常");
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_mysql) {
+            mysql_close(_mysql);
+            _mysql = nullptr;
         }
     }
 
@@ -91,53 +70,47 @@ namespace universal::mysql {
 
     void Connection::invalidate() noexcept {
         std::lock_guard<std::mutex> lock(_mutex);
-        if (_mysql && _owns_mysql) {
+        if (_mysql) {
             mysql_close(_mysql);
             _mysql = nullptr;
         }
     }
 
-    void Connection::reconnect() {
+    bool Connection::reconnect() {
         std::lock_guard<std::mutex> lock(_mutex);
-        if (_mysql && _owns_mysql) {
+        if (_mysql) {
             mysql_close(_mysql);
             _mysql = nullptr;
         }
 
-        try {
-            _mysql = mysql_init(nullptr);
-            if (!_mysql) {
-                throw std::runtime_error("MySQL初始化失败");
-            }
-
-            _set_options();
-
-            if (!mysql_real_connect(
-                _mysql,
-                _opts.host.c_str(),
-                _opts.username.c_str(),
-                _opts.password.c_str(),
-                _opts.database.c_str(),
-                _opts.port,
-                _opts.type == ConnectionType::SOCKET ? _opts.socket_path.c_str() : nullptr,
-                _opts.client_flag
-            )) {
-                std::string error = mysql_error(_mysql);
-                mysql_close(_mysql);
-                _mysql = nullptr;
-                throw std::runtime_error("MySQL重新连接失败: " + error);
-            }
-
-            _last_active = std::chrono::steady_clock::now();
+        _mysql = mysql_init(nullptr);
+        if (!_mysql) {
+            LOGGER_ERROR("MySQL初始化失败");
+            return false;
         }
-        catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("重新连接MySQL发生异常: {}", e.what()));
-            if (_mysql) {
-                mysql_close(_mysql);
-                _mysql = nullptr;
-            }
-            throw;
+
+        _set_options();
+
+        if (!mysql_real_connect(
+            _mysql,
+            _opts.host.c_str(),
+            _opts.username.c_str(),
+            _opts.password.c_str(),
+            _opts.database.c_str(),
+            _opts.port,
+            _opts.type == ConnectionType::SOCKET ? _opts.socket_path.c_str() : nullptr,
+            _opts.client_flag
+        )) {
+            unsigned int error_code = mysql_errno(_mysql);
+            std::string error = mysql_error(_mysql);
+            mysql_close(_mysql);
+            _mysql = nullptr;
+            LOGGER_ERROR(std::format("MySQL重新连接失败: {}, code: {}", error, error_code));
         }
+
+        _last_active = std::chrono::steady_clock::now();
+
+        return true;
     }
 
     bool Connection::execute_query(const std::string& query) {
@@ -148,31 +121,21 @@ namespace universal::mysql {
             return false;
         }
 
-        try {
-            int state = mysql_query(_mysql, query.c_str());
-            if (state != 0) {
-                std::string error = mysql_error(_mysql);
-                LOGGER_ERROR(std::format("执行查询失败: {}", error));
-                return false;
-            }
-
-            MYSQL_RES* result = mysql_store_result(_mysql);
-            if (result) {
-                mysql_free_result(result);
-            }
-
-            // 更新最后活动时间
-            _last_active = std::chrono::steady_clock::now();
-            return true;
-        }
-        catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("执行查询时发生异常: {}", e.what()));
+        int state = mysql_query(_mysql, query.c_str());
+        if (state != 0) {
+            std::string error = mysql_error(_mysql);
+            LOGGER_ERROR(std::format("执行查询失败: {}, code: {}", error, mysql_errno(_mysql)));
             return false;
         }
-        catch (...) {
-            LOGGER_ERROR("执行查询时发生未知异常");
-            return false;
+
+        MYSQL_RES* result = mysql_store_result(_mysql);
+        if (result) {
+            mysql_free_result(result);
         }
+
+        // 更新最后活动时间
+        _last_active = std::chrono::steady_clock::now();
+        return true;
     }
 
     bool Connection::start_transaction() {
@@ -187,25 +150,15 @@ namespace universal::mysql {
             return false;
         }
 
-        try {
-            if (mysql_commit(_mysql) != 0) {
-                std::string error = mysql_error(_mysql);
-                LOGGER_ERROR(std::format("提交事务失败: {}", error));
-                return false;
-            }
+        if (mysql_commit(_mysql) != 0) {
+            std::string error = mysql_error(_mysql);
+            LOGGER_ERROR(std::format("提交事务失败: {}", error));
+            return false;
+        }
 
-            // 更新最后活动时间
-            _last_active = std::chrono::steady_clock::now();
-            return true;
-        }
-        catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("提交事务时发生异常: {}", e.what()));
-            return false;
-        }
-        catch (...) {
-            LOGGER_ERROR("提交事务时发生未知异常");
-            return false;
-        }
+        // 更新最后活动时间
+        _last_active = std::chrono::steady_clock::now();
+        return true;
     }
 
     bool Connection::rollback() {
@@ -216,25 +169,15 @@ namespace universal::mysql {
             return false;
         }
 
-        try {
-            if (mysql_rollback(_mysql) != 0) {
-                std::string error = mysql_error(_mysql);
-                LOGGER_ERROR(std::format("回滚事务失败: {}", error));
-                return false;
-            }
+        if (mysql_rollback(_mysql) != 0) {
+            std::string error = mysql_error(_mysql);
+            LOGGER_ERROR(std::format("回滚事务失败: {}", error));
+            return false;
+        }
 
-            // 更新最后活动时间
-            _last_active = std::chrono::steady_clock::now();
-            return true;
-        }
-        catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("回滚事务时发生异常: {}", e.what()));
-            return false;
-        }
-        catch (...) {
-            LOGGER_ERROR("回滚事务时发生未知异常");
-            return false;
-        }
+        // 更新最后活动时间
+        _last_active = std::chrono::steady_clock::now();
+        return true;
     }
 
     MYSQL* Connection::get_mysql() noexcept {
@@ -249,26 +192,22 @@ namespace universal::mysql {
             return false;
         }
 
-        try {
-            // 执行简单查询检查连接是否有效
-            int state = mysql_query(_mysql, "SELECT 1");
-            if (state != 0) {
-                return false;
-            }
-
-            MYSQL_RES* result = mysql_store_result(_mysql);
-            if (result) {
-                mysql_free_result(result);
-            }
-
-            // 更新最后活动时间
-            _last_active = std::chrono::steady_clock::now();
-            return true;
-        }
-        catch (...) {
-            // 任何异常都表示连接无效
+        // 执行简单查询检查连接是否有效
+        int state = mysql_query(_mysql, "SELECT 1");
+        if (state != 0) {
+            std::string error = mysql_error(_mysql);
+            LOGGER_ERROR(std::format("执行查询失败: {}, code: {}", error, mysql_errno(_mysql)));
             return false;
         }
+
+        MYSQL_RES* result = mysql_store_result(_mysql);
+        if (result) {
+            mysql_free_result(result);
+        }
+
+        // 更新最后活动时间
+        _last_active = std::chrono::steady_clock::now();
+        return true;
     }
 
     /*bool Connection::is_expired(std::chrono::milliseconds timeout) const {

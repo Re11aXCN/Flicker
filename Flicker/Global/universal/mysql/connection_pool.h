@@ -72,9 +72,6 @@ public:
     // 释放连接回连接池
     void release(Connection connection);
     
-    // 创建一个新连接
-    Connection create();
-    
     // 克隆连接池
     std::shared_ptr<ConnectionPool> clone() const;
     

@@ -10,10 +10,6 @@ namespace universal::mysql {
         auto names = getFieldNames();
         auto values = getFieldValues();
 
-        if (names.size() != values.size()) {
-            throw std::runtime_error("Field names and values size mismatch");
-        }
-
         // 计算列宽（考虑表头和数据）
         size_t col1 = _max(names, [](const auto& v) {
             return v.size();

@@ -25,8 +25,8 @@ public:
 
     std::optional<FKUserEntity> findByEmail(const std::string& email);
     std::optional<FKUserEntity> findByUsername(const std::string& username);
-    universal::mysql::DbOperatorStatus updatePasswordByEmail(const std::string& email, const std::string& password);
-    universal::mysql::DbOperatorStatus deleteByEmail(const std::string& email);
+    universal::mysql::MySQLResult<uint64_t> updatePasswordByEmail(const std::string& email, const std::string& password);
+    universal::mysql::MySQLResult<uint64_t> deleteByEmail(const std::string& email);
 
     bool isUsernameExists(const std::string& username);
     bool isEmailExists(const std::string& email);
@@ -50,7 +50,7 @@ protected:
     constexpr std::string insertQuery() const override;
     constexpr std::string deleteByIdQuery() const override;
     
-    void bindInsertParams(universal::mysql::StmtPtr& stmtPtr, const FKUserEntity& entity) const override;
+    bool bindInsertParams(universal::mysql::StmtPtr& stmtPtr, const FKUserEntity& entity) const override;
     
     FKUserEntity createEntityFromBinds(MYSQL_BIND* binds, MYSQL_FIELD* fields, unsigned long* lengths,
         char* isNulls, size_t columnCount) const override;

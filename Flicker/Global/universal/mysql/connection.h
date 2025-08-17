@@ -130,7 +130,7 @@ namespace universal::mysql {
         void invalidate() noexcept;
         
         // 重新连接
-        void reconnect();
+        bool reconnect();
 
         // 获取创建时间
         auto create_time() const
@@ -180,9 +180,6 @@ namespace universal::mysql {
         friend void swap(Connection& lhs, Connection& rhs) noexcept;
 
     private:
-        // 私有构造函数，用于连接池创建连接
-        struct Dummy {};
-        Connection(const ConnectionOptions& opts, Dummy);
         
         // 设置连接选项
         void _set_options();
@@ -195,9 +192,6 @@ namespace universal::mysql {
 
         // MYSQL指针
         MYSQL* _mysql = nullptr;
-        
-        // 是否拥有MYSQL指针的所有权
-        bool _owns_mysql = true;
         
         // 连接创建时间
         std::chrono::time_point<std::chrono::steady_clock> _create_time;
@@ -221,7 +215,6 @@ namespace universal::mysql {
         std::lock_guard<std::mutex> lock_rhs(rhs._mutex);
         
         std::swap(lhs._mysql, rhs._mysql);
-        std::swap(lhs._owns_mysql, rhs._owns_mysql);
         std::swap(lhs._create_time, rhs._create_time);
         std::swap(lhs._last_active, rhs._last_active);
         std::swap(lhs._opts, rhs._opts);

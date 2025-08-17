@@ -249,8 +249,9 @@ FKLogicSystem::FKLogicSystem()
             }
 
             // 3. 插入用户
-            auto [status, affectedRows] = mapper.insert(FKUserEntity{ username, email, bcrypt::generateHash(hashedPassword) });
-            if (status == mysql::DbOperatorStatus::Success) [[likely]] {
+            auto insertResult = mapper.insert(FKUserEntity{ username, email, bcrypt::generateHash(hashedPassword) });
+            LOGGER_INFO(std::format("insert user success, affected rows: {}", insertResult.value()));
+            if (insertResult) [[likely]] {
                 nlohmann::json dataObj;
                 dataObj["request_service_type"] = requestRoot["request_service_type"];
                 responseRoot["response_status_code"] = static_cast<int>(boost::beast::http::status::ok);
@@ -527,8 +528,9 @@ FKLogicSystem::FKLogicSystem()
 
         try {
             FKUserMapper mapper(_pFlickerDbPool.get());
-            auto result = mapper.updatePasswordByEmail(email, bcrypt::generateHash(hashedPassword));
-            if (result == mysql::DbOperatorStatus::Success) [[likely]] {
+            auto updateResult = mapper.updatePasswordByEmail(email, bcrypt::generateHash(hashedPassword));
+            LOGGER_INFO(std::format("update user success, affected rows: {}", updateResult.value()));
+            if (updateResult) [[likely]] {
                 nlohmann::json dataObj;
                 dataObj["request_type"] = static_cast<int>(Flicker::Client::Enums::ServiceType::ResetPassword);
                 responseRoot["response_status_code"] = static_cast<int>(boost::beast::http::status::ok);

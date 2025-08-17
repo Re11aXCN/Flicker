@@ -31,7 +31,7 @@ ConnectionPool::ConnectionPool(ConnectionOptions connection_opts,
     }
 
     for (size_t i = 0; i < _pool_opts.size; ++i) {
-        _pool.push_back(std::move(create()));
+        _pool.emplace_back(_connection_opts);
     }
 
     // 启动监控线程
@@ -110,22 +110,6 @@ void ConnectionPool::shutdown() {
     LOGGER_INFO("MySQL连接池已关闭");
 }
 
-// 创建一个新连接
-Connection ConnectionPool::create() {
-    try {
-        // 创建一个新的连接
-        Connection connection(_connection_opts, Connection::Dummy{});
-        
-        // 初始化连接
-        connection.reconnect();
-        
-        return connection;
-    } catch (const std::exception& e) {
-        LOGGER_ERROR(std::format("创建MySQL连接失败: {}", e.what()));
-        throw;
-    }
-}
-
 // 从连接池获取一个连接
 Connection ConnectionPool::fetch() {
     std::unique_lock<std::mutex> lock(_mutex);
@@ -135,13 +119,10 @@ Connection ConnectionPool::fetch() {
     
     // 检查连接是否需要重连
     if (_need_reconnect(connection)) {
-        try {
-            connection.reconnect();
-        } catch (const std::exception& e) {
+        if (bool isFailed = !connection.reconnect()) {
             // 重连失败，返回连接到池中，稍后重试
             release(std::move(connection));
-            LOGGER_ERROR(std::format("重连MySQL连接失败: {}", e.what()));
-            throw;
+            LOGGER_ERROR(std::format("重连MySQL连接失败"));
         }
     }
     
@@ -162,7 +143,7 @@ Connection ConnectionPool::_fetch(std::unique_lock<std::mutex>& lock) {
             ++_used_connections;
             
             // 延迟创建一个新连接，避免在持有锁的情况下连接
-            return Connection(_connection_opts, Connection::Dummy{});
+            return Connection(_connection_opts);
         }
     }
     
@@ -189,7 +170,8 @@ void ConnectionPool::_wait_for_connection(std::unique_lock<std::mutex>& lock) {
         // 有超时限制，等待指定时间
         if (!_cv.wait_for(lock, wait_timeout, [this] { 
                 return !this->_pool.empty() || this->_is_shutdown.load(); 
-            })) {
+            })) 
+        {
             throw std::runtime_error("等待连接超时: " + 
                 std::to_string(wait_timeout.count()) + " 毫秒");
         }
@@ -279,43 +261,34 @@ void ConnectionPool::_monitor_thread_func() {
             break;
         }
         
-        try {
-            std::unique_lock<std::mutex> lock(_mutex);
-            
-            // 检查空闲连接
-            auto it = _pool.begin();
-            while (it != _pool.end()) {
-                // 检查连接是否需要重连
-                if (_need_reconnect(*it)) {
-                    // 移除过期或空闲超时的连接
-                    it = _pool.erase(it);
-                } else {
-                    // 检查连接是否有效
-                    if (!it->is_valid()) {
-                        try {
-                            // 尝试重连
-                            it->reconnect();
-                        } catch (...) {
-                            // 重连失败，移除连接
-                            it = _pool.erase(it);
-                            continue;
-                        }
+        std::unique_lock<std::mutex> lock(_mutex);
+
+        // 检查空闲连接
+        auto it = _pool.begin();
+        while (it != _pool.end()) {
+            // 检查连接是否需要重连
+            if (_need_reconnect(*it)) {
+                // 移除过期或空闲超时的连接
+                it = _pool.erase(it);
+            }
+            else {
+                // 检查连接是否有效
+                if (!it->is_valid()) {
+                    // 尝试重连
+                    if (bool isFailed = !it->reconnect()) {
+                        // 重连失败，移除连接
+                        it = _pool.erase(it);
+                        continue;
                     }
-                    ++it;
                 }
+                ++it;
             }
-            
-            // 确保连接池中有足够的连接
-            while (_pool.size() + _used_connections < _pool_opts.size) {
-                try {
-                    _pool.push_back(create());
-                } catch (const std::exception& e) {
-                    LOGGER_ERROR(std::format("监控线程创建连接失败: {}", e.what()));
-                    break;
-                }
-            }
-        } catch (const std::exception& e) {
-            LOGGER_ERROR(std::format("监控线程异常: {}", e.what()));
+        }
+
+        // 确保连接池中有足够的连接
+        while (_pool.size() + _used_connections < _pool_opts.size) {
+            _pool.emplace_back(_connection_opts);
+
         }
     }
 }

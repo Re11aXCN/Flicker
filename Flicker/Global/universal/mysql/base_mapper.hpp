@@ -1,4 +1,4 @@
-/*************************************************************************************
+﻿/*************************************************************************************
  *
  * @ Filename     : BaseMapper.hpp
  * @ Description : 基础数据库映射器模板类，提供通用的数据库操作
@@ -82,7 +82,6 @@ public:
     using EntityRows = std::vector<Entity>;
     using FieldMap = std::unordered_map<std::string, std::any>;
     using FieldMapRows = std::vector<FieldMap>;
-    using StatusWithAffectedRows = std::pair<DbOperatorStatus, std::size_t>;
     explicit BaseMapper(ConnectionPool* pool)
         : _pool(pool)
     {
@@ -104,47 +103,47 @@ public:
     std::optional<Entity> findById(ID_TYPE id);
     template <SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 } >
-    EntityRows findAll();
-    StatusWithAffectedRows insert(const Entity& entity);
-    StatusWithAffectedRows deleteById(ID_TYPE id);
+    MySQLResult<EntityRows> findAll();
+    MySQLResult<my_ulonglong> insert(const Entity& entity);
+    MySQLResult<my_ulonglong> deleteById(ID_TYPE id);
 
     // 安全的字段更新方法 - 使用字段名称列表和对应的值来防止SQL注入
     // 示例用法: updateFieldsByIdSafe(id, {"field1", "field2"}, value1, value2);
     template<typename... Args>
-    StatusWithAffectedRows updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
+    MySQLResult<my_ulonglong> updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
 
     // 通用的查询实体方法，支持排序和分页
     template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 },
         typename... Args >
-    EntityRows queryEntities(std::string&& sql, Args&&... args) const;
+    MySQLResult<EntityRows> queryEntities(std::string&& sql, Args&&... args) const;
 
     // 使用查询条件策略的实体查询方法
     template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 } >
-    EntityRows queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+    MySQLResult<EntityRows> queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
 
     // 使用查询条件策略的更新方法
     template<typename... Args>
-    StatusWithAffectedRows updateFieldsByCondition(const std::unique_ptr<IQueryCondition>& condition,
+    MySQLResult<my_ulonglong> updateFieldsByCondition(const std::unique_ptr<IQueryCondition>& condition,
         const std::vector<std::string>& fieldNames,
         Args&&... args) const;
     // 使用查询条件策略的通用查询方法
     template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 }>
-    FieldMapRows queryFieldsByCondition(
+    MySQLResult<FieldMapRows> queryFieldsByCondition(
         const std::unique_ptr<IQueryCondition>& condition,
         const std::vector<std::string>& fieldNames) const;
 
     // 使用查询条件策略的计数方法
-    size_t countByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+    MySQLResult<my_ulonglong> countByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
 
     // 使用查询条件策略的删除方法
-    StatusWithAffectedRows deleteByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
-    StatusWithAffectedRows deleteAll(bool confirm = false) const;
+    MySQLResult<my_ulonglong> deleteByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
+    MySQLResult<my_ulonglong> truncateTable(bool confirm = false) const;
 
-    bool createTable();
-    bool dropTable(bool confirm = false);
+    MySQLVoidResult createTable();
+    MySQLVoidResult dropTable(bool confirm = false);
 
     enum class GetFieldMapResStatus {
         Success,
@@ -166,7 +165,7 @@ protected:
     virtual constexpr std::string deleteByIdQuery() const = 0;
 
     // 子类必须实现的参数绑定方法
-    virtual void bindInsertParams(StmtPtr& stmtPtr, const Entity& entity) const = 0;
+    virtual bool bindInsertParams(StmtPtr& stmtPtr, const Entity& entity) const = 0;
 
     // 子类必须实现的结果处理方法
     virtual Entity createEntityFromBinds(MYSQL_BIND* binds, MYSQL_FIELD* fields, unsigned long* lengths,
@@ -176,14 +175,14 @@ protected:
     
     // 整形、浮点型、mysql_varchar、MYSQL_TIME、std::optional参数绑定方法
     template<typename... Args>
-    void bindValues(StmtPtr& stmtPtr, Args&&... args) const;
+    MySQLVoidResult bindValues(StmtPtr& stmtPtr, Args&&... args) const;
     template<typename... Args>
-    void bindValues(StmtPtr& stmtPtr, MYSQL_BIND* existingBinds, size_t& startIndex, Args&&... args) const;
-    void bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition) const;
-    void bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition, MYSQL_BIND* existingBinds, size_t& startIndex) const;
+    MySQLVoidResult bindValues(StmtPtr& stmtPtr, MYSQL_BIND* existingBinds, size_t& startIndex, Args&&... args) const;
+    MySQLVoidResult bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition) const;
+    MySQLVoidResult bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition, MYSQL_BIND* existingBinds, size_t& startIndex) const;
 
-    StmtPtr prepareStatement(const std::string& query) const;
-    void executeQuery(StmtPtr& stmtPtr) const;
+    MySQLResult<StmtPtr> prepareStatement(const std::string& query) const;
+    MySQLVoidResult executeQuery(StmtPtr& stmtPtr) const;
 
     // 编译时构建UPDATE SET子句和绑定值tuple,使用BindableParam/ExpressionParam, 详细见"Inl-CoreStructDef.ipp"
     template<typename... Args, size_t... Is>
@@ -196,10 +195,10 @@ protected:
     template <Pagination Pagination>
     static constexpr auto buildLimitClause();
 private:
-    EntityRows _find_all_impl(const std::string& query) const;
-    FieldMapRows _query_fields_impl(const std::string& query) const;
-    std::size_t _count_all_impl(const std::string& query) const;
-    StatusWithAffectedRows _delete_all_impl(const std::string& query) const;
+    MySQLResult<EntityRows> _find_all_impl(const std::string& query) const;
+    MySQLResult<FieldMapRows> _query_fields_impl(const std::string& query) const;
+    MySQLResult<my_ulonglong> _count_all_impl(const std::string& query) const;
+    MySQLResult<my_ulonglong> _delete_all_impl(const std::string& query) const;
 };
 
 }

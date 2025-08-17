@@ -1,6 +1,6 @@
 ﻿#ifndef UNIVERSAL_MYSQL_HEADER_ONLY
-#endif
 #include "base_mapper.hpp"
+#endif
 
 #define MSYSQL_QUERY_CONDITION_JUDGMENT(NeedBind)\
 switch (condition->getConditionType()) {\
@@ -14,8 +14,7 @@ case ConditionType::NOTIN_:\
 case ConditionType::AND_:\
 case ConditionType::OR_: {\
     if (condition->buildConditionClause() == "1=0") {\
-        LOGGER_WARN("IN / NOT IN / AND / OR condition must be set values " __FUNCTION__ "");\
-        return {};\
+        return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "IN / NOT IN / AND / OR condition must be set values"} };\
     }\
     break;\
 }\
@@ -135,140 +134,129 @@ inline std::optional<Entity> BaseMapper<Entity, ID_TYPE>::findById(ID_TYPE id)
 
 template<typename Entity, typename ID_TYPE>
 template <SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
-inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::findAll()
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
+    BaseMapper<Entity, ID_TYPE>::findAll()
 {
     std::string query = utils::string::concat(findAllQuery(),
         this->buildOrderClause<Order, FieldName>(),
         this->buildLimitClause<Pagination>());
-    this->_find_all_impl(query);
+    return this->_find_all_impl(query);
 }
 
 template<typename Entity, typename ID_TYPE>
-inline BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::insert(const Entity& entity)
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::insert(const Entity& entity)
 {
-    try {
-        std::string query = insertQuery();
-        StmtPtr stmtPtr = this->prepareStatement(query);
-        if (!stmtPtr) {
-            throw std::runtime_error("Failed to prepare statement for insert");
-        }
-        this->bindInsertParams(stmtPtr, entity);
-        this->executeQuery(stmtPtr);
-        my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr.get());
-
-        if (affectedRows == 0) {
-            return { DbOperatorStatus::DataNotExist, 0 };
-        }
-        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-            throw std::runtime_error("Statement execution failed");
-        }
-
-        return { DbOperatorStatus::Success, affectedRows };
+    std::string query = insertQuery();
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
     }
-    catch (const std::exception& e) {
-        std::string error = e.what();
-        LOGGER_ERROR(std::format("insert error: {}", error));
-        if (error.find("Duplicate entry") != std::string::npos) {
-            return { DbOperatorStatus::DataAlreadyExist, 0 };
-        }
-        return { DbOperatorStatus::DatabaseError, 0 };
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+    MYSQL_STMT* stmt = stmtPtr.get();
+    if (!this->bindInsertParams(stmtPtr, entity)) {
+        return std::unexpected{ MySQLError{ ErrorCode::BindParameterFailed,
+            std::format("Failed to stmt bind result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
+
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
+    return mysql_stmt_affected_rows(stmt);
 }
 
 template<typename Entity, typename ID_TYPE>
-inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::deleteById(ID_TYPE id)
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::deleteById(ID_TYPE id)
 {
-    try {
-        std::string query = deleteByIdQuery();
-        StmtPtr stmtPtr = this->prepareStatement(query);
-        if (!stmtPtr) throw std::runtime_error("Failed to prepare statement for " __FUNCTION__ "");
-
-        this->bindValues(stmtPtr, id);
-        this->executeQuery(stmtPtr);
-
-        my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-
-        if (affectedRows == 0) {
-            return { DbOperatorStatus::DataNotExist, 0};
-        }
-        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-            throw std::runtime_error("Statement execution failed");
-        }
-
-        return { DbOperatorStatus::Success, affectedRows };
+    std::string query = deleteByIdQuery();
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
     }
-    catch (const std::exception& e) {
-        LOGGER_ERROR(std::format("deleteById error: {}", e.what()));
-        return { DbOperatorStatus::DatabaseError, 0 };
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    auto bindResult = this->bindValues(stmtPtr, id);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
     }
+
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
+    return mysql_stmt_affected_rows(stmtPtr.get());
 }
 
 template<typename Entity, typename ID_TYPE>
 template<typename ...Args>
-inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::updateFieldsById(
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::updateFieldsById(
      ID_TYPE id,
     const std::vector<std::string>& fieldNames, Args && ...args)
 {
     if (fieldNames.empty()) {
-        LOGGER_ERROR("Update fields is null in " __FUNCTION__ ", Cannot update without fields");
-        return { DbOperatorStatus::InvalidParameters, 0 };
+        return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "Cannot update without fields"} };
     }
-    try {
-        // 参数数量检查
-        if (sizeof...(args) != fieldNames.size()) {
-            throw std::runtime_error("Number of field names must match number of values");
-        }
-
-        std::string query = fieldNames.size() > 1
-            ? utils::string::concat(
-                "UPDATE ", this->getTableName(),
-                " SET ", utils::string::join_range(" = ?, ", fieldNames),
-                " = ? WHERE  id = ?")
-            : utils::string::concat(
-                "UPDATE ", this->getTableName(),
-                " SET ", fieldNames[0],
-                " = ? WHERE  id = ?");
-        StmtPtr stmtPtr = this->prepareStatement(query);
-        if (!stmtPtr) throw std::runtime_error("Failed to prepare statement for " __FUNCTION__ "");
-
-        this->bindValues(stmtPtr, std::forward<Args>(args)..., id);
-        this->executeQuery(stmtPtr);
-
-        my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-        if (affectedRows == 0) {
-            return { DbOperatorStatus::DataNotExist, 0 };
-
-        }
-        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-            throw std::runtime_error("Statement execution failed");
-        }
-        return { DbOperatorStatus::Success, affectedRows };
+    if (sizeof...(args) != fieldNames.size()) {
+        return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "Number of field names must match number of values"} };
     }
-    catch (const std::exception& e) {
-        LOGGER_ERROR(std::format("updateFieldsByIdSafe error: {}", e.what()));
-        return { DbOperatorStatus::DatabaseError, 0 };
+    std::string query = fieldNames.size() > 1
+        ? utils::string::concat(
+            "UPDATE ", this->getTableName(),
+            " SET ", utils::string::join_range(" = ?, ", fieldNames),
+            " = ? WHERE  id = ?")
+        : utils::string::concat(
+            "UPDATE ", this->getTableName(),
+            " SET ", fieldNames[0],
+            " = ? WHERE  id = ?");
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
     }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    auto bindResult = this->bindValues(stmtPtr, std::forward<Args>(args)..., id);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
+    return mysql_stmt_affected_rows(stmtPtr.get());
 }
 
 template<typename Entity, typename ID_TYPE>
 template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination,
     typename... Args >
-inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::queryEntities(std::string&& sql, Args && ...args) const
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows> BaseMapper<Entity, ID_TYPE>::queryEntities(std::string&& sql, Args && ...args) const
 {
     // 构建sql初始化
     std::string query = utils::string::concat(std::move(sql),
         this->buildOrderClause<Order, FieldName>(),
         this->buildLimitClause<Pagination>());
-    StmtPtr stmtPtr = this->prepareStatement(query);
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
+    }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
 
-    if (!stmtPtr)  throw std::runtime_error("Failed to prepare statement for " __FUNCTION__ "");
     // 绑定条件参数并执行查询
-    this->bindValues(stmtPtr, std::forward<Args>(args)...);
-    this->executeQuery(stmtPtr);
+    auto bindResult = this->bindValues(stmtPtr, std::forward<Args>(args)...);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
 
     MYSQL_STMT* stmt = stmtPtr.get();
     ResPtr resPtr(mysql_stmt_result_metadata(stmt));
-    if (!resPtr)  throw std::runtime_error("No metadata available for fetchFieldsByCondition query");
+    if (!resPtr) {
+        return std::unexpected{ MySQLError{ErrorCode::NoMetadataAvailable, "No metadata available query"} };
+    }
     std::size_t columnCount = mysql_num_fields(resPtr.get());
     MYSQL_FIELD* fields = mysql_fetch_fields(resPtr.get());
 
@@ -282,14 +270,18 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
     MYSQL_FOREACH_BIND_RESSET(fields, binds, lengths, isNull, buffers, columnCount)
 
     if (mysql_stmt_bind_result(stmt, binds.get())) {
-        throw std::runtime_error("Failed to bind result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ErrorCode::BindParameterFailed,
+            std::format("Failed to stmt bind result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
 
     if (mysql_stmt_store_result(stmt)) {
-        throw std::runtime_error("Failed to store result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ErrorCode::StoreResultFailed,
+            std::format("Failed to stmt store result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
     my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
-    if (rowCount == 0) return {};
+    if (rowCount == 0) return EntityRows{};
 
     EntityRows results;
     results.reserve(rowCount);
@@ -299,22 +291,22 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
             break;
         }
         else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
-            throw std::runtime_error("Fetch failed: " + std::string(mysql_stmt_error(stmt)));
+            return std::unexpected{ MySQLError{ErrorCode::FetchResultFailed,
+                std::format("Failed to stmt fetch result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+                mysql_stmt_errno(stmt) } };
         }
-        results.push_back(createEntityFromBinds(binds.get(), fields, lengths.get(),
-            isNull.get(), columnCount));
+        results.push_back(createEntityFromBinds(binds.get(), fields, lengths.get(), isNull.get(), columnCount));
     }
     return results;
 }
 
 template<typename Entity, typename ID_TYPE>
 template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
-inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::queryEntitiesByCondition(
-    const std::unique_ptr<IQueryCondition>& condition) const
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
+    BaseMapper<Entity, ID_TYPE>::queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const
 {
     if (!condition) {
-        LOGGER_WARN("Condition is null in " __FUNCTION__ "");
-        return {};
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
     }
     std::string query = utils::string::concat(
         "SELECT * FROM ", this->getTableName(),
@@ -328,14 +320,26 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
         return this->_find_all_impl(query);
     }
     
-    StmtPtr stmtPtr = this->prepareStatement(query);
-    if (!stmtPtr)  throw std::runtime_error("Failed to prepare statement for " __FUNCTION__ "");
-    this->bindConditionValues(stmtPtr, condition);
-    this->executeQuery(stmtPtr);
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
+    }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    auto bindResult = this->bindConditionValues(stmtPtr, condition);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
 
     MYSQL_STMT* stmt = stmtPtr.get();
     ResPtr resPtr(mysql_stmt_result_metadata(stmt));
-    if (!resPtr)  throw std::runtime_error("No metadata available for fetchFieldsByCondition query");
+    if (!resPtr) {
+        return std::unexpected{ MySQLError{ErrorCode::NoMetadataAvailable, "No metadata available query"} };
+    } 
     std::size_t columnCount = mysql_num_fields(resPtr.get());
     MYSQL_FIELD* fields = mysql_fetch_fields(resPtr.get());
 
@@ -349,14 +353,18 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
     MYSQL_FOREACH_BIND_RESSET(fields, binds, lengths, isNull, buffers, columnCount)
 
     if (mysql_stmt_bind_result(stmt, binds.get())) {
-        throw std::runtime_error("Failed to bind result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::BindParameterFailed,
+            std::format("Failed to stmt bind result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
 
     if (mysql_stmt_store_result(stmt)) {
-        throw std::runtime_error("Failed to store result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::StoreResultFailed,
+            std::format("Failed to stmt store result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
     my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
-    if (rowCount == 0) return {};
+    if (rowCount == 0) return EntityRows{};
 
     EntityRows results;
     results.reserve(rowCount);
@@ -366,7 +374,9 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
             break;
         }
         else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
-            throw std::runtime_error("Fetch failed: " + std::string(mysql_stmt_error(stmt)));
+            return std::unexpected{ MySQLError{ ErrorCode::FetchResultFailed,
+                std::format("Failed to stmt fetch result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+                mysql_stmt_errno(stmt) } };
         }
         results.push_back(createEntityFromBinds(binds.get(), fields, lengths.get(),
             isNull.get(), columnCount));
@@ -376,19 +386,13 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::quer
 
 template<typename Entity, typename ID_TYPE>
 template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
-inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::queryFieldsByCondition(
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::FieldMapRows> 
+    BaseMapper<Entity, ID_TYPE>::queryFieldsByCondition(
     const std::unique_ptr<IQueryCondition>& condition, 
     const std::vector<std::string>& fieldNames) const
 {
-    if (!condition) {
-        LOGGER_WARN("Condition is null in " __FUNCTION__ "");
-        return {};
-    }
-    
-    if (fieldNames.empty()) {
-        LOGGER_WARN("Field names is empty in " __FUNCTION__ "");
-        return {};
-    }
+    if (!condition) return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
+    if (fieldNames.empty()) return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Cannot query without fields" } };
     
     // 构建查询语句
     std::string query = utils::string::concat(
@@ -405,14 +409,26 @@ inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::qu
         return this->_query_fields_impl(query);
     }
 
-    StmtPtr stmtPtr = this->prepareStatement(query);
-    if (!stmtPtr) throw std::runtime_error("Failed to prepare statement in " __FUNCTION__ "");
-    this->bindConditionValues(stmtPtr, condition);
-    this->executeQuery(stmtPtr);
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
+    }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    auto bindResult = this->bindConditionValues(stmtPtr, condition);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
 
     MYSQL_STMT* stmt = stmtPtr.get();
     ResPtr resPtr(mysql_stmt_result_metadata(stmt));
-    if (!resPtr)  throw std::runtime_error("No metadata available for fetchFieldsByCondition query");
+    if (!resPtr) {
+        return std::unexpected{ MySQLError{ ErrorCode::NoMetadataAvailable, "No metadata available query" } };
+    }
     std::size_t columnCount = mysql_num_fields(resPtr.get());
     MYSQL_FIELD* fields = mysql_fetch_fields(resPtr.get());
 
@@ -426,14 +442,18 @@ inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::qu
     MYSQL_FOREACH_BIND_RESSET(fields, binds, lengths, isNull, buffers, columnCount)
 
     if (mysql_stmt_bind_result(stmt, binds.get())) {
-        throw std::runtime_error("Failed to bind result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::BindParameterFailed,
+            std::format("Failed to stmt bind result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
 
     if (mysql_stmt_store_result(stmt)) {
-        throw std::runtime_error("Failed to store result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::StoreResultFailed,
+            std::format("Failed to store result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
     my_ulonglong rowCount = mysql_stmt_num_rows(stmt);
-    if (rowCount == 0) return {};
+    if (rowCount == 0) return FieldMapRows{};
 
     FieldMapRows results;
     results.reserve(rowCount);
@@ -443,7 +463,9 @@ inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::qu
             break;
         }
         else if (fetch_result != 0 && fetch_result != MYSQL_DATA_TRUNCATED) {
-            throw std::runtime_error("Fetch failed: " + std::string(mysql_stmt_error(stmt)));
+            return std::unexpected{ MySQLError{ ErrorCode::FetchResultFailed,
+                std::format("Failed to stmt fetch result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+                mysql_stmt_errno(stmt) } };
         }
         FieldMap fieldMap;
         for (unsigned int i = 0; i < columnCount; ++i) {
@@ -521,7 +543,7 @@ inline auto BaseMapper<Entity, ID_TYPE>::getFieldMapValue(const FieldMap& fieldM
         return { std::any_cast<ValueType>(it->second), GetFieldMapResStatus::Success };
     }
     catch (const std::bad_any_cast&) {
-        LOGGER_ERROR("Type mismatch for key: " + fieldName);
+        // Type mismatch for key
         return { std::nullopt, GetFieldMapResStatus::BadCast };
     }
 }
@@ -536,12 +558,11 @@ inline ValueType BaseMapper<Entity, ID_TYPE>::getFieldMapValueOrDefault(const Fi
 }
 
 template<typename Entity, typename ID_TYPE>
-inline size_t BaseMapper<Entity, ID_TYPE>::countByCondition(
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::countByCondition(
     const std::unique_ptr<IQueryCondition>& condition) const
 {
     if (!condition) {
-        LOGGER_WARN("Condition is null in " __FUNCTION__ "");
-        return 0;
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
     }
     std::string query = utils::string::concat(
         "SELECT COUNT(*) FROM ", this->getTableName(),
@@ -553,10 +574,20 @@ inline size_t BaseMapper<Entity, ID_TYPE>::countByCondition(
         return this->_count_all_impl(query);
     }
 
-    StmtPtr stmtPtr = this->prepareStatement(query);
-    if (!stmtPtr) throw std::runtime_error("Failed to prepare statement in " __FUNCTION__ "");
-    this->bindConditionValues(stmtPtr, condition);
-    this->executeQuery(stmtPtr);
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
+    }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    auto bindResult = this->bindConditionValues(stmtPtr, condition);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
 
     // 获取结果集
     MYSQL_STMT* stmt = stmtPtr.get();
@@ -568,22 +599,26 @@ inline size_t BaseMapper<Entity, ID_TYPE>::countByCondition(
     bind.buffer_length = sizeof(count);
 
     if (mysql_stmt_bind_result(stmt, &bind)) {
-        throw std::runtime_error("Failed to bind result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::BindParameterFailed,
+            std::format("Failed to stmt bind result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
+
     if (mysql_stmt_fetch(stmt) != 0) {
-        throw std::runtime_error("Failed to fetch result in " __FUNCTION__ ": " + std::string(mysql_stmt_error(stmt)));
+        return std::unexpected{ MySQLError{ ErrorCode::FetchResultFailed,
+            std::format("Failed to stmt fetch result: {}, code: {}", mysql_stmt_error(stmt), mysql_stmt_errno(stmt)),
+            mysql_stmt_errno(stmt) } };
     }
 
     return count;
 }
 
 template<typename Entity, typename ID_TYPE>
-inline BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::deleteByCondition(
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::deleteByCondition(
     const std::unique_ptr<IQueryCondition>& condition) const
 {
     if (!condition) {
-        LOGGER_WARN("Condition is null in " __FUNCTION__ ", Cannot delete without condition");
-        return { DbOperatorStatus::InvalidParameters, 0 };
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
     }
     std::string query = utils::string::concat(
         "DELETE FROM ", this->getTableName(),
@@ -591,93 +626,87 @@ inline BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID
     );
     bool isNeedBind = true;
     MSYSQL_QUERY_CONDITION_JUDGMENT(isNeedBind);
-    try {
-        if (!isNeedBind) {
-            return this->_delete_all_impl(query);
-        }
-        StmtPtr stmtPtr = this->prepareStatement(query);
-        if (!stmtPtr) throw std::runtime_error("Failed to prepare statement in " __FUNCTION__ "");
-        this->bindConditionValues(stmtPtr, condition);
-        this->executeQuery(stmtPtr);
-
-        my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-
-        if (affectedRows == 0) {
-            return { DbOperatorStatus::DataNotExist, 0 };
-        }
-        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-            throw std::runtime_error("Statement execution failed");
-        }
-
-        return { DbOperatorStatus::Success, affectedRows };
+    
+    if (!isNeedBind) {
+        return this->_delete_all_impl(query);
     }
-    catch (const std::exception& e) {
-        LOGGER_ERROR(std::format("" __FUNCTION__ " error: {}", e.what()));
-        return { DbOperatorStatus::DatabaseError, 0 };
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
     }
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+    auto bindResult = this->bindConditionValues(stmtPtr, condition);
+    if (!bindResult) {
+        return std::unexpected(bindResult.error());
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
+    return mysql_stmt_affected_rows(stmtPtr.get());
 }
 
 template<typename Entity, typename ID_TYPE>
-inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::deleteAll(bool confirm) const
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::truncateTable(bool confirm) const
 {
     if (!confirm) {
-        LOGGER_WARN("WARNING: This will permanently delete ALL DATA! You should confirm (true) the operation.");
-        return { DbOperatorStatus::InvalidParameters, 0 };
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters,
+            "WARNING: This will permanently truncate ALL DATA! You should confirm (true) the operation."
+            } };
     }
     return _pool->execute_with_connection(
-        [this](MYSQL* mysql) -> StatusWithAffectedRows {
+        [this](MYSQL* mysql) -> MySQLResult<my_ulonglong> {
             if (mysql_query(mysql, utils::string::concat("TRUNCATE TABLE ", this->getTableName()).c_str())) {
-                throw std::runtime_error("Delete all failed: " + std::string(mysql_error(mysql))
-                    + ". Table: " + this->getTableName());
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Truncate all failed: ", mysql_error(mysql),
+                        ". Table: ", this->getTableName()),
+                    mysql_errno(mysql)} };
             }
-            const my_ulonglong affectedRows = mysql_affected_rows(mysql);
-            if (affectedRows == 0) {
-                return { DbOperatorStatus::DataNotExist, 0 };
-            }
-            else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-                throw std::runtime_error("Delete all failed: " + std::string(mysql_error(mysql)));
-            }
-
-            return { DbOperatorStatus::Success, affectedRows };
+            return mysql_affected_rows(mysql);
         }
     );
 }
 
 template<typename Entity, typename ID_TYPE>
-inline bool BaseMapper<Entity, ID_TYPE>::createTable() 
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::createTable()
 {
     return _pool->execute_with_connection(
-        [this](MYSQL* mysql) -> std::size_t {
+        [this](MYSQL* mysql) -> MySQLVoidResult {
             if (mysql_query(mysql, createTableQuery().c_str())) {
-                throw std::runtime_error("Query failed: " + std::string(mysql_error(mysql)));
-                return false;
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Create table failed: ", mysql_error(mysql),
+                        ". Table: ", this->getTableName()),
+                    mysql_errno(mysql)} };
             }
-            return true;
+            return {};
         }
     );
 }
 
 template<typename Entity, typename ID_TYPE>
-inline bool BaseMapper<Entity, ID_TYPE>::dropTable(bool confirm)
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::dropTable(bool confirm)
 {
     if (!confirm) {
-        LOGGER_WARN("WARNING: This will permanently delete TABLE and ALL DATA! You should confirm (true) the operation.");
-        return false;
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters,
+            "WARNING: This will permanently delete TABLE and ALL DATA! You should confirm (true) the operation."
+            } };
     }
     return _pool->execute_with_connection(
-        [this](MYSQL* mysql) -> std::size_t {
+        [this](MYSQL* mysql) -> MySQLVoidResult {
             if (mysql_query(mysql, utils::string::concat("DROP TABLE IF EXISTS ", this->getTableName()).c_str())) {
-                throw std::runtime_error("Query failed: " + std::string(mysql_error(mysql)));
-                return false;
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Drop table failed: ", mysql_error(mysql),
+                        ". Table: ", this->getTableName()),
+                    mysql_errno(mysql)} };
             }
-            return true;
+            return {};
         }
     );
 }
 
 template<typename Entity, typename ID_TYPE>
 template<typename... Args>
-inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::updateFieldsByCondition(
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::updateFieldsByCondition(
     const std::unique_ptr<IQueryCondition>& condition,
     const std::vector<std::string>& fieldNames,
     Args&&... args) const
@@ -685,12 +714,11 @@ inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, I
     static_assert((... && is_supported_param_v<Args>),
         "Unsupported parameter type. Use BindableParam or ExpressionParam");
 
-    if (!condition || fieldNames.empty()) {
-        LOGGER_WARN("Condition/Update fields is null in " __FUNCTION__ ", Cannot update without condition/fields");
-        return { DbOperatorStatus::InvalidParameters, 0 };
-    }
+    if (!condition) return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
+    if (fieldNames.empty()) return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Cannot query without fields" } };
+
     if (sizeof...(args) != fieldNames.size()) {
-        throw std::runtime_error("Number of field names must match number of values");
+        return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Number of field names must match number of values" } };
     }
     auto [setClauses, bindTuple] = this->buildSetClauseAndBindTuple(
         fieldNames,
@@ -699,94 +727,88 @@ inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, I
     );
     bool isNeedBind = true;
     MSYSQL_QUERY_CONDITION_JUDGMENT(isNeedBind);
-    try {
-        std::string query = utils::string::concat(
-            "UPDATE ", this->getTableName(),
-            " SET ", utils::string::join_range(", ", setClauses),
-            " WHERE ", condition->buildConditionClause());
+    
+    std::string query = utils::string::concat(
+        "UPDATE ", this->getTableName(),
+        " SET ", utils::string::join_range(", ", setClauses),
+        " WHERE ", condition->buildConditionClause());
 
-        StmtPtr stmtPtr = this->prepareStatement(query);
-        if (!stmtPtr) throw std::runtime_error("Failed to prepare statement for " __FUNCTION__ "");
-        
-        // 计算总参数数量：set需要绑定参数 + where条件参数
-        const size_t setBindCount = std::tuple_size_v<decltype(bindTuple)>;
-        const size_t totalParamCount = setBindCount + (isNeedBind ? condition->getParamCount() : 0);
-        std::vector<MYSQL_BIND> binds(totalParamCount);
-        std::memset(binds.data(), 0, sizeof(MYSQL_BIND) * totalParamCount);
-
-        // 首先绑定set字段值参数，从0开始
-        size_t startIndex = 0;
-        std::apply([&](auto&&... bindArgs) {
-            this->bindValues(stmtPtr, binds.data(), startIndex, std::forward<decltype(bindArgs)>(bindArgs)...);
-            }, bindTuple);
-
-        // 然后绑定where条件参数，从条件参数数量的位置开始
-        if (isNeedBind) this->bindConditionValues(stmtPtr, condition, binds.data(), startIndex);
-
-        // 一次性绑定所有参数
-        MYSQL_STMT* stmt = stmtPtr;
-        if (mysql_stmt_bind_param(stmt, binds.data())) {
-            throw std::runtime_error("Bind param failed: " + std::string(mysql_stmt_error(stmt)));
-        }
-        
-        this->executeQuery(stmtPtr);
-
-        my_ulonglong affectedRows = mysql_stmt_affected_rows(stmtPtr);
-        if (affectedRows == 0) {
-            return { DbOperatorStatus::DataNotExist, 0 };
-        }
-        else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-            throw std::runtime_error("Statement execution failed");
-        }
-
-        return { DbOperatorStatus::Success, affectedRows };
+    auto stmtPtrResult = this->prepareStatement(query);
+    if (!stmtPtrResult) {
+        return std::unexpected(stmtPtrResult.error());
     }
-    catch (const std::exception& e) {
-        LOGGER_ERROR(std::format("updateFieldsByCondition error: {}", e.what()));
-        return { DbOperatorStatus::DatabaseError, 0 };
+    StmtPtr stmtPtr = std::move(stmtPtrResult.value());
+
+    // 计算总参数数量：set需要绑定参数 + where条件参数
+    const size_t setBindCount = std::tuple_size_v<decltype(bindTuple)>;
+    const size_t totalParamCount = setBindCount + (isNeedBind ? condition->getParamCount() : 0);
+    std::vector<MYSQL_BIND> binds(totalParamCount);
+    std::memset(binds.data(), 0, sizeof(MYSQL_BIND) * totalParamCount);
+
+    // 首先绑定set字段值参数，从0开始
+    size_t startIndex = 0;
+    std::apply([&](auto&&... bindArgs) {
+        this->bindValues(stmtPtr, binds.data(), startIndex, std::forward<decltype(bindArgs)>(bindArgs)...);
+        }, bindTuple);
+
+    // 然后绑定where条件参数，从条件参数数量的位置开始
+    if (isNeedBind) {
+        auto bindResult = this->bindConditionValues(stmtPtr, condition, binds.data(), startIndex);
+        if (!bindResult) {
+            return std::unexpected(bindResult.error());
+        }
     }
+
+    // 一次性绑定所有参数
+    MYSQL_STMT* stmt = stmtPtr;
+    if (mysql_stmt_bind_param(stmt, binds.data())) {
+        return std::unexpected{ MySQLError{ErrorCode::BindParameterFailed,
+            utils::string::concat("Bind param failed: ", mysql_stmt_error(stmt)),
+            mysql_stmt_errno(stmt)} };
+    }
+    auto queryResult = this->executeQuery(stmtPtr);
+    if (!queryResult) {
+        return std::unexpected(queryResult.error());
+    }
+    return mysql_stmt_affected_rows(stmtPtr.get());
 }
 
 template<typename Entity, typename ID_TYPE>
-StmtPtr BaseMapper<Entity, ID_TYPE>::prepareStatement(const std::string& query) const
+MySQLResult<StmtPtr> BaseMapper<Entity, ID_TYPE>::prepareStatement(const std::string& query) const
 {
     return _pool->execute_with_connection(
-        [&](MYSQL* mysql) -> StmtPtr {
+        [&](MYSQL* mysql) -> MySQLResult<StmtPtr> {
             MYSQL_STMT* stmt = mysql_stmt_init(mysql);
-            if (!stmt) {
-                throw std::runtime_error("Statement init failed");
-            }
-
-            StmtPtr stmtPtr(stmt);
-
             if (mysql_stmt_prepare(stmt, query.c_str(), static_cast<unsigned long>(query.length()))) {
-                std::string error = mysql_error(mysql);
-                throw std::runtime_error("Prepare failed: " + error);
+                return std::unexpected{ MySQLError{ ErrorCode::PrepareStatementFailed,
+                    std::format("Prepare failed: {}", mysql_stmt_error(stmt)),
+                    mysql_stmt_errno(stmt)} };
             }
-
-            return stmtPtr;
+            return StmtPtr{ stmt };
         }
     );
 }
 
 template<typename Entity, typename ID_TYPE>
-inline void BaseMapper<Entity, ID_TYPE>::executeQuery(StmtPtr& stmtPtr) const
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::executeQuery(StmtPtr& stmtPtr) const
 {
     MYSQL_STMT* stmt = stmtPtr.get();
-    if (int code = mysql_stmt_execute(stmt)) {
-        std::string error = mysql_stmt_error(stmt);
-        throw std::runtime_error("Execute failed: " + error);
+    if (mysql_stmt_execute(stmt)) {
+        return std::unexpected{ MySQLError{ErrorCode::ExecuteStatementFailed,
+            std::format("Execute failed: {}", mysql_stmt_error(stmt)), 
+            mysql_stmt_errno(stmt)} };
     }
+    return {};
 }
 
 template<typename Entity, typename ID_TYPE>
 template<typename... Args>
-inline void BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, Args&&... args) const
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, Args&&... args) const
 {
-    MYSQL_STMT* stmt = stmtPtr.get();
     constexpr size_t count = sizeof...(Args);
-    if (count == 0) return;
+    if (count == 0) return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "No parameters to bind"} };
 
+    MYSQL_STMT* stmt = stmtPtr.get();
     std::vector<MYSQL_BIND> binds(count);
     std::memset(binds.data(), 0, sizeof(MYSQL_BIND) * count);  // 安全初始化
 
@@ -794,20 +816,22 @@ inline void BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, Args&&... 
     bindParams(binds.data(), std::forward<Args>(args)...);
 
     if (mysql_stmt_bind_param(stmt, binds.data())) {
-        std::string error = mysql_stmt_error(stmt);
-        throw std::runtime_error("Bind param failed: " + error);
+        return std::unexpected{ MySQLError{ErrorCode::BindParameterFailed,
+            utils::string::concat("Bind param failed: ", mysql_stmt_error(stmt)),
+            mysql_stmt_errno(stmt)} };
     }
+    return {};
     //bindValues(stmtPtr, nullptr, 0, std::forward<Args>(args)...);
 }
 
 template<typename Entity, typename ID_TYPE>
 template<typename... Args>
-inline void BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, MYSQL_BIND* existingBinds, size_t& startIndex, Args&&... args) const
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, MYSQL_BIND* existingBinds, size_t& startIndex, Args&&... args) const
 {
-    MYSQL_STMT* stmt = stmtPtr;
     constexpr size_t count = sizeof...(Args);
-    if (count == 0) return;
+    if (count == 0) return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "No parameters to bind"} };
 
+    MYSQL_STMT* stmt = stmtPtr;
     std::vector<MYSQL_BIND> localBinds;
     MYSQL_BIND* bindsToUse = existingBinds;
     
@@ -824,10 +848,12 @@ inline void BaseMapper<Entity, ID_TYPE>::bindValues(StmtPtr& stmtPtr, MYSQL_BIND
     // 只有在使用本地binds时才需要调用mysql_stmt_bind_param
     if (!existingBinds) {
         if (mysql_stmt_bind_param(stmt, bindsToUse)) {
-            std::string error = mysql_stmt_error(stmt);
-            throw std::runtime_error("Bind param failed: " + error);
+            return std::unexpected{ MySQLError{ErrorCode::BindParameterFailed,
+                utils::string::concat("Bind param failed: ", mysql_stmt_error(stmt)),
+                mysql_stmt_errno(stmt)} };
         }
     }
+    return {};
 }
 
 template<typename Entity, typename ID_TYPE>
@@ -876,18 +902,20 @@ inline auto BaseMapper<Entity, ID_TYPE>::buildSetClauseAndBindTuple(const std::v
 }
 
 template<typename Entity, typename ID_TYPE>
-inline void BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition) const
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition) const
 {
     size_t startIndex = 0;
-    bindConditionValues(stmtPtr, condition, nullptr, startIndex);
+    return bindConditionValues(stmtPtr, condition, nullptr, startIndex);
 }
 
 template<typename Entity, typename ID_TYPE>
-inline void BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition, MYSQL_BIND* existingBinds, size_t& startIndex) const
+inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr& stmtPtr, const std::unique_ptr<IQueryCondition>& condition, MYSQL_BIND* existingBinds, size_t& startIndex) const
 {
     MYSQL_STMT* stmt = stmtPtr.get();
     size_t totalParams = condition->getParamCount();
-    if (totalParams == 0) return;
+    if (totalParams == 0) {
+        return std::unexpected{ MySQLError{ErrorCode::InvalidParameters, "No parameters to bind"} };
+    }
 
     std::vector<MYSQL_BIND> localBinds;
     MYSQL_BIND* bindsToUse = existingBinds;
@@ -900,10 +928,12 @@ inline void BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr& stmtPtr, c
 
     if (!existingBinds) {
         if (mysql_stmt_bind_param(stmt, bindsToUse)) {
-            std::string error = mysql_stmt_error(stmt);
-            throw std::runtime_error("Bind param failed: " + error);
+            return std::unexpected{ MySQLError{ErrorCode::BindParameterFailed,
+                utils::string::concat("Bind param failed: ", mysql_stmt_error(stmt)),
+                mysql_stmt_errno(stmt)} };
         }
     }
+    return {};
 }
 
 template<typename Entity, typename ID_TYPE>
@@ -934,16 +964,18 @@ inline constexpr auto BaseMapper<Entity, ID_TYPE>::buildLimitClause()
 }
 
 template<typename Entity, typename ID_TYPE>
-inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::_find_all_impl(const std::string& query) const
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows> BaseMapper<Entity, ID_TYPE>::_find_all_impl(const std::string& query) const
 {
     return _pool->execute_with_connection(
-        [this, &query](MYSQL* mysql) -> EntityRows {
+        [this, &query](MYSQL* mysql) -> MySQLResult<EntityRows> {
             if (mysql_query(mysql, query.c_str())) {
-                throw std::runtime_error("Query failed: " + std::string(mysql_error(mysql)));
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Query failed: ", mysql_error(mysql)),
+                    mysql_errno(mysql)} };
             }
             ResPtr resPtr(mysql_store_result(mysql));
             if (!resPtr) {
-                throw std::runtime_error("Store result failed");
+                return std::unexpected{ MySQLError{ ErrorCode::StoreResultFailed, "Store result failed" } };
             }
 
             EntityRows results;
@@ -953,12 +985,7 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::_fin
             const int numFields = mysql_num_fields(resPtr.get());
 
             while ((row = mysql_fetch_row(resPtr.get()))) {
-                lengths = mysql_fetch_lengths(resPtr.get());
-                if (!lengths) {
-                    throw std::runtime_error("Lengths fetch error");
-                }
-
-                results.push_back(this->createEntityFromRow(row, fields, lengths, numFields));
+                results.push_back(this->createEntityFromRow(row, fields, mysql_fetch_lengths(resPtr.get()), numFields));
             }
 
             return results;
@@ -967,16 +994,19 @@ inline BaseMapper<Entity, ID_TYPE>::EntityRows BaseMapper<Entity, ID_TYPE>::_fin
 }
 
 template<typename Entity, typename ID_TYPE>
-inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::_query_fields_impl(const std::string& query) const
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::FieldMapRows>
+    BaseMapper<Entity, ID_TYPE>::_query_fields_impl(const std::string& query) const
 {
     return _pool->execute_with_connection(
-        [this, &query](MYSQL* mysql) -> FieldMapRows {
+        [this, &query](MYSQL* mysql) -> MySQLResult<FieldMapRows> {
             if (mysql_query(mysql, query.c_str())) {
-                throw std::runtime_error("Query failed: " + std::string(mysql_error(mysql)));
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Query failed: ", mysql_error(mysql)),
+                    mysql_errno(mysql)} };
             }
             ResPtr resPtr(mysql_store_result(mysql));
             if (!resPtr) {
-                throw std::runtime_error("Store result failed");
+                return std::unexpected{ MySQLError{ ErrorCode::StoreResultFailed, "Store result failed" } };
             }
 
             MYSQL_FIELD* fields = mysql_fetch_fields(resPtr.get());
@@ -988,9 +1018,6 @@ inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::_q
 
             while ((row = mysql_fetch_row(resPtr.get()))) {
                 lengths = mysql_fetch_lengths(resPtr.get());
-                if (!lengths) {
-                    throw std::runtime_error("Failed to get row lengths");
-                }
                 FieldMap fieldMap;
                 for (int i = 0; i < numFields; ++i) {
                     const bool isNull = _parser.isFieldNull(row, i);
@@ -1055,46 +1082,36 @@ inline BaseMapper<Entity, ID_TYPE>::FieldMapRows BaseMapper<Entity, ID_TYPE>::_q
 }
 
 template<typename Entity, typename ID_TYPE>
-inline std::size_t BaseMapper<Entity, ID_TYPE>::_count_all_impl(const std::string& query) const
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::_count_all_impl(const std::string& query) const
 {
     return _pool->execute_with_connection(
-        [this, &query](MYSQL* mysql) -> std::size_t {
+        [this, &query](MYSQL* mysql) -> MySQLResult<my_ulonglong> {
             if (mysql_query(mysql, query.c_str())) {
-                throw std::runtime_error("Query failed: " + std::string(mysql_error(mysql)));
+                return std::unexpected{ MySQLError{ErrorCode::QueryFailed,
+                    utils::string::concat("Query failed: ", mysql_error(mysql)),
+                    mysql_errno(mysql)} };
             }
             ResPtr resPtr(mysql_store_result(mysql));
             if (!resPtr) {
-                throw std::runtime_error("Store result failed");
+                return std::unexpected{ MySQLError{ ErrorCode::StoreResultFailed, "Store result failed" } };
             }
             MYSQL_ROW row = mysql_fetch_row(resPtr.get());
-            if (!row || !row[0]) {
-                return 0;
-            }
-
             return static_cast<size_t>(std::stoull(row[0]));
         }
     );
 }
 
 template<typename Entity, typename ID_TYPE>
-inline  BaseMapper<Entity, ID_TYPE>::StatusWithAffectedRows BaseMapper<Entity, ID_TYPE>::_delete_all_impl(const std::string& query) const
+inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::_delete_all_impl(const std::string& query) const
 {
     return _pool->execute_with_connection(
-        [&query, this](MYSQL* mysql) -> StatusWithAffectedRows {
+        [&query, this](MYSQL* mysql) -> MySQLResult<my_ulonglong> {
             if (mysql_query(mysql, query.c_str())) {
-                throw std::runtime_error("Delete all failed: " + std::string(mysql_error(mysql))
-                    + ". Table: " + this->getTableName());
+                return std::unexpected{ MySQLError{ ErrorCode::QueryFailed,
+                    utils::string::concat("Delete all failed: ", mysql_error(mysql), ". Table: ", this->getTableName()),
+                    mysql_errno(mysql) } };
             }
-
-            const my_ulonglong affectedRows = mysql_affected_rows(mysql);
-            if (affectedRows == 0) {
-                return { DbOperatorStatus::DataNotExist, 0 };
-            }
-            else if (affectedRows == static_cast<my_ulonglong>(-1)) {
-                throw std::runtime_error("Delete all failed: " + std::string(mysql_error(mysql)));
-            }
-
-            return { DbOperatorStatus::Success, affectedRows };
+            return mysql_affected_rows(mysql);
             }
         );
 }
