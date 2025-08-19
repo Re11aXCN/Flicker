@@ -732,6 +732,7 @@ void FKFormPannel::_onPasswordEditingFinished()
                 if (isMatch) {
                     _pValidationFlags |= Enums::InputValidationFlag::PasswordValid;
                     _pValidationFlags |= Enums::InputValidationFlag::ConfirmPasswordValid;
+                    _pConfirmPasswordLineEdit->setStyleSheet(_pNormalStyleSheet);
                 }
                 else {
                     _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::PasswordValid };
@@ -766,6 +767,7 @@ void FKFormPannel::_onConfirmPasswordEditingFinished()
             if (isMatch) {
                 _pValidationFlags |= Enums::InputValidationFlag::PasswordValid;
                 _pValidationFlags |= Enums::InputValidationFlag::ConfirmPasswordValid;
+                _pPasswordLineEdit->setStyleSheet(_pNormalStyleSheet);
             } 
             else {
                 _pValidationFlags &= ~Enums::InputValidationFlags{ Enums::InputValidationFlag::ConfirmPasswordValid };

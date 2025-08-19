@@ -14,19 +14,23 @@ constexpr std::string FKUserMapper::getTableName() const {
 
 constexpr std::string FKUserMapper::createTableQuery() const
 {
-    return "CREATE TABLE IF NOT EXISTS "
-        "users ( "
-        "id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
-        "uuid CHAR(36) NOT NULL UNIQUE DEFAULT (UUID()), "
-        "username VARCHAR(30) NOT NULL UNIQUE, "
-        "email VARCHAR(320) NOT NULL UNIQUE, "
-        "password CHAR(60) NOT NULL, "
-        "create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3), "
-        "update_time TIMESTAMP(3) DEFAULT NULL, "
-        "INDEX idx_email (email), "
-        "INDEX idx_username (username) "
-        ") "
-        "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+    // mysql 会给主键和unique自动创建索引，主键是聚集索引，unique是二级索引
+    // 查询 show index from users
+    // 索引必须使用NOT NULL事先定义
+    // 极小概率会出现hash冲突，但是还是不使用 UNIQUE INDEX
+    return R"(
+    CREATE TABLE IF NOT EXISTS users (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        uuid CHAR(36) NOT NULL UNIQUE DEFAULT (UUID()),
+        username VARCHAR(30) NOT NULL UNIQUE,
+        email VARCHAR(320) NOT NULL UNIQUE,
+        password CHAR(60) NOT NULL,
+        create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
+        update_time TIMESTAMP(3) DEFAULT NULL,
+        INDEX idx_users_email_password (email, password), -- 覆盖索引
+        INDEX idx_users_username_password (username, password)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    )";
 }
 
 constexpr std::string FKUserMapper::findByIdQuery() const {
@@ -68,6 +72,7 @@ constexpr std::string FKUserMapper::deleteByIdQuery() const {
 }
 
 constexpr std::string FKUserMapper::updatePasswordByEmailQuery() const {
+    // 更新操作，条件最好是建立索引，否则行锁变为表锁，并发性能下降
     return "UPDATE " + getTableName() + 
            " SET password = ?, update_time = ? WHERE email = ?";
 }
@@ -78,25 +83,25 @@ constexpr std::string FKUserMapper::deleteByEmailQuery() const {
 
 constexpr std::string FKUserMapper::_isUsernameExistsQuery() const
 {
-    return "SELECT 1 FROM " + getTableName() + " WHERE username = ? LIMIT 1";
+    return "SELECT id FROM " + getTableName() + " WHERE username = ?";
 }
 
 
 constexpr std::string FKUserMapper::_isEmailExistsQuery() const
 {
-    return "SELECT 1 FROM " + getTableName() + " WHERE email = ? LIMIT 1";
+    return "SELECT id FROM " + getTableName() + " WHERE email = ?";
 }
 
 
 constexpr std::string FKUserMapper::_findPasswordByEmailQuery()
 {
-    return "SELECT password FROM " + getTableName() + " WHERE email = ?";
+    return "SELECT password FROM " + getTableName() + " USE INDEX(idx_users_email_password) WHERE email = ?";
 }
 
 
 constexpr std::string FKUserMapper::_findPasswordByUsernameQuery()
 {
-    return "SELECT password FROM " + getTableName() + " WHERE username = ?";
+    return "SELECT password FROM " + getTableName() + " USE INDEX(idx_users_username_password) WHERE username = ?";
 }
 
 bool FKUserMapper::bindInsertParams(StmtPtr& stmtPtr, const FKUserEntity& entity) const {

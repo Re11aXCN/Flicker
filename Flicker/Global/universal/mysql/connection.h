@@ -45,9 +45,6 @@ namespace universal::mysql {
 
         ~ConnectionOptions() = default;*/
 
-        // 连接类型
-        ConnectionType type = ConnectionType::TCP;
-
         // 主机地址
         std::string host{ "127.0.0.1" };
 
@@ -96,6 +93,10 @@ namespace universal::mysql {
 
         // 端口号
         uint16_t port{ 3306 };
+
+        // 连接类型
+        ConnectionType type = ConnectionType::TCP;
+
 
         // 获取服务器信息字符串，用于日志和调试
         std::string server_info() const {

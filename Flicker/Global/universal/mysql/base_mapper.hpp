@@ -101,8 +101,6 @@ public:
     std::optional<ValueType> getFieldValue(const std::string& fieldName) const;
 
     std::optional<Entity> findById(ID_TYPE id);
-    template <SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
-        Pagination pagination = Pagination{ 0, 0 } >
     MySQLResult<EntityRows> findAll();
     MySQLResult<my_ulonglong> insert(const Entity& entity);
     MySQLResult<my_ulonglong> deleteById(ID_TYPE id);
@@ -113,13 +111,11 @@ public:
     MySQLResult<my_ulonglong> updateFieldsById(ID_TYPE id, const std::vector<std::string>& fieldNames, Args&&... args);
 
     // 通用的查询实体方法，支持排序和分页
-    template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
-        Pagination pagination = Pagination{ 0, 0 },
-        typename... Args >
-    MySQLResult<EntityRows> queryEntities(std::string&& sql, Args&&... args) const;
+    template<typename... Args >
+    MySQLResult<EntityRows> queryEntities(const std::string& sql, Args&&... args) const;
 
     // 使用查询条件策略的实体查询方法
-    template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
+    template<bool Distinct = false, SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 } >
     MySQLResult<EntityRows> queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
 
@@ -129,13 +125,14 @@ public:
         const std::vector<std::string>& fieldNames,
         Args&&... args) const;
     // 使用查询条件策略的通用查询方法
-    template<SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
+    template<bool Distinct = false, SortOrder Order = SortOrder::Ascending, utils::string::fixed_string FieldName = "id",
         Pagination pagination = Pagination{ 0, 0 }>
     MySQLResult<FieldMapRows> queryFieldsByCondition(
         const std::unique_ptr<IQueryCondition>& condition,
         const std::vector<std::string>& fieldNames) const;
 
     // 使用查询条件策略的计数方法
+    template<bool Distinct = false>
     MySQLResult<my_ulonglong> countByCondition(const std::unique_ptr<IQueryCondition>& condition) const;
 
     // 使用查询条件策略的删除方法
@@ -190,6 +187,8 @@ protected:
         std::index_sequence<Is...>,
         Args&&... args) const;
 
+    template <bool Distinct>
+    static constexpr auto buildDistinctClause();
     template <SortOrder Order, utils::string::fixed_string FieldName>
     static constexpr auto buildOrderClause();
     template <Pagination Pagination>

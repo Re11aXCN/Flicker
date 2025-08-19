@@ -31,15 +31,13 @@ FKLogicSystem::FKLogicSystem()
         .read_default_group = "mysqld"
     };
     _pFlickerDbPool = mysql::ConnectionPoolManager::getInstance()->get_pool(std::move(options));
-    //{
-    //    try {
-    //        FKUserMapper mapper(_pFlickerDbPool.get());
-    //        mapper.createTable();
-    //    }
-    //    catch (...) {
-    //        LOGGER_ERROR("创建 user 表失败!");
-    //    }
-    //}
+    {
+        FKUserMapper mapper(_pFlickerDbPool.get());
+        auto createRes = mapper.createTable();
+        if (!createRes) {
+            throw std::runtime_error(createRes.error().message);
+        }
+    }
 
     auto getVerifyCodeFunc = [this](std::shared_ptr<FKHttpConnection> connection) {
         // 读取请求体

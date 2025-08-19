@@ -84,7 +84,9 @@ private:
     im::service::ChatServerInfo _selectBestChatServer();
     void _updateServerLoad(const std::string& server_id, int32_t load);
     void _decrementServerLoad(const std::string& server_id);
-    
+
+    void _cleanupTask();
+private:
     // 聊天服务器列表管理
     std::vector<std::shared_ptr<ChatServerStatus>> _pChatServers;
     mutable std::shared_mutex _pServersMutex; // 使用读写锁提高并发性能
@@ -95,7 +97,6 @@ private:
     // 清理任务相关
     std::unique_ptr<std::thread> _pCleanupThread;
     std::atomic<bool> _pCleanupRunning{false};
-    void _cleanupTask();
 };
 
 #endif // FK_STATUS_SERVER_H_

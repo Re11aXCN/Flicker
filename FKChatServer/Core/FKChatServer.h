@@ -86,7 +86,6 @@ private:
 
     // 配置
     static constexpr size_t MAX_CONNECTIONS = 10000;
-    static constexpr std::chrono::seconds HEARTBEAT_INTERVAL{ 30 };
 };
 
 #endif // FK_CHAT_SERVER_H_

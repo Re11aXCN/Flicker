@@ -133,14 +133,10 @@ inline std::optional<Entity> BaseMapper<Entity, ID_TYPE>::findById(ID_TYPE id)
 }
 
 template<typename Entity, typename ID_TYPE>
-template <SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
 inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
     BaseMapper<Entity, ID_TYPE>::findAll()
 {
-    std::string query = utils::string::concat(findAllQuery(),
-        this->buildOrderClause<Order, FieldName>(),
-        this->buildLimitClause<Pagination>());
-    return this->_find_all_impl(query);
+    return this->_find_all_impl(findAllQuery());
 }
 
 template<typename Entity, typename ID_TYPE>
@@ -228,15 +224,11 @@ inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::updateFieldsById(
 }
 
 template<typename Entity, typename ID_TYPE>
-template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination,
-    typename... Args >
-inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows> BaseMapper<Entity, ID_TYPE>::queryEntities(std::string&& sql, Args && ...args) const
+template<typename... Args >
+inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows> BaseMapper<Entity, ID_TYPE>::queryEntities(const std::string& sql, Args && ...args) const
 {
     // 构建sql初始化
-    std::string query = utils::string::concat(std::move(sql),
-        this->buildOrderClause<Order, FieldName>(),
-        this->buildLimitClause<Pagination>());
-    auto stmtPtrResult = this->prepareStatement(query);
+    auto stmtPtrResult = this->prepareStatement(sql);
     if (!stmtPtrResult) {
         return std::unexpected(stmtPtrResult.error());
     }
@@ -301,7 +293,7 @@ inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows> BaseMapper<
 }
 
 template<typename Entity, typename ID_TYPE>
-template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
+template<bool Distinct, SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
 inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
     BaseMapper<Entity, ID_TYPE>::queryEntitiesByCondition(const std::unique_ptr<IQueryCondition>& condition) const
 {
@@ -309,7 +301,8 @@ inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
         return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
     }
     std::string query = utils::string::concat(
-        "SELECT * FROM ", this->getTableName(),
+        this->buildDistinctClause<Distinct>(),
+        "* FROM ", this->getTableName(),
         " WHERE ", condition->buildConditionClause(),
         this->buildOrderClause<Order, FieldName>(),
         this->buildLimitClause<Pagination>()
@@ -385,7 +378,7 @@ inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::EntityRows>
 }
 
 template<typename Entity, typename ID_TYPE>
-template<SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
+template<bool Distinct, SortOrder Order, utils::string::fixed_string FieldName, Pagination Pagination>
 inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::FieldMapRows> 
     BaseMapper<Entity, ID_TYPE>::queryFieldsByCondition(
     const std::unique_ptr<IQueryCondition>& condition, 
@@ -396,7 +389,8 @@ inline MySQLResult<typename BaseMapper<Entity, ID_TYPE>::FieldMapRows>
     
     // 构建查询语句
     std::string query = utils::string::concat(
-        "SELECT ", utils::string::join_range(", ", fieldNames),
+        this->buildDistinctClause<Distinct>(),
+        utils::string::join_range(", ", fieldNames),
         " FROM ", this->getTableName(),
         " WHERE ", condition->buildConditionClause(),
         this->buildOrderClause<Order, FieldName>(),
@@ -558,6 +552,7 @@ inline ValueType BaseMapper<Entity, ID_TYPE>::getFieldMapValueOrDefault(const Fi
 }
 
 template<typename Entity, typename ID_TYPE>
+template<bool Distinct>
 inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::countByCondition(
     const std::unique_ptr<IQueryCondition>& condition) const
 {
@@ -565,7 +560,8 @@ inline MySQLResult<my_ulonglong> BaseMapper<Entity, ID_TYPE>::countByCondition(
         return std::unexpected{ MySQLError{ ErrorCode::InvalidParameters, "Condition is null" } };
     }
     std::string query = utils::string::concat(
-        "SELECT COUNT(*) FROM ", this->getTableName(),
+        this->buildDistinctClause<Distinct>(),
+        "COUNT(*) FROM ", this->getTableName(),
         " WHERE ", condition->buildConditionClause()
     );
     bool isNeedBind = true;
@@ -934,6 +930,18 @@ inline MySQLVoidResult BaseMapper<Entity, ID_TYPE>::bindConditionValues(StmtPtr&
         }
     }
     return {};
+}
+
+template<typename Entity, typename ID_TYPE>
+template<bool Distinct>
+inline constexpr auto BaseMapper<Entity, ID_TYPE>::buildDistinctClause()
+{
+    if constexpr (Distinct) {
+        return "SELECT DISTINCT ";
+    }
+    else {
+        return "SELECT ";
+    }
 }
 
 template<typename Entity, typename ID_TYPE>
